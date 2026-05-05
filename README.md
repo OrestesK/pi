@@ -1,124 +1,124 @@
 # Pi Config v2
 
-Personal pi coding agent configuration for Orestes. Built May 2026.
+Personal pi coding agent configuration.
 
 ## Architecture
 
 ```
-pi-v2/
-├── AGENTS.md                  # Core agent behavior (~140 lines)
-├── APPEND_SYSTEM.md           # Environment-specific details (stack, system)
+pi/
+├── AGENTS.md                  # Core agent behavior
+├── APPEND_SYSTEM.md           # Machine- and workflow-specific details
 ├── settings.json              # Provider, model, packages, compaction
-├── models.json                # Custom model definitions (gpt-5.5)
-├── mcp.json                   # MCP servers (tree-sitter + context7 + nvim)
-├── permissions.json           # YOLO mode
-├── keybindings.json           # escape/ctrl+c/ctrl+d
+├── models.json                # Custom model definitions
+├── mcp.json                   # MCP servers
+├── permissions.json           # Permission mode
+├── keybindings.json           # Terminal keybindings
 ├── setup.sh                   # Symlinks config to ~/.pi/agent
 ├── worktree-setup.sh          # Git worktree isolation setup
 │
 ├── agents/                    # Subagent role definitions
-│   ├── scout.md               # Read-only recon (gpt-5.4-mini, fast)
-│   ├── worker.md              # Implementation (gpt-5.4)
-│   ├── reviewer.md            # Code review (gpt-5.4)
+│   ├── scout.md               # Read-only recon
+│   ├── worker.md              # Implementation
+│   ├── reviewer.md            # Code review
 │   └── general-purpose.md     # Default subagent override
 │
-├── skills/                    # On-demand skills (zero cost until triggered)
-│   ├── manager-workflow/      # 3-tier workflow: just-do-it / talk-first / write-it-down
-│   ├── commit/                # Git commit conventions (ok/ prefix, terse messages)
-│   ├── systematic-debugging/  # Observe → hypothesize → verify → fix
+├── skills/                    # On-demand workflows
+│   ├── manager-workflow/      # Tiered implementation workflow
+│   ├── commit/                # Commit-message guidance
+│   ├── systematic-debugging/  # Debugging workflow
 │   ├── frontend/              # React/TypeScript conventions
-│   ├── semantic-git/          # sem CLI for structural git analysis
-│   ├── github/                # gh CLI operations
+│   ├── semantic-git/          # Structural git analysis
+│   ├── github/                # GitHub CLI workflow
 │   ├── learn-codebase/        # First-session project orientation
-│   ├── iterate-pr/            # Automated PR fix-push-check loop
+│   ├── iterate-pr/            # PR iteration workflow
 │   ├── review/                # Code review standards
-│   ├── self-improve/          # End-of-session retrospective (from HazAT)
-│   └── session-reader/        # Parse session JSONL files (from HazAT)
+│   ├── self-improve/          # Config retrospective workflow
+│   └── session-reader/        # Session JSONL inspection
 │
 ├── extensions/
-│   ├── claude-ui/             # Custom Claude-style terminal UI (must be first in load order)
-│   ├── todos/                 # File-based todo management (from mitsuhiko via HazAT)
-│   ├── guardrails.json        # Blocks destructive commands and all git mutations
-│   ├── answer.ts              # /answer — Q&A TUI for answering agent questions one by one (from mitsuhiko)
-│   ├── files.ts               # /files /diff — fuzzy file browser with quick actions (from mitsuhiko)
-│   ├── continue.ts            # /continue — session handoff to fresh context (from Mansoor)
-│   └── compact-advisor.ts     # Warns at 150k tokens, suggests compaction (from Mansoor)
+│   ├── claude-ui/             # Custom terminal UI
+│   ├── todos/                 # File-based todo management
+│   ├── guardrails.json        # Blocks destructive commands and git mutations
+│   ├── answer.ts              # /answer question-answering TUI
+│   ├── files.ts               # /files and /diff file browser
+│   ├── continue.ts            # /continue session handoff
+│   └── compact-advisor.ts     # Context compaction prompt
 │
 ├── themes/
 │   └── gruvbox-custom.json    # Gruvbox dark theme
 │
 ├── mcp-servers/
-│   └── tree-sitter/           # Custom tree-sitter MCP (7 AST tools)
+│   └── tree-sitter/           # Local tree-sitter MCP server
 │
 └── .gitignore                 # Excludes auth, sessions, caches, logs, node_modules
 ```
 
 ## How It Works
 
-### Workflow (3 tiers)
+### Workflow tiers
 
-| Tier              | When                                  | What happens                                                          |
-| ----------------- | ------------------------------------- | --------------------------------------------------------------------- |
-| 1 — Just do it    | Single file, < 20 lines, clear intent | Agent makes the change directly                                       |
-| 2 — Talk first    | Multi-file or ambiguous               | Agent discusses approach, gets approval                               |
-| 3 — Write it down | Architectural, > 5 files              | Agent writes plan to .scratch/, marks assumptions, waits for approval |
+| Tier              | When                              | What happens                                                    |
+| ----------------- | --------------------------------- | --------------------------------------------------------------- |
+| 1 — Just do it    | Single-file, small, clear changes | Main agent edits directly                                       |
+| 2 — Talk first    | Multi-file or ambiguous changes   | Agent discusses approach before editing                         |
+| 3 — Write it down | Architectural or broad changes    | Agent writes a plan in `.scratch/plans/` and waits for approval |
 
-### Delegation (4 roles)
+### Agent roles
 
-| Role     | Model        | What it does                                                 |
-| -------- | ------------ | ------------------------------------------------------------ |
-| main     | gpt-5.5      | Plans, coordinates, talks with you. Does Tier 1 edits.       |
-| scout    | gpt-5.4-mini | Fast read-only recon. Writes to .scratch/research/.          |
-| worker   | gpt-5.4      | Implements from exact instructions. Runs checks before done. |
-| reviewer | gpt-5.4      | Reviews against plan. Writes to .scratch/reviews/.           |
+| Role     | Model        | Purpose                                               |
+| -------- | ------------ | ----------------------------------------------------- |
+| main     | gpt-5.5      | Planning, coordination, user interaction, small edits |
+| scout    | gpt-5.4-mini | Fast read-only reconnaissance                         |
+| worker   | gpt-5.4      | Implementation from specific instructions             |
+| reviewer | gpt-5.4      | Review against plan and coding standards              |
 
 ### Tool priority
 
-1. **tree-sitter** (symbol_definition, search_symbols, document_symbols, pattern_search) — always first for code navigation
-2. **context7** — for library/framework docs, never guess
-3. **Preferred CLIs** — uv, pnpm, difft, fd, bat, sd, ast-grep, shellcheck, gh, aws
-4. **Grep/Glob/Read** — when tree-sitter doesn't apply
+1. **Tree-sitter** for symbol-aware code navigation.
+2. **context7** for library and framework documentation.
+3. **Preferred CLIs** such as `uv`, `pnpm`, `difft`, `fd`, `bat`, `sd`, `ast-grep`, `shellcheck`, `gh`, and `aws`.
+4. **Grep/Glob/Read** when structural tools do not apply.
 
-### Git: read-only
+### Git policy
 
-Agent can only run: git log, git diff, git status, git blame, git show.
-All mutations (add, commit, push, checkout, etc.) are blocked by guardrails.
+The agent can inspect git state with `git log`, `git diff`, `git status`, `git blame`, and `git show`.
 
-### .scratch/ workspace
+Git mutations are intentionally blocked by guardrails. Staging, committing, pushing, rebasing, resetting, and branch operations are manual.
+
+### Scratch workspace
 
 ```
 .scratch/           (gitignored, per-project)
 ├── research/       scout findings
-├── plans/          change plans with [ASSUMPTION] annotations
+├── plans/          change plans with assumptions
 ├── reviews/        reviewer output
-└── sessions/       session state for continuation
+└── sessions/       continuation notes
 ```
 
-## Packages (11)
+## Packages
 
-| Package                      | What it does                                                |
-| ---------------------------- | ----------------------------------------------------------- |
-| extensions/claude-ui (local) | Claude-style terminal UI rendering                          |
-| pi-subagents                 | Scout/worker/reviewer delegation                            |
-| pi-mcp-adapter               | Lazy MCP proxy for context7                                 |
-| pi-lens                      | AST-enhanced reads                                          |
-| pi-web-access                | Web search + content extraction                             |
-| pi-memory-md                 | Cross-session memory (git-backed markdown)                  |
-| @aliou/pi-guardrails         | Security baseline (npm)                                     |
-| @aliou/pi-toolchain          | Enforces preferred CLIs (uv, pnpm, difft, fd, etc.)         |
-| pi-rewind                    | Per-turn git checkpoints                                    |
-| pi-ask-user                  | Structured question UI — agent presents options, user picks |
-| context-mode                 | Keeps raw data out of context (98% reduction)               |
+| Package                | Purpose                                          |
+| ---------------------- | ------------------------------------------------ |
+| `extensions/claude-ui` | Local terminal UI customization                  |
+| `pi-subagents`         | Scout/worker/reviewer delegation                 |
+| `pi-mcp-adapter`       | Lazy MCP loading                                 |
+| `pi-lens`              | AST-aware code tooling                           |
+| `pi-web-access`        | Web search and content extraction                |
+| `pi-memory-md`         | Git-backed markdown memory                       |
+| `@aliou/pi-guardrails` | Command and path safety policies                 |
+| `@aliou/pi-toolchain`  | Preferred CLI enforcement                        |
+| `pi-rewind`            | Per-turn recovery checkpoints                    |
+| `pi-ask-user`          | Structured user decision UI                      |
+| `context-mode`         | Large-output processing outside the main context |
 
-## MCP Servers (3)
+## MCP Servers
 
-| Server      | Mode                          | Purpose                                                      |
-| ----------- | ----------------------------- | ------------------------------------------------------------ |
-| tree-sitter | Direct tools (always visible) | Code intelligence — symbols, definitions, patterns           |
-| context7    | Via adapter (on demand)       | Library/framework documentation lookup                       |
-| nvim        | Lazy (on demand)              | Neovim state — open buffers, cursor, selections, diagnostics |
-
-Everything else (GitHub, AWS, etc.) uses CLI tools via bash — zero token cost.
+| Server       | Mode                     | Purpose                                             |
+| ------------ | ------------------------ | --------------------------------------------------- |
+| tree-sitter  | Direct tools, keep-alive | Code symbols, definitions, patterns, and maps       |
+| context7     | Lazy                     | Library/framework documentation lookup              |
+| nvim         | Lazy                     | Neovim buffers, cursor, selections, and diagnostics |
+| context-mode | Lazy                     | Large-output analysis and indexing                  |
 
 ## Setup
 
@@ -135,6 +135,8 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
+This config contains absolute paths under `~/.config/pi`. Review `settings.json` and `mcp.json` before reusing it on another machine.
+
 ## Publishing Safety
 
 This repository intentionally excludes local runtime and secret-bearing files:
@@ -143,20 +145,21 @@ This repository intentionally excludes local runtime and secret-bearing files:
 - `sessions/`
 - `run-history.jsonl`
 - `mcp-cache.json`
+- `mcp-onboarding.json`
 - `pi-crash.log`
-- `**/node_modules/`
+- `**/node_modules`
 - `.scratch/`
 
-Review `APPEND_SYSTEM.md`, `settings.json`, and `permissions.json` before reusing this config. They contain personal environment assumptions, absolute paths, model/provider choices, and YOLO-mode permissions guarded by `extensions/guardrails.json`.
+Review `APPEND_SYSTEM.md`, `settings.json`, and `permissions.json` before reusing this config. They contain personal environment assumptions, model/provider choices, absolute paths, and permission settings.
 
 ## Design Decisions
 
-Based on analysis of 4 Claude Code sessions (4,528 tool calls) and research from 21+ articles and 10+ community configs:
+- **Tree-sitter first**: Code navigation should start from symbols and structure instead of raw text search.
+- **Read-only git**: The agent can inspect repository state but does not mutate git history or staging state.
+- **File-backed scratch space**: Research, plans, reviews, and continuation notes are written to `.scratch/` instead of being pushed directly into the conversation.
+- **Role-based delegation**: Scout, worker, and reviewer agents have narrow responsibilities.
+- **Skills over prompt bloat**: Specialized workflows live in skills and load only when needed.
+- **Guardrails over prompts alone**: Destructive shell and git operations are blocked by configuration, not just instructions.
+- **Lazy integrations**: MCP servers and heavier workflows are loaded on demand unless they need to be direct tools.
 
-- **Tree-sitter as direct tools**: Claude Code ignored MCP tools across ALL sessions. Pi's smaller system prompt gives AGENTS.md instructions more weight. Direct tools make them reflexive.
-- **Read-only git**: Session 3 had a destructive git disaster (checkout → stash → stash drop destroyed work). Blocked at guardrails level.
-- **Workers write to .scratch/, not context**: Session 1 had subagent results polluting main context. .scratch/ files keep context clean.
-- **Batched code quality checks**: Session 3 had 35 pyright runs in one session. Workers batch checks at end.
-- **Named agent roles**: Prevents "general-purpose does everything badly." Each role has specific model, tools, and rules.
-- **11 skills, zero context cost**: Skills load on demand. No token cost until triggered.
-- **gitnexus CLI**: Available globally for on-demand call-chain and blast radius analysis (`gitnexus query`, `gitnexus impact`). Not a pi package — zero token cost.
+See `DESIGN.md` for more detail and `ATTRIBUTIONS.md` for upstream sources and copied/adapted files.
