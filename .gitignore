@@ -1,0 +1,17 @@
+# Local scratch space
+.scratch/
+
+# Runtime/session state
+sessions/
+run-history.jsonl
+mcp-cache.json
+pi-crash.log
+
+# Secrets/local auth
+/auth.json
+
+# Dependency installs (directories and symlinks)
+**/node_modules
+
+# Pi onboarding/runtime state
+mcp-onboarding.json

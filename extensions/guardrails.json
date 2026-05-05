@@ -1,0 +1,77 @@
+{
+  "features": {
+    "policies": true,
+    "permissionGate": true,
+    "pathAccess": false
+  },
+  "permissionGate": {
+    "explainCommands": false,
+    "autoDenyPatterns": [
+      "rm -rf /",
+      "rm -rf ~",
+      "rm -rf .",
+      ":(){ :|:& };:",
+      "dd if=/dev/",
+      "mkfs",
+      "git add",
+      "git commit",
+      "git push",
+      "git checkout --",
+      "git reset --hard",
+      "git stash drop",
+      "git stash pop",
+      "git stash clear",
+      "git clean -f",
+      "git clean -d",
+      "git rebase",
+      "git merge",
+      "git cherry-pick",
+      "git revert",
+      "git branch -D",
+      "git stash push",
+      "git stash save",
+      "git stash apply",
+      "git restore",
+      "git switch",
+      "git tag",
+      "git push --force",
+      "git push -f",
+      "sudo rm -rf",
+      "chmod 777",
+      "curl | bash",
+      "curl | sh",
+      "wget | bash",
+      "wget | sh"
+    ]
+  },
+  "policies": {
+    "rules": [
+      {
+        "id": "no-env-files",
+        "patterns": [
+          { "pattern": "**/.env" },
+          { "pattern": "**/.env.*" },
+          { "pattern": "**/credentials*" },
+          { "pattern": "**/secrets*" }
+        ],
+        "protection": "readOnly",
+        "enabled": true
+      },
+      {
+        "id": "no-git-internals",
+        "patterns": [
+          { "pattern": "**/.git/**" }
+        ],
+        "protection": "noAccess",
+        "enabled": true
+      }
+    ]
+  },
+  "version": "0.9.0-20260327",
+  "applyBuiltinDefaults": true,
+  "onboarding": {
+    "completed": true,
+    "completedAt": "2026-05-03T00:00:00.000Z",
+    "version": "0.9.0-20260327"
+  }
+}

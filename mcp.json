@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "context7-mcp",
+      "args": [],
+      "lifecycle": "lazy"
+    },
+    "nvim": {
+      "command": "uvx",
+      "args": ["nvim-mcp"],
+      "lifecycle": "lazy"
+    },
+    "tree-sitter": {
+      "command": "node",
+      "args": ["/home/orestes/.config/pi/mcp-servers/tree-sitter/index.mjs"],
+      "directTools": ["search_symbols", "document_symbols", "symbol_definition", "pattern_search", "codebase_overview", "codebase_map"],
+      "lifecycle": "keep-alive"
+    },
+    "context-mode": {
+      "command": "context-mode",
+      "lifecycle": "lazy"
+    }
+  }
+}

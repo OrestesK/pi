@@ -1,0 +1,52 @@
+{
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.5",
+  "defaultThinkingLevel": "high",
+  "theme": "gruvbox-custom",
+  "quietStartup": true,
+  "steeringMode": "all",
+  "followUpMode": "all",
+  "collapseChangelog": true,
+  "enableInstallTelemetry": false,
+  "branchSummary": {
+    "skipPrompt": true
+  },
+  "hideThinkingBlock": true,
+  "terminal": {
+    "showImages": true,
+    "imageWidthCells": 80,
+    "showTerminalProgress": true
+  },
+  "editorPaddingX": 0,
+  "retry": {
+    "maxRetries": 3,
+    "baseDelayMs": 2000
+  },
+  "lastChangelogVersion": "0.72.1",
+  "transport": "sse",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
+  "packages": [
+    "/home/orestes/.config/pi/extensions/claude-ui",
+    "npm:pi-subagents",
+    "npm:pi-mcp-adapter",
+    "npm:pi-lens",
+    "npm:pi-web-access",
+    "npm:pi-memory-md",
+    "npm:@aliou/pi-guardrails",
+    "npm:@aliou/pi-toolchain",
+    "npm:pi-rewind",
+    "npm:pi-ask-user",
+    {
+      "source": "npm:context-mode",
+      "skills": [
+        "context-mode"
+      ]
+    }
+  ],
+  "autocompleteMaxVisible": 10,
+  "doubleEscapeAction": "tree"
+}

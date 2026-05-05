@@ -1,0 +1,6 @@
+{
+  "app.interrupt": "escape",
+  "app.clear": "ctrl+c",
+  "app.exit": "ctrl+d",
+  "app.models.clearAll": ""
+}
