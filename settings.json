@@ -30,7 +30,7 @@
     "keepRecentTokens": 20000
   },
   "packages": [
-    "/home/orestes/.config/pi/extensions/claude-ui",
+    "extensions/claude-ui",
     "npm:pi-subagents",
     "npm:pi-mcp-adapter",
     "npm:pi-lens",

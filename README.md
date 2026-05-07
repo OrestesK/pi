@@ -119,6 +119,7 @@ Git mutations are intentionally blocked by guardrails. Staging, committing, push
 | context7     | Lazy                     | Library/framework documentation lookup              |
 | nvim         | Lazy                     | Neovim buffers, cursor, selections, and diagnostics |
 | context-mode | Lazy                     | Large-output analysis and indexing                  |
+| notion       | Lazy remote OAuth        | Notion workspace access via official remote MCP     |
 
 ## Setup
 
@@ -135,7 +136,7 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-This config contains absolute paths under `~/.config/pi`. Review `settings.json` and `mcp.json` before reusing it on another machine.
+Tracked config uses relative paths where possible. `setup.sh` links this repository to `~/.pi/agent`, so relative local package and MCP paths resolve from the Pi agent directory.
 
 ## Publishing Safety
 
@@ -150,7 +151,12 @@ This repository intentionally excludes local runtime and secret-bearing files:
 - `**/node_modules`
 - `.scratch/`
 
-Review `APPEND_SYSTEM.md`, `settings.json`, and `permissions.json` before reusing this config. They contain personal environment assumptions, model/provider choices, absolute paths, and permission settings.
+Review these intentional personal choices before reusing this config:
+
+- `APPEND_SYSTEM.md` assumes Arch Linux on Wayland/sway with Foot, Neovim, `pacman`/`yay`, `wl-copy`, `uv`, `pnpm`, local PostgreSQL, `git-spice`, and `aws-cli`.
+- `settings.json` and `models.json` prefer the `openai-codex` provider, GPT-5.x model IDs, the custom `gruvbox-custom` theme, and high-thinking defaults.
+- `permissions.json` uses `yolo` mode, which is a high-trust local permission posture.
+- `AGENTS.md` and `skills/commit/SKILL.md` encode the `ok/` branch prefix and read-only git policy.
 
 ## Design Decisions
 
