@@ -36,6 +36,22 @@
       "git tag",
       "git push --force",
       "git push -f",
+      {
+        "pattern": "(^|[;&|()\\s])gs\\s+((upstack|downstack|branch|stack)\\s+)?(restack|submit|rebase|continue)\\b",
+        "regex": true
+      },
+      {
+        "pattern": "(^|[;&|()\\s])gs\\s+(branch\\s+)?(create|delete|rename|checkout|onto|absorb)\\b",
+        "regex": true
+      },
+      {
+        "pattern": "(^|[;&|()\\s])gs\\s+(commit\\s+)?(create|amend)\\b",
+        "regex": true
+      },
+      {
+        "pattern": "(^|[;&|()\\s])gs\\s+repo\\s+sync\\b",
+        "regex": true
+      },
       "sudo rm -rf",
       "chmod 777",
       "curl | bash",
