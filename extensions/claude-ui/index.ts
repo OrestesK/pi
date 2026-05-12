@@ -1103,6 +1103,16 @@ function patchToolExecutionRenderers(): void {
 				theme: Theme,
 				context: ToolRenderContextLike,
 			) => {
+				if (toolName === "subagent") {
+					const rendered = renderSubagentToolResult(
+						result,
+						options,
+						theme,
+						context,
+						title,
+					);
+					if (rendered) return rendered;
+				}
 				if (
 					PRESERVE_ORIGINAL_TOOL_RENDERERS.has(toolName) &&
 					shouldUseOriginalToolRenderer(toolName, context.args) &&
@@ -1237,6 +1247,58 @@ type ToolRenderContextLike = {
 	executionStarted?: boolean;
 };
 
+type SubagentProgress = {
+	index?: number;
+	agent?: string;
+	status?: string;
+	currentTool?: string;
+	currentToolArgs?: string;
+	currentToolStartedAt?: number;
+	recentTools?: SubagentRecentTool[];
+	toolCount?: number;
+	tokens?: number;
+	durationMs?: number;
+};
+
+type SubagentRecentTool = {
+	tool: string;
+	args: string;
+	endMs: number;
+};
+
+type SubagentSingleResult = {
+	agent: string;
+	task?: string;
+	exitCode?: number;
+	detached?: boolean;
+	interrupted?: boolean;
+	progress?: SubagentProgress;
+	progressSummary?: SubagentProgress;
+	artifactPaths?: { outputPath?: string };
+	savedOutputPath?: string;
+	outputReference?: { path?: string };
+	toolCalls?: Array<{ text?: string; expandedText?: string }>;
+};
+
+type SubagentDetails = {
+	mode: string;
+	context?: string;
+	results: SubagentSingleResult[];
+	progress?: SubagentProgress[];
+	progressSummary?: SubagentProgress;
+	totalSteps?: number;
+	artifacts?: { dir?: string };
+};
+
+type SubagentToolDisplayEntry = {
+	rowLabel: string;
+	agent: string;
+	tool: string;
+	args: string;
+	endMs: number;
+	current: boolean;
+};
+
 type BuiltInTools = {
 	read: ReturnType<typeof createReadTool>;
 	grep: ReturnType<typeof createGrepTool>;
@@ -1261,6 +1323,8 @@ const COLLAPSED_PREVIEW_LINES = 4;
 const COLLAPSED_EDIT_DIFF_LINES = 80;
 const COLLAPSED_WRITE_DIFF_LINES = 40;
 const EXPANDED_PREVIEW_LINES = 20;
+const SUBAGENT_RECENT_TOOL_LIMIT = 5;
+const SUBAGENT_HIDDEN_TOOL_TYPE_LIMIT = 5;
 const MAX_WRITE_SNAPSHOTS = 100;
 const MAX_EXTERNAL_DIFFS = 100;
 const EXTERNAL_DIFF_MAX_BUFFER = 5 * 1024 * 1024;
@@ -2395,6 +2459,443 @@ function memoryListPreviewLines(output: string): string[] | undefined {
 function subagentListPreviewLines(output: string): string[] | undefined {
 	const lines = contentLines(output).filter((line) => line.startsWith("- "));
 	return lines.length > 0 ? lines : undefined;
+}
+
+function parseSubagentProgress(value: unknown): SubagentProgress | undefined {
+	if (!isRecord(value)) return undefined;
+	const recentTools = recordArray(value, "recentTools")
+		.map((item): SubagentRecentTool | undefined => {
+			if (!isRecord(item)) return undefined;
+			const tool = detailString(item, "tool");
+			if (!tool) return undefined;
+			return {
+				tool,
+				args: detailString(item, "args") ?? "",
+				endMs: detailNumber(item, "endMs") ?? 0,
+			};
+		})
+		.filter((item): item is SubagentRecentTool => item !== undefined);
+	return {
+		index: detailNumber(value, "index"),
+		agent: detailString(value, "agent"),
+		status: detailString(value, "status"),
+		currentTool: detailString(value, "currentTool"),
+		currentToolArgs: detailString(value, "currentToolArgs"),
+		currentToolStartedAt: detailNumber(value, "currentToolStartedAt"),
+		recentTools,
+		toolCount: detailNumber(value, "toolCount"),
+		tokens: detailNumber(value, "tokens"),
+		durationMs: detailNumber(value, "durationMs"),
+	};
+}
+
+function parseSubagentDetails(details: unknown): SubagentDetails | undefined {
+	if (!isRecord(details)) return undefined;
+	const mode = detailString(details, "mode");
+	const rawResults = recordArray(details, "results");
+	if (!mode || rawResults.length === 0) return undefined;
+	const results = rawResults
+		.map((item): SubagentSingleResult | undefined => {
+			if (!isRecord(item)) return undefined;
+			const agent = detailString(item, "agent");
+			if (!agent) return undefined;
+			const artifactPaths = isRecord(item.artifactPaths)
+				? { outputPath: detailString(item.artifactPaths, "outputPath") }
+				: undefined;
+			const outputReference = isRecord(item.outputReference)
+				? { path: detailString(item.outputReference, "path") }
+				: undefined;
+			const toolCalls = recordArray(item, "toolCalls")
+				.map(
+					(toolCall): { text?: string; expandedText?: string } | undefined => {
+						if (!isRecord(toolCall)) return undefined;
+						return {
+							text: detailString(toolCall, "text"),
+							expandedText: detailString(toolCall, "expandedText"),
+						};
+					},
+				)
+				.filter(
+					(toolCall): toolCall is { text?: string; expandedText?: string } =>
+						toolCall !== undefined,
+				);
+			return {
+				agent,
+				task: detailString(item, "task"),
+				exitCode: detailNumber(item, "exitCode"),
+				detached: detailBoolean(item, "detached"),
+				interrupted: detailBoolean(item, "interrupted"),
+				progress: parseSubagentProgress(item.progress),
+				progressSummary: parseSubagentProgress(item.progressSummary),
+				artifactPaths,
+				savedOutputPath: detailString(item, "savedOutputPath"),
+				outputReference,
+				toolCalls,
+			};
+		})
+		.filter((item): item is SubagentSingleResult => item !== undefined);
+	if (results.length === 0) return undefined;
+	return {
+		mode,
+		context: detailString(details, "context"),
+		results,
+		progress: recordArray(details, "progress")
+			.map(parseSubagentProgress)
+			.filter((item): item is SubagentProgress => item !== undefined),
+		progressSummary: parseSubagentProgress(details.progressSummary),
+		totalSteps: detailNumber(details, "totalSteps"),
+		artifacts: isRecord(details.artifacts)
+			? { dir: detailString(details.artifacts, "dir") }
+			: undefined,
+	};
+}
+
+function formatSubagentDuration(ms: number | undefined): string | undefined {
+	if (ms === undefined || ms <= 0) return undefined;
+	if (ms < 1000) return `${ms}ms`;
+	if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+	return `${Math.floor(ms / 60000)}m${Math.floor((ms % 60000) / 1000)}s`;
+}
+
+function subagentProgressStats(progress: SubagentProgress | undefined): string {
+	if (!progress) return "";
+	return [
+		progress.toolCount && progress.toolCount > 0
+			? plural(progress.toolCount, "tool use")
+			: undefined,
+		progress.tokens && progress.tokens > 0
+			? `${formatTokenCount(progress.tokens)} ${progress.tokens === 1 ? "token" : "tokens"}`
+			: undefined,
+		formatSubagentDuration(progress.durationMs),
+	]
+		.filter((part): part is string => part !== undefined)
+		.join(" · ");
+}
+
+function subagentOutputPath(result: SubagentSingleResult): string | undefined {
+	return (
+		result.savedOutputPath ??
+		result.outputReference?.path ??
+		result.artifactPaths?.outputPath
+	);
+}
+
+function subagentProgressForResult(
+	details: SubagentDetails,
+	result: SubagentSingleResult,
+	index: number,
+): SubagentProgress | undefined {
+	return (
+		result.progress ??
+		details.progress?.find((progress) => progress.index === index) ??
+		details.progress?.find(
+			(progress) =>
+				progress.agent === result.agent && progress.status === "running",
+		) ??
+		result.progressSummary
+	);
+}
+
+function subagentResultDone(
+	result: SubagentSingleResult,
+	progress: SubagentProgress | undefined,
+): boolean {
+	if (progress?.status === "completed") return true;
+	if (
+		progress?.status === "running" ||
+		progress?.status === "pending" ||
+		progress?.status === "failed" ||
+		progress?.status === "detached"
+	)
+		return false;
+	if (result.detached || result.interrupted) return false;
+	return result.exitCode === 0;
+}
+
+function subagentResultGlyph(
+	result: SubagentSingleResult,
+	progress: SubagentProgress | undefined,
+	theme: Theme,
+): string {
+	if (progress?.status === "running") return theme.fg("accent", "●");
+	if (progress?.status === "pending") return theme.fg("dim", "◦");
+	if (result.detached || result.interrupted || progress?.status === "detached")
+		return theme.fg("warning", "■");
+	if (progress?.status === "completed" || result.exitCode === 0)
+		return theme.fg("success", "✓");
+	return theme.fg("error", "✗");
+}
+
+function toolNameFromSummary(text: string): string {
+	const trimmed = text.trim();
+	if (trimmed.startsWith("$ ")) return "bash";
+	return trimmed.split(/\s+|:/, 1)[0] || "tool";
+}
+
+function formatSubagentTool(
+	tool: string,
+	args: string,
+	current = false,
+): string {
+	const text = args ? `${tool}: ${compactOneLine(args, 80)}` : tool;
+	return current ? `${text} (running)` : text;
+}
+
+function hiddenSubagentToolSummary(
+	entries: SubagentToolDisplayEntry[],
+	unknownCount = 0,
+): string {
+	const totalHidden = entries.length + unknownCount;
+	if (totalHidden === 0) return "";
+	const counts = new Map<string, number>();
+	for (const entry of entries)
+		counts.set(entry.tool, (counts.get(entry.tool) ?? 0) + 1);
+	const sorted = [...counts.entries()].sort(
+		(left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+	);
+	const visible = sorted.slice(0, SUBAGENT_HIDDEN_TOOL_TYPE_LIMIT);
+	const hiddenOther =
+		sorted
+			.slice(SUBAGENT_HIDDEN_TOOL_TYPE_LIMIT)
+			.reduce((total, [, count]) => total + count, 0) + unknownCount;
+	const parts = visible.map(([tool, count]) => `${tool} ${count}`);
+	if (hiddenOther > 0) parts.push(`other ${hiddenOther}`);
+	return `+${totalHidden} more: ${parts.join(" · ")}`;
+}
+
+function collectSubagentToolEntries(
+	details: SubagentDetails,
+	result: SubagentSingleResult,
+	index: number,
+): SubagentToolDisplayEntry[] {
+	const progress = subagentProgressForResult(details, result, index);
+	const rowLabel =
+		details.mode === "parallel"
+			? `Agent ${index + 1}/${details.totalSteps ?? details.results.length}`
+			: `Step ${index + 1}`;
+	const entries = (progress?.recentTools ?? []).map(
+		(tool): SubagentToolDisplayEntry => ({
+			rowLabel,
+			agent: result.agent,
+			tool: tool.tool,
+			args: tool.args,
+			endMs: tool.endMs,
+			current: false,
+		}),
+	);
+	if (entries.length === 0) {
+		for (
+			let toolIndex = 0;
+			toolIndex < (result.toolCalls?.length ?? 0);
+			toolIndex++
+		) {
+			const text =
+				result.toolCalls?.[toolIndex]?.text ??
+				result.toolCalls?.[toolIndex]?.expandedText ??
+				"tool";
+			const tool = toolNameFromSummary(text);
+			const args = text.startsWith(`${tool} `)
+				? text.slice(tool.length + 1)
+				: text;
+			entries.push({
+				rowLabel,
+				agent: result.agent,
+				tool,
+				args,
+				endMs: toolIndex,
+				current: false,
+			});
+		}
+	}
+	if (progress?.currentTool) {
+		entries.push({
+			rowLabel,
+			agent: result.agent,
+			tool: progress.currentTool,
+			args: progress.currentToolArgs ?? "",
+			endMs: progress.currentToolStartedAt ?? Date.now(),
+			current: true,
+		});
+	}
+	return entries;
+}
+
+function subagentToolCount(
+	result: SubagentSingleResult,
+	progress: SubagentProgress | undefined,
+	entries: SubagentToolDisplayEntry[],
+): number {
+	return Math.max(
+		progress?.toolCount ?? 0,
+		result.toolCalls?.length ?? 0,
+		entries.length,
+	);
+}
+
+function subagentAgentToolSummary(
+	entries: SubagentToolDisplayEntry[],
+	totalToolCount: number,
+): string | undefined {
+	const latest = [...entries].sort(
+		(left, right) => right.endMs - left.endMs,
+	)[0];
+	if (!latest) return undefined;
+	const hiddenCount = Math.max(0, totalToolCount - 1);
+	return `last: ${formatSubagentTool(latest.tool, latest.args, latest.current)}${hiddenCount ? ` · +${hiddenCount} more` : ""}`;
+}
+
+function subagentSummaryLine(details: SubagentDetails): string {
+	const total = details.totalSteps ?? details.results.length;
+	const done = details.results.filter((result, index) =>
+		subagentResultDone(
+			result,
+			subagentProgressForResult(details, result, index),
+		),
+	).length;
+	const running = details.results.filter(
+		(result, index) =>
+			subagentProgressForResult(details, result, index)?.status === "running",
+	).length;
+	const status =
+		running > 0
+			? `${running} running · ${done}/${total} done`
+			: `${done}/${total} done`;
+	const stats = subagentProgressStats(
+		details.progressSummary ?? {
+			toolCount: details.results.reduce(
+				(sum, result, index) =>
+					sum +
+					(subagentProgressForResult(details, result, index)?.toolCount ?? 0),
+				0,
+			),
+			tokens: details.results.reduce(
+				(sum, result, index) =>
+					sum +
+					(subagentProgressForResult(details, result, index)?.tokens ?? 0),
+				0,
+			),
+			durationMs: details.results.reduce(
+				(max, result, index) =>
+					Math.max(
+						max,
+						subagentProgressForResult(details, result, index)?.durationMs ?? 0,
+					),
+				0,
+			),
+		},
+	);
+	return [
+		details.mode,
+		details.context === "fork" ? "[fork]" : undefined,
+		status,
+		stats,
+	]
+		.filter((part): part is string => Boolean(part))
+		.join(" · ");
+}
+
+function renderSubagentToolResult(
+	result: AgentToolResult<unknown>,
+	options: ToolRenderOptions,
+	theme: Theme,
+	context: ToolRenderContextLike,
+	title: string,
+): Text | undefined {
+	const details = parseSubagentDetails(result.details);
+	if (!details) return undefined;
+	if (context.isError)
+		return setText(
+			context.lastComponent,
+			errorLine(theme, firstTextLine(result)),
+		);
+
+	const entriesByIndex = details.results.map((child, index) =>
+		collectSubagentToolEntries(details, child, index),
+	);
+	const totalToolCount = details.results.reduce((sum, child, index) => {
+		const progress = subagentProgressForResult(details, child, index);
+		return (
+			sum + subagentToolCount(child, progress, entriesByIndex[index] ?? [])
+		);
+	}, 0);
+	const allEntries = entriesByIndex
+		.flat()
+		.sort((left, right) => right.endMs - left.endMs);
+	const recentEntries = allEntries.slice(0, SUBAGENT_RECENT_TOOL_LIMIT);
+	const hiddenEntries = allEntries.slice(SUBAGENT_RECENT_TOOL_LIMIT);
+	const unknownHiddenCount = Math.max(0, totalToolCount - allEntries.length);
+	const lines = [treeLine(theme, title, subagentSummaryLine(details))];
+	if (recentEntries.length > 0) {
+		lines.push(muted(theme, `${DETAIL_INDENT}│ recent activity:`));
+		for (const entry of recentEntries) {
+			lines.push(
+				muted(
+					theme,
+					`${DETAIL_INDENT}│ ${entry.rowLabel} ${entry.agent} · ${formatSubagentTool(entry.tool, entry.args, entry.current)}`,
+				),
+			);
+		}
+		const hiddenSummary = hiddenSubagentToolSummary(
+			hiddenEntries,
+			unknownHiddenCount,
+		);
+		if (hiddenSummary)
+			lines.push(muted(theme, `${DETAIL_INDENT}│ ${hiddenSummary}`));
+	}
+	lines.push(muted(theme, `${DETAIL_INDENT}│ agents:`));
+	for (let index = 0; index < details.results.length; index++) {
+		const child = details.results[index];
+		const progress = subagentProgressForResult(details, child, index);
+		const rowLabel =
+			details.mode === "parallel"
+				? `Agent ${index + 1}/${details.totalSteps ?? details.results.length}`
+				: `Step ${index + 1}`;
+		const entries = entriesByIndex[index] ?? [];
+		const agentToolCount = subagentToolCount(child, progress, entries);
+		const agentSummary = subagentAgentToolSummary(entries, agentToolCount);
+		const stats = subagentProgressStats(progress);
+		lines.push(
+			muted(
+				theme,
+				`${DETAIL_INDENT}│ ${subagentResultGlyph(child, progress, theme)} ${rowLabel}: ${child.agent}${stats ? ` · ${stats}` : ""}${agentSummary ? ` · ${agentSummary}` : ""}`,
+			),
+		);
+		if (options.expanded && entries.length > 0) {
+			const sortedEntries = [...entries].sort(
+				(left, right) => right.endMs - left.endMs,
+			);
+			for (const entry of sortedEntries.slice(0, SUBAGENT_RECENT_TOOL_LIMIT)) {
+				lines.push(
+					muted(
+						theme,
+						`${DETAIL_INDENT}│   ${formatSubagentTool(entry.tool, entry.args, entry.current)}`,
+					),
+				);
+			}
+			const hiddenSummary = hiddenSubagentToolSummary(
+				sortedEntries.slice(SUBAGENT_RECENT_TOOL_LIMIT),
+				Math.max(0, agentToolCount - sortedEntries.length),
+			);
+			if (hiddenSummary)
+				lines.push(muted(theme, `${DETAIL_INDENT}│   ${hiddenSummary}`));
+		}
+		const outputPath = subagentOutputPath(child);
+		if (outputPath)
+			lines.push(
+				muted(
+					theme,
+					`${DETAIL_INDENT}│   output: ${compactOneLine(outputPath, 110)}`,
+				),
+			);
+	}
+	if (details.artifacts?.dir)
+		lines.push(
+			muted(
+				theme,
+				`${DETAIL_INDENT}│ artifacts: ${compactOneLine(details.artifacts.dir, 110)}`,
+			),
+		);
+	return setText(context.lastComponent, lines.join("\n"));
 }
 
 function toolPreviewBlock(
