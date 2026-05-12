@@ -47,6 +47,19 @@
       ]
     }
   ],
+  "subagents": {
+    "agentOverrides": {
+      "scout": {
+        "disabled": true
+      },
+      "worker": {
+        "disabled": true
+      },
+      "reviewer": {
+        "disabled": true
+      }
+    }
+  },
   "autocompleteMaxVisible": 10,
   "doubleEscapeAction": "tree"
 }
