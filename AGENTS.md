@@ -60,7 +60,9 @@ Accuracy is the success metric, not user approval.
 
 **Suggest refactoring before extending.** When existing code is getting complex, suggest refactoring before adding more to it. Agents tend to perpetually extend rather than simplify — actively resist this.
 
-**No guessing.** Never guess values, configs, API behavior, or library usage. Look them up from source code, config files, or context7 docs. If you can't find it, ask.
+**No guessing.** Never guess values, configs, API behavior, library usage, user intent, product requirements, or architectural preferences. Look them up from source code, config files, docs, or context7. If evidence does not settle it, stop and ask.
+
+**Defer decisions to the user.** When multiple reasonable paths exist, when scope is unclear, or when a choice affects behavior, architecture, data, security, UX, tests, or workflow, do not pick silently. Present the smallest useful decision with a recommendation and wait for approval. Prefer pausing too early over doing a large batch the user may need to interrupt.
 
 ## Tool Preferences
 
@@ -99,6 +101,8 @@ Never guess library behavior. Use `context7` MCP to look up library/framework do
 ### Bash discipline
 
 Never use bash for: grep (use Grep tool), cat (use Read tool), find (use Glob tool). Reserve bash for commands that need actual shell execution.
+
+For changed files, prefer targeted read-only diffs before manual reads: `git diff -- <path>`, `git diff -U20 -- <path>`, or `git show -- <path>` for committed context. Review the changed hunks first, then use tree-sitter/LSP or narrow reads only for surrounding code needed to understand the diff.
 
 ### Resource-heavy commands
 
@@ -154,15 +158,26 @@ These tools and skills are available — use them proactively:
 
 ## Delegation & Workflow
 
-Load the **manager-workflow** skill for implementation tasks. It defines the 3-tier system and mandatory planning gate.
+Load the **manager-workflow** skill for implementation tasks. It defines the 3-tier system and mandatory planning gate, with optional brainstorming/planning/TDD/review skills for non-trivial work.
 
-- **Tier 1**: Single file, < 20 lines — just do it
-- **Tier 2**: Multi-file or ambiguous — talk first, get approval
-- **Tier 3**: Architectural, > 5 files — write plan to `.scratch/plans/`, wait for approval
+Lifecycle for non-trivial work: **Clarify/Brainstorm → Plan → Approve → Execute → Verify → Review → Finish/Handoff**.
 
-Subagent roles: **scout** (gpt-5.4-mini, read-only recon), **worker** (gpt-5.4, implementation), **reviewer** (gpt-5.4, code review). See `agents/*.md` for role details.
+- **Tier 1**: Single file, < 20 lines — just do it, then verify.
+- **Tier 2**: Multi-file or ambiguous — talk first, include test/verification strategy, get approval.
+- **Tier 3**: Architectural, > 5 files, new systems, or irreversible — write plan to `.scratch/plans/`, wait for approval.
 
-Workers write results to `.scratch/` files, not back to main context.
+Use these skills as routing points:
+
+- **brainstorming**: vague ideas, new behavior, design/placement decisions.
+- **writing-plans**: approved requirements that need task breakdown.
+- **test-driven-development**: behavior changes and bug fixes; choose a TDD scenario before editing.
+- **systematic-debugging**: failures or unexpected behavior; root cause before fixes.
+- **review**: code/spec/plan review and review feedback evaluation.
+- **verification-before-completion**: evidence before done/fixed/passing claims.
+
+Subagent roles are operational contracts, not documentation: use **scout** for read-only recon, **worker** for single-thread implementation, and **reviewer** for evidence-backed code/spec review.
+
+Workers write results to `.scratch/` files, not back to main context. Parent agents verify worker claims from diffs/output before reporting completion.
 
 ## Git Rules
 

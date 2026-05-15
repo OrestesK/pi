@@ -22,8 +22,8 @@
     "maxRetries": 3,
     "baseDelayMs": 2000
   },
-  "lastChangelogVersion": "0.72.1",
-  "transport": "sse",
+  "lastChangelogVersion": "0.73.1",
+  "transport": "auto",
   "compaction": {
     "enabled": true,
     "reserveTokens": 16384,

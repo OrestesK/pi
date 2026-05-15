@@ -21,7 +21,9 @@ Focus on the minimum context another agent needs in order to act:
 - key types, interfaces, and functions
 - data flow and dependencies
 - files that are likely to need changes
-- constraints, risks, and open questions
+- existing tests and likely verification commands
+- project conventions that affect planning
+- constraints, risks, human review triggers, and open questions
 
 ## Working rules
 
@@ -61,9 +63,13 @@ Explain how the pieces connect.
 
 Name the first file another agent should open and why.
 
+## Test and Verification Clues
+
+List relevant test files, commands, fixtures, and build/lint/typecheck signals if discovered.
+
 ## Constraints, Risks, and Open Questions
 
-List anything that could affect planning or implementation.
+List anything that could affect planning or implementation, including human review triggers and any need for user decisions.
 
 ## Supervisor coordination
 
