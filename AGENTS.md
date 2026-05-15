@@ -110,6 +110,8 @@ For unavoidable heavy commands, cap parallelism, use `nice`/lower-priority execu
 
 When giving the user a command they are likely to run, strongly prefer copying it to the clipboard with `wl-copy` and explicitly say it was copied. Do this by default for multi-line commands, commands containing quotes/heredocs, and any command the user says they cannot easily copy. On this Wayland/sway system, use `wl-copy`/`wl-paste`, not xclip/xsel.
 
+Prefer one-line shell commands when presenting commands for the user to copy/paste into a terminal. Avoid backslash line continuations in user-facing shell commands because terminal/TUI selection can copy padding spaces after `\` and break the command. If a command needs to run from a directory, prefer `(cd path && command ...)` as one line. Only use multiline commands when heredoc syntax materially matters; for destructive or hard-to-copy commands, copy the exact command with `wl-copy` instead of relying on terminal selection, and copy only the executable command text, not Markdown fences or explanatory prose.
+
 ### Context preservation
 
 Use context-mode MCP tools for large-output analysis, not as a blanket replacement for normal editing tools.

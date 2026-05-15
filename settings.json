@@ -45,7 +45,8 @@
       "skills": [
         "context-mode"
       ]
-    }
+    },
+    "npm:pi-intercom"
   ],
   "subagents": {
     "agentOverrides": {

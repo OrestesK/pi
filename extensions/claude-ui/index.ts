@@ -758,17 +758,24 @@ function dimText(value: string): string {
 function createClaudeMarkdownTheme(): MarkdownTheme {
 	const base = getMarkdownTheme();
 	let codeBlockOpen = false;
+	let codeBlockLabel = "code";
 
 	return {
 		...base,
-		codeBlockIndent: dimText("│ "),
+		codeBlockIndent: "",
 		codeBlockBorder: (text: string) => {
 			const fenceInfo = text.startsWith("```") ? text.slice(3).trim() : "";
 			const isOpeningFence = text !== "```" || !codeBlockOpen;
-			codeBlockOpen = isOpeningFence;
-			if (isOpeningFence) return dimText(`╭─ ${fenceInfo || "code"}`);
+			if (isOpeningFence) {
+				codeBlockOpen = true;
+				codeBlockLabel = fenceInfo || "code";
+				return dimText(`--- ${codeBlockLabel} ---`);
+			}
+
+			const label = codeBlockLabel;
 			codeBlockOpen = false;
-			return dimText("╰─");
+			codeBlockLabel = "code";
+			return dimText(`--- ${label} ---`);
 		},
 		highlightCode: base.highlightCode,
 	};
