@@ -3191,7 +3191,7 @@ function formatBashCall(args: unknown, theme: Theme, pending = false): string {
 	return callLine(
 		theme,
 		"Bash",
-		pathText(theme, compactOneLine(argString(args, "command", ""), 90)),
+		pathText(theme, argString(args, "command", "")),
 		pending,
 	);
 }

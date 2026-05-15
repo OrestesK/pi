@@ -16,3 +16,4 @@ pi-crash.log
 # Pi onboarding/runtime state
 mcp-onboarding.json
 /mcp-oauth/notion
+/intercom
