@@ -29,13 +29,28 @@
     "reserveTokens": 16384,
     "keepRecentTokens": 20000
   },
+  "pi-memory-md": {
+    "enabled": true,
+    "memoryDir": {
+      "localPath": "~/.pi/memory-md",
+      "globalMemory": "common"
+    },
+    "delivery": "system-prompt",
+    "hooks": {
+      "sessionStart": [],
+      "sessionEnd": []
+    },
+    "tape": {
+      "enabled": false
+    }
+  },
   "packages": [
     "extensions/claude-ui",
-    "npm:pi-subagents",
+    "packages/pi-subagents",
     "npm:pi-mcp-adapter",
     "npm:pi-lens",
     "npm:pi-web-access",
-    "npm:pi-memory-md",
+    "packages/pi-memory-md",
     "npm:@aliou/pi-guardrails",
     "npm:@aliou/pi-toolchain",
     "npm:pi-rewind",

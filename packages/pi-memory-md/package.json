@@ -1,0 +1,71 @@
+{
+	"name": "pi-memory-md",
+	"version": "0.1.35",
+	"description": "Letta-like memory management for pi using structured markdown files in a git repository",
+	"type": "module",
+	"license": "MIT",
+	"author": "VandeePunk",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/VandeeFeng/pi-memory-md.git"
+	},
+	"keywords": [
+		"pi-package",
+		"pi-extension",
+		"pi-skill",
+		"memory",
+		"markdown",
+		"git",
+		"letta",
+		"persistent-memory",
+		"ai-memory",
+		"coding-agent"
+	],
+	"dependencies": {
+		"@sinclair/typebox": "^0.34.49",
+		"gray-matter": "^4.0.3"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.12",
+		"@mariozechner/pi-coding-agent": "^0.73.1",
+		"@mariozechner/pi-tui": "^0.73.1",
+		"@types/node": "^20.0.0",
+		"husky": "^9.1.7",
+		"tsx": "^4.21.0",
+		"typescript": "^5.0.0"
+	},
+	"peerDependencies": {
+		"@mariozechner/pi-coding-agent": "*",
+		"@mariozechner/pi-tui": "*"
+	},
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		],
+		"skills": [
+			"./skills/memory-init/SKILL.md",
+			"./skills/memory-management/SKILL.md",
+			"./skills/memory-sync/SKILL.md",
+			"./skills/memory-search/SKILL.md"
+		]
+	},
+	"files": [
+		"hooks.ts",
+		"index.ts",
+		"memory-git.ts",
+		"memory-core.ts",
+		"tools.ts",
+		"types.ts",
+		"utils.ts",
+		"tape",
+		"skills",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"prepare": "node .husky/install.mjs",
+		"check": "biome check --error-on-warnings . && tsc --noEmit --skipLibCheck --module NodeNext --moduleResolution NodeNext --target ES2022 --lib ES2022,DOM --strict index.ts hooks.ts memory-core.ts memory-git.ts tools.ts types.ts utils.ts tape/*.ts tests/*.ts",
+		"test": "node --import tsx --test tests/*-test.ts"
+	}
+}
