@@ -23,7 +23,7 @@
  * Todo storage settings are kept in <todo-dir>/settings.json.
  * Defaults:
  * {
- *   "gc": true,   // delete closed todos older than gcDays on startup
+ *   "gc": false,  // opt in to deleting closed todos older than gcDays on startup
  *   "gcDays": 7   // age threshold for GC (days since created_at)
  * }
  *
@@ -61,7 +61,7 @@ const TODO_SETTINGS_NAME = "settings.json";
 const TODO_ID_PREFIX = "TODO-";
 const TODO_ID_PATTERN = /^[a-f0-9]{8}$/i;
 const DEFAULT_TODO_SETTINGS = {
-	gc: true,
+	gc: false,
 	gcDays: 7,
 };
 const LOCK_TTL_MS = 30 * 60 * 1000;
