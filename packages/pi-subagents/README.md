@@ -326,7 +326,7 @@ The `oracle` and `worker` builtins are designed for an explicit decision loop. A
 
 ## Clarify and launch UI
 
-Chains open a clarify UI by default so you can preview and edit the workflow before it runs. Single and parallel tool calls can opt into the same flow with `clarify: true`; slash commands launch directly.
+Tool-call chains launch directly by default so scripted/agent-authored workflows do not stop in an interactive preview. Set `clarify: true` to preview and edit a chain before it runs. Single and parallel tool calls can opt into the same flow with `clarify: true`; slash commands launch directly.
 
 Common clarify keys:
 
@@ -710,7 +710,7 @@ Agent definitions are not loaded into context by default. Management actions let
 | `chain`           | array                         | -                        | Sequential and parallel chain steps.                                                                                                   |
 | `context`         | `fresh \| fork`               | agent default or `fresh` | `fork` creates real branched sessions from the parent leaf. Packaged `planner`, `worker`, and `oracle` default to `fork`.              |
 | `chainDir`        | string                        | temp chain dir           | Persistent directory for chain artifacts.                                                                                              |
-| `clarify`         | boolean                       | true for chains          | Show TUI preview/edit flow.                                                                                                            |
+| `clarify`         | boolean                       | false                    | Show TUI preview/edit flow when explicitly set to `true`.                                                                              |
 | `agentScope`      | `user \| project \| both`     | `both`                   | Agent discovery scope. Project wins on collisions.                                                                                     |
 | `async`           | boolean                       | false                    | Background execution. Chains require `clarify: false`.                                                                                 |
 | `cwd`             | string                        | runtime cwd              | Override working directory.                                                                                                            |
