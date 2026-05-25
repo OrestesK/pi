@@ -26,8 +26,17 @@
   "transport": "auto",
   "compaction": {
     "enabled": true,
-    "reserveTokens": 16384,
+    "reserveTokens": 24000,
     "keepRecentTokens": 20000
+  },
+  "smartCompact": {
+    "profile": "light",
+    "summaryModel": "openai-codex/gpt-5.5",
+    "segmentationModel": "openai-codex/gpt-5.5",
+    "autoTrigger": true,
+    "autoTriggerTimeoutMs": 300000,
+    "minContextPercent": 60,
+    "backupEnabled": true
   },
   "pi-memory-md": {
     "enabled": true,
@@ -61,7 +70,8 @@
         "context-mode"
       ]
     },
-    "npm:pi-intercom"
+    "npm:pi-intercom",
+    "npm:pi-smart-compact"
   ],
   "subagents": {
     "disableBuiltins": false
