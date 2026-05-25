@@ -1,9 +1,9 @@
 /**
  * Compact Advisor
  *
- * Suggests compaction when context usage exceeds a threshold.
- * Prompts the user for confirmation, then triggers compaction with
- * task-aware instructions that preserve current work context.
+ * Shows a non-blocking context-size notice when usage exceeds a threshold.
+ * Core pi auto-compaction remains responsible for unattended compaction near
+ * the model limit; this extension must not prompt or compact at agent_end.
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
@@ -23,7 +23,7 @@ function isStaleContextError(error: unknown) {
 export default function (pi: ExtensionAPI) {
 	let lastSuggested = 0;
 
-	pi.on("agent_end", async (_event, ctx) => {
+	pi.on("agent_end", (_event, ctx) => {
 		try {
 			if (!ctx.hasUI) return;
 
@@ -34,16 +34,10 @@ export default function (pi: ExtensionAPI) {
 			if (now - lastSuggested < COOLDOWN_MS) return;
 			lastSuggested = now;
 
-			const confirmed = await ctx.ui.confirm(
-				"Context getting large",
-				`At ${Math.round(usage.tokens / 1000)}k tokens. Compact now? This preserves your current task context.`,
+			ctx.ui.notify(
+				`Context at ${Math.round(usage.tokens / 1000)}k tokens. Core auto-compaction is enabled; use /compact or /continue manually if you want an earlier reset.`,
+				"info",
 			);
-			if (!confirmed) return;
-
-			ctx.compact({
-				customInstructions:
-					"Preserve the current task context and any in-progress work. Focus the summary on what's actively being worked on, key decisions made, and what's next.",
-			});
 		} catch (error) {
 			if (isStaleContextError(error)) return;
 			throw error;

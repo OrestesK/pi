@@ -140,7 +140,7 @@ Implementation work should be followed by review when the change is non-trivial.
 | `files.ts`           | Browse repo files and session-referenced files through a TUI            |
 | `todos/`             | File-backed task tracking                                               |
 | `continue.ts`        | Write continuation notes and start fresh context                        |
-| `compact-advisor.ts` | Prompt for compaction when context grows large                          |
+| `compact-advisor.ts` | Non-blocking context-size notice                                        |
 | `guardrails.json`    | Deny destructive shell and git operations                               |
 
 Copied and adapted extension sources are listed in `ATTRIBUTIONS.md`.

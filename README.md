@@ -42,7 +42,7 @@ pi/
 │   ├── answer.ts              # /answer question-answering TUI
 │   ├── files.ts               # /files and /diff file browser
 │   ├── continue.ts            # /continue session handoff
-│   └── compact-advisor.ts     # Context compaction prompt
+│   └── compact-advisor.ts     # Non-blocking context-size notice
 │
 ├── themes/
 │   └── gruvbox-custom.json    # Gruvbox dark theme
