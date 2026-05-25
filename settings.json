@@ -30,12 +30,12 @@
     "keepRecentTokens": 20000
   },
   "smartCompact": {
-    "profile": "light",
+    "profile": "aggressive",
     "summaryModel": "openai-codex/gpt-5.5",
-    "segmentationModel": "openai-codex/gpt-5.5",
+    "segmentationModel": "openai-codex/gpt-5.3-codex-spark",
     "autoTrigger": true,
     "autoTriggerTimeoutMs": 300000,
-    "minContextPercent": 60,
+    "minContextPercent": 75,
     "backupEnabled": true
   },
   "pi-memory-md": {
