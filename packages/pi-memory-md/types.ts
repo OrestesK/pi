@@ -8,6 +8,7 @@ import type { TapeConfig } from "./tape/tape-types.js";
 export interface MemoryFrontmatter {
 	description: string;
 	limit?: number;
+	status?: string;
 	tags?: string[];
 	created?: string;
 	updated?: string;

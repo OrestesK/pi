@@ -22,6 +22,16 @@ export { DEFAULT_LOCAL_PATH, getCurrentDate } from "./utils.js";
 
 export const DEFAULT_MEMORY_SCAN: [number, number] = [72, 168];
 export const DEFAULT_GLOBAL_MEMORY_DIRNAME = "global";
+const HIDDEN_MEMORY_INDEX_STATUSES = new Set(["superseded"]);
+
+export function isMemoryVisibleInIndex(
+	memory: MemoryFile | null,
+): memory is MemoryFile {
+	if (!memory) return false;
+
+	const status = memory.frontmatter.status?.trim().toLowerCase();
+	return !status || !HIDDEN_MEMORY_INDEX_STATUSES.has(status);
+}
 
 export function normalizeMemoryScanRange(
 	memoryScan?: [number, number],
@@ -495,7 +505,18 @@ export async function listMemoryFilesAsync(
 	}
 
 	await walkDir(memoryDir);
-	return files;
+	return files.sort((a, b) => a.localeCompare(b));
+}
+
+export async function listVisibleMemoryFilesAsync(
+	memoryDir: string,
+): Promise<string[]> {
+	const files = await listMemoryFilesAsync(memoryDir);
+	const memories = await Promise.all(
+		files.map((filePath) => readMemoryFileAsync(filePath)),
+	);
+
+	return files.filter((_, index) => isMemoryVisibleInIndex(memories[index]));
 }
 
 function stringifyMemoryFile(
@@ -585,11 +606,22 @@ async function readMemoryFiles(
 		return null;
 	}
 
+	const memories = await Promise.all(
+		files.map((filePath) => readMemoryFileAsync(filePath)),
+	);
+	const visibleEntries = files
+		.map((filePath, index) => ({ filePath, memory: memories[index] }))
+		.filter((entry): entry is { filePath: string; memory: MemoryFile } =>
+			isMemoryVisibleInIndex(entry.memory),
+		);
+
+	if (visibleEntries.length === 0) {
+		return null;
+	}
+
 	return {
-		files,
-		memories: await Promise.all(
-			files.map((filePath) => readMemoryFileAsync(filePath)),
-		),
+		files: visibleEntries.map((entry) => entry.filePath),
+		memories: visibleEntries.map((entry) => entry.memory),
 	};
 }
 

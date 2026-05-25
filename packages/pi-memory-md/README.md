@@ -81,8 +81,8 @@ The LLM can use these tools to interact with memory:
 |------|------------|-------------|
 | `memory_sync` | `{action: "pull" / "push" / "status"}` | Git operations |
 | `memory_write` | `{path, content, description, tags?}` | Write a project memory file by relative path |
-| `memory_list` | `{directory?: string}` | List project memory by relative path; global paths stay absolute |
-| `memory_search` | `{query?, grep?, rg?}` | Search by tags/description and custom grep/ripgrep patterns |
+| `memory_list` | `{directory?: string}` | List visible memory by relative path; global paths stay absolute; `status: superseded` files are hidden |
+| `memory_search` | `{query?, grep?, rg?}` | Search by tags/description and custom grep/ripgrep patterns, including superseded files |
 | `memory_check` | `{}` | Check current project memory folder structure |
 
 ## Memory File Format

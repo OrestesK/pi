@@ -10,6 +10,7 @@ import {
 	getMemoryCoreDir,
 	getMemoryDir,
 	listMemoryFilesAsync,
+	listVisibleMemoryFilesAsync,
 	readMemoryFileAsync,
 	writeMemoryFile,
 } from "./memory-core.js";
@@ -435,7 +436,7 @@ export function registerMemoryList(
 		name: "memory_list",
 		label: "Memory List",
 		description:
-			"List memory files: project paths are relative, global paths are absolute",
+			"List visible memory files: project paths are relative, global paths are absolute; status=superseded files are hidden",
 		parameters: Type.Object({
 			directory: Type.Optional(
 				Type.String({
@@ -467,7 +468,7 @@ export function registerMemoryList(
 				}
 
 				const files = toProjectRelativePaths(
-					await listMemoryFilesAsync(listDir),
+					await listVisibleMemoryFilesAsync(listDir),
 				);
 				return {
 					content: [
@@ -483,7 +484,7 @@ export function registerMemoryList(
 			const globalMemoryDir = getGlobalMemoryDir(settings);
 			if (!globalMemoryDir || globalMemoryDir === projectMemoryDir) {
 				const files = toProjectRelativePaths(
-					await listMemoryFilesAsync(projectMemoryDir),
+					await listVisibleMemoryFilesAsync(projectMemoryDir),
 				);
 				return {
 					content: [
@@ -497,8 +498,8 @@ export function registerMemoryList(
 			}
 
 			const [globalFiles, projectFiles] = await Promise.all([
-				listMemoryFilesAsync(globalMemoryDir),
-				listMemoryFilesAsync(projectMemoryDir),
+				listVisibleMemoryFilesAsync(globalMemoryDir),
+				listVisibleMemoryFilesAsync(projectMemoryDir),
 			]);
 			const files = [...globalFiles, ...toProjectRelativePaths(projectFiles)];
 

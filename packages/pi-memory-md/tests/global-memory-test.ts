@@ -7,6 +7,7 @@ import test from "node:test";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import memoryMdExtension from "../index.js";
 import {
+	listMemoryFilesAsync,
 	type MemoryFrontmatter,
 	readMemoryFileAsync,
 	writeMemoryFile,
@@ -211,6 +212,98 @@ test("global memory delivery supports message append mode", async () => {
 		},
 		{ delivery: "message-append" },
 	);
+});
+
+test("startup delivery hides superseded memories", async () => {
+	await withGlobalOnlyMemory(async ({ root, cwd }) => {
+		await writeFile(
+			path.join(root, "memory", "common", "core", "OLD.md"),
+			[
+				"---",
+				"description: Old superseded memory",
+				"status: superseded",
+				"tags:",
+				"  - old-superseded-memory",
+				"---",
+				"",
+				"# Old Memory",
+			].join("\n"),
+		);
+		const harness = createHarness();
+		const ctx = createContext(cwd, harness.notifications);
+
+		await harness.handlers.get("session_start")?.({ reason: "new" }, ctx);
+		const result = (await harness.handlers.get("before_agent_start")?.(
+			{ prompt: "hello", systemPrompt: "BASE" },
+			ctx,
+		)) as { systemPrompt?: string } | undefined;
+
+		assert.match(result?.systemPrompt ?? "", /test-global-memory/);
+		assert.doesNotMatch(result?.systemPrompt ?? "", /old-superseded-memory/);
+		assert.ok(
+			harness.notifications.some((message) =>
+				message.includes("Memory delivered: 1 files"),
+			),
+		);
+	});
+});
+
+test("memory_list hides superseded memories but memory_search can find them", async () => {
+	await withGlobalOnlyMemory(async ({ root, cwd }) => {
+		await writeFile(
+			path.join(root, "memory", "common", "core", "OLD.md"),
+			[
+				"---",
+				"description: Old superseded memory",
+				"status: superseded",
+				"tags:",
+				"  - old-superseded-memory",
+				"---",
+				"",
+				"# Old Memory",
+			].join("\n"),
+		);
+		const harness = createHarness();
+		const ctx = createContext(cwd, harness.notifications);
+
+		const listResult = await harness.tools
+			.get("memory_list")
+			?.execute("test-call", {}, undefined, undefined, ctx);
+		assert.equal(listResult?.details?.count, 1);
+		assert.doesNotMatch(listResult?.content?.[0]?.text ?? "", /OLD\.md/);
+
+		const searchResult = await harness.tools
+			.get("memory_search")
+			?.execute(
+				"test-call",
+				{ query: "old-superseded-memory" },
+				undefined,
+				undefined,
+				ctx,
+			);
+		assert.equal(searchResult?.details?.count, 1);
+		assert.match(searchResult?.content?.[0]?.text ?? "", /OLD\.md/);
+	});
+});
+
+test("listMemoryFilesAsync returns deterministic sorted paths", async () => {
+	const root = await mkdtemp(path.join(os.tmpdir(), "pi-memory-md-test-"));
+
+	try {
+		await mkdir(path.join(root, "z"), { recursive: true });
+		await mkdir(path.join(root, "a"), { recursive: true });
+		await writeFile(path.join(root, "z", "b.md"), "---\ndescription: B\n---\n");
+		await writeFile(path.join(root, "a", "c.md"), "---\ndescription: C\n---\n");
+		await writeFile(path.join(root, "a", "a.md"), "---\ndescription: A\n---\n");
+
+		const files = (await listMemoryFilesAsync(root)).map((filePath) =>
+			path.relative(root, filePath),
+		);
+
+		assert.deepEqual(files, ["a/a.md", "a/c.md", "z/b.md"]);
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
 });
 
 test("project memory outside core is delivered and searchable", async () => {

@@ -17,3 +17,5 @@ pi-crash.log
 mcp-onboarding.json
 /mcp-oauth/notion
 /intercom
+/.cache
+/compact-backups
