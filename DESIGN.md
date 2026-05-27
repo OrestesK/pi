@@ -127,7 +127,6 @@ Implementation work should be followed by review when the change is non-trivial.
 | `pi-memory-md`         | Durable markdown memory                                     |
 | `@aliou/pi-guardrails` | Tool-layer safety policies                                  |
 | `@aliou/pi-toolchain`  | Preferred CLI enforcement                                   |
-| `pi-rewind`            | Recovery checkpoints                                        |
 | `pi-ask-user`          | Structured user decision prompts                            |
 | `context-mode`         | Large-output analysis without flooding conversation context |
 | `extensions/claude-ui` | Local terminal UI customization                             |

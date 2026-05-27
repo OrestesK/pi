@@ -76,7 +76,7 @@ pi/
 
 1. **Tree-sitter** for symbol-aware code navigation.
 2. **context7** for library and framework documentation.
-3. **Preferred CLIs** such as `uv`, `pnpm`, `difft`, `fd`, `bat`, `sd`, `ast-grep`, `shellcheck`, `gh`, and `aws`.
+3. **Configured preferred CLIs** for the current host and project.
 4. **Grep/Glob/Read** when structural tools do not apply.
 
 ### Git policy
@@ -107,20 +107,19 @@ Git mutations are intentionally blocked by guardrails. Staging, committing, push
 | `pi-memory-md`         | Git-backed markdown memory                       |
 | `@aliou/pi-guardrails` | Command and path safety policies                 |
 | `@aliou/pi-toolchain`  | Preferred CLI enforcement                        |
-| `pi-rewind`            | Per-turn recovery checkpoints                    |
 | `pi-ask-user`          | Structured user decision UI                      |
 | `context-mode`         | Large-output processing outside the main context |
 
 ## MCP Servers
 
-| Server       | Mode                     | Purpose                                                           |
-| ------------ | ------------------------ | ----------------------------------------------------------------- |
-| tree-sitter  | Direct tools, keep-alive | Code symbols, definitions, patterns, and maps                     |
-| context7     | Lazy                     | Library/framework documentation lookup                            |
-| nvim         | Lazy                     | Neovim buffers, cursor, selections, and diagnostics               |
-| context-mode | Lazy                     | Large-output analysis and indexing                                |
-| notion       | Lazy remote OAuth        | Notion workspace access via official remote MCP                   |
-| google_docs  | Lazy local OAuth         | Google Docs/Drive read/write via local `@a-bonus/google-docs-mcp` |
+| Server       | Mode                     | Purpose                                                             |
+| ------------ | ------------------------ | ------------------------------------------------------------------- |
+| tree-sitter  | Direct tools, keep-alive | Code symbols, definitions, patterns, and maps                       |
+| context7     | Lazy                     | Library/framework documentation lookup                              |
+| nvim         | Lazy                     | Editor buffers, cursor, selections, and diagnostics when configured |
+| context-mode | Lazy                     | Large-output analysis and indexing                                  |
+| notion       | Lazy remote OAuth        | Notion workspace access via official remote MCP                     |
+| google_docs  | Lazy local OAuth         | Google Docs/Drive read/write via local `@a-bonus/google-docs-mcp`   |
 
 `google_docs` is sensitive. `AGENTS.md` requires explicit user approval before any `google_docs_*` tool call other than schema inspection, and per-action approval for every mutation or destructive operation.
 
@@ -130,7 +129,7 @@ Prerequisites:
 
 - pi coding agent
 - Node.js/npm for npm-hosted packages and the local tree-sitter MCP server
-- uv/uvx for the nvim MCP server
+- uv/uvx for optional Python-based MCP servers
 - context7-mcp on PATH for library documentation lookup
 
 ```bash
@@ -154,12 +153,11 @@ This repository intentionally excludes local runtime and secret-bearing files:
 - `**/node_modules`
 - `.scratch/`
 
-Review these intentional personal choices before reusing this config:
+## Local Host Customization
 
-- `APPEND_SYSTEM.md` assumes Arch Linux on Wayland/sway with Foot, Neovim, `pacman`/`yay`, `wl-copy`, `uv`, `pnpm`, local PostgreSQL, `git-spice`, and `aws-cli`.
-- `settings.json` and `models.json` prefer the `openai-codex` provider, GPT-5.x model IDs, the custom `gruvbox-custom` theme, and high-thinking defaults.
-- `permissions.json` uses `yolo` mode, which is a high-trust local permission posture.
-- `AGENTS.md` and `skills/commit/SKILL.md` encode the `ok/` branch prefix and read-only git policy.
+`APPEND_SYSTEM.md` is the host-specific overlay. Replace it with your own operating system, editor, terminal, package manager, clipboard, database, git workflow, and cloud/tooling details before reusing this config.
+
+The rest of the tracked config should stay portable. If a detail only applies to one machine or one private work environment, put it in `APPEND_SYSTEM.md` or an ignored local file, not in `AGENTS.md`, `USAGE.md`, or the general README.
 
 ## Design Decisions
 

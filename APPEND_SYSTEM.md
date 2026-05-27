@@ -3,10 +3,11 @@
 ## System
 
 - ThinkPad X1 Carbon Gen 13, x86_64, Arch Linux
-- Wayland (sway) — use `wl-copy`/`wl-paste` not xclip/xsel; sway config syntax not i3
+- Wayland compositor: sway. Use sway config syntax
+- Clipboard: use `wl-copy`/`wl-paste`; To copy an exact command, pipe only the command text to `wl-copy`, e.g. `printf '%s\n' '<command>' | wl-copy`.
 - IDE: Neovim, Terminal: Foot
 - Package manager: `pacman`/`yay` (not apt/brew)
-- When a command needs sudo, copy it to clipboard via `wl-copy` instead of just printing it
+- Sudo commands: do not run them directly unless explicitly authorized; copy the exact command to the clipboard with `wl-copy` and say it was copied.
 
 ## Stack
 
@@ -23,13 +24,16 @@
 ## Language Conventions
 
 ### Python
+
 - No local imports — always import at the top of the file. Only exception: circular dependency resolution.
 - Logging: DEBUG for lifecycle details, INFO for state changes, WARNING for real problems.
 
 ### TypeScript
+
 - Strict mode. No `any`. Import types with `type` keyword.
 
 ### Bash
+
 - Run shellcheck on any script you write or edit.
 
 ## Code Quality

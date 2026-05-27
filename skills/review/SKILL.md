@@ -1,6 +1,6 @@
 ---
 name: review
-description: Code, plan, and implementation review against requirements and Orestes' standards. Use for review requests, after non-trivial implementation, or when dispatching reviewer subagents in spec-compliance or code-quality mode.
+description: Code, plan, and implementation review against requirements and configured project standards. Use for review requests, after non-trivial implementation, or when dispatching reviewer subagents in spec-compliance or code-quality mode.
 ---
 
 # Review

@@ -89,7 +89,7 @@ For async subagent reporting details, load and follow the `pi-subagents` skill. 
 
 **Stale context/tool errors are bugs, not noise.** Errors mentioning stale extension context, session replacement/reload, interrupted tool state, or invalid captured context should be investigated as agent-harness failure modes. Do not blindly retry; preserve the artifact path, inspect the session/log, and fix or report the underlying lifecycle issue.
 
-**No direct git mutation.** Never execute mutating `git` commands yourself. GitHub PR metadata/comment operations via `gh` are allowed when the user explicitly asks for them, including `gh pr edit`, `gh pr comment`, `gh pr review`, and `gh api` calls that create PR review comments. Still do not use `gh` to merge, close, reopen, label, assign, request reviewers, change bases, push branches, create/delete refs, or otherwise alter repository history/workflow state unless the user explicitly asks for that exact operation. If a blocked git mutation is needed, copy the exact command for the user with `wl-copy` and say it was copied.
+**No direct git mutation.** Never execute mutating `git` commands yourself. GitHub PR metadata/comment operations via `gh` are allowed when the user explicitly asks for them, including `gh pr edit`, `gh pr comment`, `gh pr review`, and `gh api` calls that create PR review comments. Still do not use `gh` to merge, close, reopen, label, assign, request reviewers, change bases, push branches, create/delete refs, or otherwise alter repository history/workflow state unless the user explicitly asks for that exact operation. If a blocked git mutation is needed, copy the exact command with the host clipboard tool and say it was copied.
 
 **Defer decisions to the user.** When multiple reasonable paths exist, when scope is unclear, or when a choice affects behavior, architecture, data, security, UX, tests, or workflow, do not pick silently. Present the smallest useful decision with a recommendation and wait for approval. Prefer pausing too early over doing a large batch the user may need to interrupt.
 
@@ -163,9 +163,9 @@ For unavoidable heavy commands, cap parallelism, use `nice`/lower-priority execu
 
 ### Clipboard-first commands
 
-When giving the user a command they are likely to run, strongly prefer copying it to the clipboard with `wl-copy` and explicitly say it was copied. Do this by default for multi-line commands, commands containing quotes/heredocs, and any command the user says they cannot easily copy. On this Wayland/sway system, use `wl-copy`/`wl-paste`, not xclip/xsel.
+When giving the user a command they are likely to run, strongly prefer copying it to the system clipboard and explicitly say it was copied. Use the clipboard tool configured for the host. Do this by default for multi-line commands, commands containing quotes/heredocs, and any command the user says they cannot easily copy.
 
-Prefer one-line shell commands when presenting commands for the user to copy/paste into a terminal. Avoid backslash line continuations in user-facing shell commands because terminal/TUI selection can copy padding spaces after `\` and break the command. If a command needs to run from a directory, prefer `(cd path && command ...)` as one line. Only use multiline commands when heredoc syntax materially matters; for destructive or hard-to-copy commands, copy the exact command with `wl-copy` instead of relying on terminal selection, and copy only the executable command text, not Markdown fences or explanatory prose.
+Prefer one-line shell commands when presenting commands for the user to copy/paste into a terminal. Avoid backslash line continuations in user-facing shell commands because terminal/TUI selection can copy padding spaces after `\` and break the command. If a command needs to run from a directory, prefer `(cd path && command ...)` as one line. Only use multiline commands when heredoc syntax materially matters; for destructive or hard-to-copy commands, copy the exact command with the host clipboard tool instead of relying on terminal selection, and copy only the executable command text, not Markdown fences or explanatory prose.
 
 ### Context preservation
 
@@ -197,11 +197,11 @@ These tools and skills are available — use them proactively:
 
 - **pi-web-access**: General web search and content extraction. Use for non-library topics. For library/framework docs, use context7 instead.
 - **pi-memory-md**: Cross-session memory stored as markdown files. Persist important decisions, patterns, or context that should survive across sessions.
-  - **Read memory first** for any nontrivial work involving these trigger words or concepts: debug, failure, failing test, CI, benchmark, bench-run, LegalBench, Valkyrie, model-proxy, gateway, platform, Dramatiq, Redis, Postgres, AWS, Docker, deploy, migration, refactor, architecture, setup, command, runbook, workflow, flaky, rate limit, token retry, queue, cancellation, or “how does this repo work”.
+  - **Read memory first** before any nontrivial work. This includes debugging, implementation, refactoring, architecture, CI, deployment, operations, benchmarking, workflow questions, or unfamiliar-repo investigation.
   - **Write memory aggressively** after discovering reusable repo knowledge, command flows, debugging flows, root causes, gotchas, environment setup, successful verification commands, failed approaches, or user preferences. Do not wait for the user to say “remember this”.
-  - **Common memory root:** `/home/orestes/.pi/memory-md/common`. Prefer this shared directory for durable knowledge that should transfer across repos or sessions. Use project memory only for narrow, repo-local notes that should not appear globally.
-  - Since `memory_write` is project-scoped, write common memories directly with `write` under `/home/orestes/.pi/memory-md/common/core/project/...` using normal YAML frontmatter. Use `memory_write` for project-scoped memories.
-  - Before writing, search/list first to update an existing focused file instead of creating duplicates. Use `memory_list`, `memory_search`, and targeted `grep` over `/home/orestes/.pi/memory-md/common/core`.
+  - **Common memory root:** `$HOME/.pi/memory-md/common`. Prefer this shared directory for durable knowledge that should transfer across repos or sessions. Use project memory only for narrow, repo-local notes that should not appear globally.
+  - Since `memory_write` is project-scoped, write common memories directly with `write` under `$HOME/.pi/memory-md/common/core/project/...` using normal YAML frontmatter. Use `memory_write` for project-scoped memories.
+  - Before writing, search/list first to update an existing focused file instead of creating duplicates. Use `memory_list`, `memory_search`, and targeted `grep` over `$HOME/.pi/memory-md/common/core`.
   - Maintain memory as curated runbooks, not a dump. If new facts supersede old ones, edit the existing memory to be current, specific, and shorter; do not append contradictions.
   - Do not duplicate authoritative behavioral rules from `AGENTS.md` into memory. Keep enforcement in config; memory may store repo/debug/runbook knowledge and short pointers only when useful.
   - **Metadata quality is mandatory, not clerical. Future agents see metadata before body content, so bad metadata makes good memory effectively invisible or actively misleading.** When creating or touching a memory file, update metadata in the same edit.
@@ -213,7 +213,6 @@ These tools and skills are available — use them proactively:
   - Use status honestly: `current`, `resolved`, `partial`, `abandoned`, `superseded`, `historical`, or `unknown`. If status is not current/resolved, make the caveat explicit before the runbook details. Mark stale duplicates `superseded` and point to the replacement.
   - Store sanitized reusable procedure, not raw logs or secrets. Capture exact working commands, cwd, required env vars, prerequisite services, failure symptoms, diagnosis steps, root cause, fix, and verification.
   - At the end of debugging/running sessions, ask: “What would save 30+ minutes next time?” Write that to memory before final response when non-sensitive; if no memory is written after a substantial debug/run session, say why.
-- **pi-rewind**: Per-turn file checkpoints. Use `/rewind` to restore files to a previous state if changes go wrong.
 - **self-improve**: End-of-session retrospective. Invoke with `/skill:self-improve` to analyze what went well/poorly and update config.
 - **session-reader**: Parse and analyze previous session JSONL files. Use when reviewing past work or debugging agent behavior.
 - **/continue**: When context is getting full, use `/continue` to write a distilled continuation file and start a fresh session.

@@ -11,9 +11,8 @@
       "lifecycle": "lazy"
     },
     "tree-sitter": {
-      "command": "node",
-      "cwd": "/home/orestes/.pi/agent",
-      "args": ["mcp-servers/tree-sitter/index.mjs"],
+      "command": "bash",
+      "args": ["-lc", "exec node \"${PI_AGENT_DIR:-$HOME/.pi/agent}/mcp-servers/tree-sitter/index.mjs\""],
       "directTools": ["search_symbols", "document_symbols", "symbol_definition", "pattern_search", "codebase_overview", "codebase_map"],
       "lifecycle": "keep-alive"
     },
@@ -29,7 +28,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "set -a; source /home/orestes/.config/pi/mcp-oauth/google_docs/env.sh; set +a; export npm_config_ignore_scripts=true; exec npx -y @a-bonus/google-docs-mcp@1.10.0"
+        "set -a; source \"${PI_CONFIG_DIR:-$HOME/.config/pi}/mcp-oauth/google_docs/env.sh\"; set +a; export npm_config_ignore_scripts=true; exec npx -y @a-bonus/google-docs-mcp@1.10.0"
       ],
       "lifecycle": "lazy"
     }

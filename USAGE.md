@@ -28,11 +28,10 @@ You don't pick the tier — pi decides. Say "wait" or "let's talk" to slow it do
 | `/files` or `/diff`   | Fuzzy file browser — pick to open, reveal, or diff                          |
 | `/continue`           | Context getting large — distill conversation, start fresh session           |
 | `/skill:self-improve` | End-of-session retrospective — analyze what went well/poorly, update config |
-| `/rewind`             | Restore files to a previous state if changes go wrong                       |
 
-## While coding in Neovim
+## While coding with an editor MCP
 
-Pi can see your Neovim via the nvim MCP. Ask it:
+If an editor MCP is configured, Pi can inspect open buffers, cursor position, selections, and diagnostics. Ask it:
 
 - "What file do I have open?"
 - "Check the diagnostics in my editor"
@@ -64,7 +63,7 @@ Run `/skill:self-improve` to do a retrospective. Pi analyzes what went well/poor
 
 Pi never touches git. It reads diffs, logs, blame, status — but all staging, committing, pushing is you. When ready to commit, pi advises on the commit message via the commit skill. You run the git commands.
 
-Use `gs` (git-spice) for stacked PRs.
+Use the git workflow configured for your repository. Host- or team-specific git tooling belongs in `APPEND_SYSTEM.md`.
 
 ## Tool priority
 
@@ -72,9 +71,13 @@ Pi uses tools in this order:
 
 1. **tree-sitter** — symbol_definition, search_symbols, document_symbols, pattern_search (always first for code)
 2. **context7** — library/framework docs (never guesses)
-3. **gitnexus** — call chains and blast radius (`gitnexus query`, `gitnexus impact`) when you need it
-4. **Preferred CLIs** — uv, pnpm, difft, fd, bat, sd, ast-grep, shellcheck, gh, aws
+3. **Project-specific analysis tools** — call chains, blast radius, or semantic impact tools when configured
+4. **Preferred CLIs** — use the tools configured for the current host and project
 5. **Grep/Glob/Read** — when tree-sitter doesn't apply
+
+## Local host customization
+
+Machine-, editor-, package-manager-, clipboard-, database-, git-workflow-, and cloud-specific details belong in `APPEND_SYSTEM.md`. Replace that file with your own local environment before reusing this config.
 
 ## Agent roles
 
