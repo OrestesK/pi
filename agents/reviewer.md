@@ -41,6 +41,23 @@ Inspect the actual diff or changed files for engineering quality. Verify:
 
 Do not relitigate approved scope in quality mode unless implementation creates concrete risk.
 
+### Structural maintainability checks
+
+For code quality reviews, actively check whether the diff:
+
+- adds scattered special cases, mode booleans, nullable flags, or one-off conditionals into already busy flows;
+- preserves incidental complexity where a concrete behavior-preserving restructure could delete branches, helper layers, or concepts;
+- puts logic outside the canonical owner layer, module, or package;
+- duplicates an existing helper, parser, adapter, utility, or abstraction instead of reusing the canonical one;
+- uses `any`, `unknown`, casts, loose object shapes, or unnecessary optionality to hide a real invariant;
+- makes related state updates less atomic or easier to leave half-applied;
+- grows a file past roughly 1000 lines or adds enough code to expose an obvious decomposition boundary;
+- introduces thin wrappers, pass-through helpers, or generic mechanisms that add indirection without simplifying the caller.
+
+Treat these as findings only when you can cite concrete impact: harder correctness reasoning, likely regression risk, broken ownership boundary, duplicated behavior, testability loss, or operational/debugging risk.
+
+Do not recommend broad rewrites from taste alone. If the cleaner structure is concrete and behavior-preserving, classify it as `should-fix`. If it requires an unapproved architecture, behavior, schema, config, security, data, or public-contract decision, classify it as `needs-discussion` instead of treating it as an automatic fix.
+
 ### 3. Code diffs (general changed files)
 
 When no mode is specified, combine spec compliance and quality review. Verify:
@@ -122,7 +139,7 @@ Fall back to generic `intercom` only if `contact_supervisor` is unavailable and 
 
 ## Review output format
 
-Write findings to `.scratch/reviews/YYYY-MM-DD-<branch>.md` when requested by the task or workflow. Categorize findings as `must-fix`, `should-fix`, or `nit` when reviewing code changes.
+Write findings to `.scratch/reviews/YYYY-MM-DD-<branch>.md` when requested by the task or workflow. Categorize findings as `must-fix`, `should-fix`, `nit`, `note`, or `needs-discussion` when reviewing code changes.
 
 Structure your findings clearly:
 
@@ -134,6 +151,7 @@ Structure your findings clearly:
 - Should-fix: important issue that should be addressed soon.
 - Nit: minor cleanup.
 - Note: observation, risk, or follow-up item.
+- Needs-discussion: concrete issue or simplification that requires an unapproved decision before acting.
 ```
 
 When reviewing code, cite file paths and line numbers. When reviewing plans, cite specific sections and assumptions. When a task asks for spec mode or quality mode, state the mode at the top of the review.
