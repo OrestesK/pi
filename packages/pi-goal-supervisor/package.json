@@ -1,0 +1,39 @@
+{
+  "name": "pi-goal-supervisor",
+  "version": "0.1.0",
+  "description": "Non-invasive session-scoped goal continuation supervisor for Pi",
+  "type": "module",
+  "author": "OrestesK",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "goal",
+    "autonomy",
+    "supervisor"
+  ],
+  "files": [
+    "src/",
+    "docs/",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm test && npm run typecheck"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  }
+}
