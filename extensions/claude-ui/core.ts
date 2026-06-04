@@ -6,8 +6,6 @@ import { homedir, tmpdir } from "node:os";
 import { basename, extname, isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
-	ANSI_BLINK,
-	ANSI_BLINK_RESET,
 	ANSI_FG_RESET,
 	EDITOR_RULE_ACCENT,
 	USER_MESSAGE_ACCENT,
@@ -2270,7 +2268,7 @@ function callLine(
 	body: string,
 	pending = false,
 ): string {
-	const marker = pending ? `${ANSI_BLINK}●${ANSI_BLINK_RESET}` : "●";
+	const marker = pending ? "◦" : "●";
 	return `${theme.fg("accent", marker)} ${label(theme, title)}${muted(
 		theme,
 		"(",
@@ -4448,6 +4446,7 @@ export default function (pi: ExtensionAPI) {
 	let workingState: WorkingState = "inactive";
 	let workingStateStartedAt: number | undefined;
 	let statusAnimationTimer: ReturnType<typeof setInterval> | undefined;
+	let idleReconcileTimer: ReturnType<typeof setTimeout> | undefined;
 	let footerRenderRevision = 0;
 	const footerDisposers = new Set<() => void>();
 
@@ -4472,6 +4471,11 @@ export default function (pi: ExtensionAPI) {
 		if (statusAnimationTimer) return;
 		statusAnimationTimer = setInterval(requestRender, 1000);
 		(statusAnimationTimer as { unref?: () => void }).unref?.();
+	};
+	const clearIdleReconcile = () => {
+		if (!idleReconcileTimer) return;
+		clearTimeout(idleReconcileTimer);
+		idleReconcileTimer = undefined;
 	};
 	const isStaleContextError = (error: unknown) =>
 		error instanceof Error &&
@@ -4505,6 +4509,7 @@ export default function (pi: ExtensionAPI) {
 	};
 	const setWorkingState = (state: WorkingState, ctx?: ExtensionContext) => {
 		if (ctx && safeHasUI(ctx)) hideBuiltInWorking(ctx);
+		if (state === "inactive") clearIdleReconcile();
 		if (workingState === state) return;
 		workingState = state;
 		workingStateStartedAt = state === "inactive" ? undefined : Date.now();
@@ -4520,8 +4525,12 @@ export default function (pi: ExtensionAPI) {
 		}
 	};
 	const scheduleIdleReconcile = () => {
-		const timer = setTimeout(reconcileIdleState, 50);
-		(timer as { unref?: () => void }).unref?.();
+		if (idleReconcileTimer) return;
+		idleReconcileTimer = setTimeout(() => {
+			idleReconcileTimer = undefined;
+			reconcileIdleState();
+		}, 50);
+		(idleReconcileTimer as { unref?: () => void }).unref?.();
 	};
 
 	patchToolExecutionRenderers();
@@ -4656,8 +4665,9 @@ export default function (pi: ExtensionAPI) {
 	pi.on("message_update", (event, ctx) => {
 		if (!safeHasUI(ctx)) return;
 		activeCtx = ctx;
-		bumpFooterRenderRevision();
-		sessionCostCache.delete(ctx);
+		// Keep footer context/cost stable during assistant streaming. Recomputing
+		// context usage on every message_update makes keystroke-triggered renders
+		// scale with transcript size in long sessions; turn boundaries refresh it.
 		if (event.message.role === "assistant") {
 			const idleState = safeIdleState(ctx);
 			if (idleState === "stale") {
@@ -4714,6 +4724,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_shutdown", () => {
 		stopStatusAnimation();
+		clearIdleReconcile();
 		toolExecutionExpandedById.clear();
 		for (const dispose of footerDisposers) dispose();
 		footerDisposers.clear();
