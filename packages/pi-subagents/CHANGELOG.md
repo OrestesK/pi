@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Async `events.jsonl` now persists compact child-event observations instead of full child message/tool/stdout/stderr payloads, keeping liveness and control breadcrumbs without retaining large context snapshots or thinking signatures.
+
 ## [0.24.0] - 2026-05-03
 
 ### Changed

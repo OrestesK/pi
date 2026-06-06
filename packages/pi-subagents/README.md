@@ -924,7 +924,7 @@ Async runs write:
   subagent-log-<id>.md
 ```
 
-`status.json` powers the widget and `subagent({ action: "status" })` output. `events.jsonl` contains wrapper events plus child Pi JSON events annotated with run and step metadata. `output-<n>.log` is a live human-readable tail. Fallback information is persisted so background runs are debuggable after completion. On extension startup, async run directories older than 24 hours are removed after they reach a terminal state (`complete` or `failed`) or no longer contain a readable status file; `queued`, `running`, and `paused` runs are retained.
+`status.json` powers the widget and `subagent({ action: "status" })` output, including liveness details such as last activity, current tool, turn counts, and token counts. `events.jsonl` contains wrapper/control events plus compact child-event observations annotated with run and step metadata; it intentionally does not persist child message snapshots, tool arguments/results, stdout/stderr text, or thinking signatures. `output-<n>.log` is a live human-readable tail. Fallback information is persisted so background runs are debuggable after completion. On extension startup, async run directories older than 24 hours are removed after they reach a terminal state (`complete` or `failed`) or no longer contain a readable status file; `queued`, `running`, and `paused` runs are retained.
 
 ## Live progress
 

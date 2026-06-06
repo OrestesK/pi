@@ -77,6 +77,7 @@ import {
 } from "../shared/long-running-guard.ts";
 import { parseSessionTokens } from "../../shared/session-tokens.ts";
 import type { TokenUsage } from "../../shared/types.ts";
+import { compactChildEventForAsyncLog } from "./child-event-log.ts";
 import {
 	cleanupWorktrees,
 	createWorktrees,
@@ -213,7 +214,7 @@ type ChildMessage = Message & {
 	usage?: ChildUsage;
 };
 
-interface ChildEvent {
+interface ChildEvent extends Record<string, unknown> {
 	type?: string;
 	message?: ChildMessage;
 	toolName?: string;
@@ -287,7 +288,7 @@ function runPiStreaming(
 			appendJsonl(
 				childEventContext.eventsPath,
 				JSON.stringify({
-					...event,
+					...compactChildEventForAsyncLog(event),
 					subagentSource: "child",
 					subagentRunId: childEventContext.runId,
 					subagentStepIndex: childEventContext.stepIndex,
