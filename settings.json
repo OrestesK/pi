@@ -2,7 +2,6 @@
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.5",
   "defaultThinkingLevel": "high",
-  "theme": "gruvbox-custom",
   "quietStartup": true,
   "steeringMode": "all",
   "followUpMode": "all",
@@ -12,17 +11,10 @@
     "skipPrompt": true
   },
   "hideThinkingBlock": true,
-  "terminal": {
-    "showImages": true,
-    "imageWidthCells": 80,
-    "showTerminalProgress": true
-  },
-  "editorPaddingX": 0,
   "retry": {
     "maxRetries": 3,
     "baseDelayMs": 2000
   },
-  "lastChangelogVersion": "0.73.1",
   "transport": "auto",
   "compaction": {
     "enabled": true,
@@ -39,27 +31,11 @@
     "judgeModel": "openai-codex/gpt-5.5",
     "judgeThreshold": 7,
     "repairAttempts": 3,
-    "rejectedSummaryMode": "ask",
+    "rejectedSummaryMode": "accept",
     "pendingTtlMs": 300000,
     "artifactRoot": ".scratch/compactions"
   },
-  "pi-memory-md": {
-    "enabled": true,
-    "memoryDir": {
-      "localPath": "~/.pi/memory-md",
-      "globalMemory": "common"
-    },
-    "delivery": "system-prompt",
-    "hooks": {
-      "sessionStart": [],
-      "sessionEnd": []
-    },
-    "tape": {
-      "enabled": false
-    }
-  },
   "packages": [
-    "extensions/claude-ui",
     "packages/pi-subagents",
     "npm:pi-mcp-adapter",
     {
@@ -69,13 +45,6 @@
       ]
     },
     "npm:pi-web-access",
-    "packages/pi-memory-md",
-    "npm:@aliou/pi-guardrails",
-    "npm:@aliou/pi-toolchain",
-    {
-      "source": "npm:pi-ask-user",
-      "skills": []
-    },
     {
       "source": "packages/context-mode",
       "skills": [
@@ -83,15 +52,11 @@
         "ctx-doctor"
       ]
     },
-    "npm:pi-intercom",
-    "packages/pi-codex-retry",
-    "packages/pi-slipstream-compact",
-    "packages/pi-goal-supervisor",
-    "npm:pisesh"
+    "npm:pi-slipstream-compact",
+    "packages/pi-goal-supervisor"
   ],
   "subagents": {
     "disableBuiltins": false
   },
-  "autocompleteMaxVisible": 10,
-  "doubleEscapeAction": "tree"
+  "autocompleteMaxVisible": 10
 }

@@ -5,39 +5,24 @@
       "args": [],
       "lifecycle": "lazy"
     },
-    "nvim": {
-      "command": "uvx",
-      "args": ["nvim-mcp"],
-      "lifecycle": "lazy"
-    },
     "tree-sitter": {
       "command": "bash",
-      "args": ["-lc", "exec node \"${PI_AGENT_DIR:-$HOME/.pi/agent}/mcp-servers/tree-sitter/index.mjs\""],
-      "directTools": ["search_symbols", "document_symbols", "symbol_definition", "pattern_search", "codebase_overview", "codebase_map"],
+      "args": [
+        "-lc",
+        "exec node \"${PI_CONFIG_DIR:-/opt/orestes-pi-config}/mcp-servers/tree-sitter/index.mjs\""
+      ],
+      "directTools": [
+        "search_symbols",
+        "document_symbols",
+        "symbol_definition",
+        "pattern_search",
+        "codebase_overview",
+        "codebase_map"
+      ],
       "lifecycle": "keep-alive"
     },
     "context-mode": {
       "command": "context-mode",
-      "lifecycle": "lazy"
-    },
-    "notion": {
-      "url": "https://mcp.notion.com/mcp",
-      "lifecycle": "lazy"
-    },
-    "google_docs": {
-      "command": "bash",
-      "args": [
-        "-lc",
-        "set -a; source \"${PI_CONFIG_DIR:-$HOME/.config/pi}/mcp-oauth/google_docs/env.sh\"; set +a; export npm_config_ignore_scripts=true; exec npx -y @a-bonus/google-docs-mcp@1.10.0"
-      ],
-      "lifecycle": "lazy"
-    },
-    "slack": {
-      "command": "bash",
-      "args": [
-        "-lc",
-        "set -a; source \"${PI_CONFIG_DIR:-$HOME/.config/pi}/mcp-oauth/slack/env.sh\"; set +a; exec \"${PI_SLACK_MCP_SERVER_BIN:-$HOME/.local/bin/slack-mcp-server-patched}\" --transport stdio"
-      ],
       "lifecycle": "lazy"
     }
   }
