@@ -1,40 +1,45 @@
 ---
 name: memory-init
-description: Initialize memory repository - clone git repo and create directory structure. Use when you need to set up pi-memory-md for the first time or initalize project's memory files.
+description: Initialize local pi-memory-md directories, with optional git sync when repoUrl is configured. Use when you need to set up pi-memory-md for the first time or initialize project memory files.
 ---
 
 ## Overview
 
-1. Run [scripts/memory-init.sh](scripts/memory-init.sh) to clone/sync repo and create directories
-2. Read and copy template files from [templates/](templates/) (user decides which)
+1. Inspect settings and create the local memory directories under `localPath`
+2. If `repoUrl` is configured and the user wants git sync, initialize/clone/sync the git repository outside this skill’s direct file writes
+3. Read and copy template files from [templates/](templates/) only after user confirmation
 
 ## Prerequisites
 
 Before running this skill, ensure:
+
 - Package installed: `pi install npm:pi-memory-md`
-- Settings configured with `repoUrl` in your settings file
-- Git repository created and accessible
+- `localPath` is configured in global settings or you accept the default `~/.pi/memory-md`
+- Optional: `repoUrl` is configured and accessible if you want pull/push sync
 
 ## Execution Steps
 
-### Step 1: Run Initialization Script
+### Step 1: Initialize Local Directories
 
-Execute the initialization script: [scripts/memory-init.sh](scripts/memory-init.sh)
+Read settings from global pi settings, then calculate:
 
-The script will:
-1. Read settings from `.pi/settings.json` or `$PI_CODING_AGENT_DIR/settings.json`
-2. Calculate memory directories
-3. Clone or sync the git repository
-4. Create `core/project/`
+1. `localPath`
+2. Project memory directory for the current cwd
+3. Optional `globalMemory` directory
+
+Create the project memory directory and its `core/project/` folder. If `globalMemory` is enabled, create that directory too. Do not require `repoUrl` for local-only memory.
+
+If the user wants git sync and `repoUrl` is configured, they may initialize or clone the memory repository before creating files. Do not claim pull/push sync is available unless `localPath` is git-backed and `repoUrl` is configured.
 
 ### Step 2: Configure globalMemory (if applicable)
 
-Read settings from `.pi/settings.json` or `$PI_CODING_AGENT_DIR/settings.json` and check for `globalMemory` configuration.
+Read `globalMemory` from global pi settings. Project `.pi/settings.json` does not override `pi-memory-md.memoryDir`, so do not use project settings to decide whether shared global memory is enabled.
 
-Then ask user whether they also want to create default global files under the configured `globalMemory` directory:
-- `{globalMemory}/USER.md` from `user-template.md`
-- `{globalMemory}/MEMORY.md` from `memory-template.md`
-- `{globalMemory}/TASK.md` from `task-template.md`
+Then ask user whether they also want to create default global files under the configured `globalMemory` core directory:
+
+- `{globalMemory}/core/USER.md` from `user-template.md`
+- `{globalMemory}/core/MEMORY.md` from `memory-template.md`
+- `{globalMemory}/core/TASK.md` from `task-template.md`
 
 ### Step 3: Copy Template Files for Project Memory (Optional)
 
@@ -56,7 +61,7 @@ cp templates/user-template.md {projectMemoryDir}/core/USER.md
 
 ### Step 4: Import Preferences from AGENTS.md (Optional)
 
-This step extracts preferences from AGENTS.md to populate project `core/USER.md` and, if global memory is enabled, `{globalMemory}/USER.md`.
+This step extracts preferences from AGENTS.md to populate project `core/USER.md` and, if global memory is enabled, `{globalMemory}/core/USER.md`.
 
 1. **Find AGENTS.md** (check in order):
    - Project root: `{cwd}/AGENTS.md`
@@ -76,18 +81,19 @@ This step extracts preferences from AGENTS.md to populate project `core/USER.md`
    - Technical Preferences
 
 4. **Summarize and confirm**:
+
    ```
    Found these preferences in AGENTS.md:
    - IMPORTANT Rules: [1-2 sentence summary]
    - Code Quality Principles: [1-2 sentence summary]
    - Coding Style: [1-2 sentence summary]
 
-   Include these in project core/USER.md and, if available, {globalMemory}/USER.md? (yes/no)
+   Include these in project core/USER.md and, if available, {globalMemory}/core/USER.md? (yes/no)
    ```
 
 5. **If confirmed**, update or create the target profile files with:
    - `core/USER.md`
-   - `{globalMemory}/USER.md` if global memory is enabled
+   - `{globalMemory}/core/USER.md` if global memory is enabled
    - Extracted content from AGENTS.md
    - Keep the existing frontmatter (description, tags, created)
 
@@ -101,24 +107,26 @@ This step extracts preferences from AGENTS.md to populate project `core/USER.md`
 Ask user whether they want to create any additional folders beyond `core/project`.
 
 Examples:
+
 - `reference/`
 - `archive/`
 - Any custom project-specific folder
 
 If YES, ask for the folder names and create them under the project memory directory.
 
-### Step 6: Verify Setup
+### Step 6: Inspect Setup
 
-Call `memory_check` tool to verify setup is correct.
+Call the `memory_check` tool to inspect project memory plus configured shared-global memory, including folder structure and file counts.
 
 ## Memory Repository Structure
 
 ```
 {localPath}/
 ├── {globalMemory}/            # (if globalMemory config block exists)
-│   ├── USER.md                # Shared user profile and preferences
-│   ├── MEMORY.md              # Shared durable notes, conventions, and lessons learned
-│   └── TASK.md                # Shared task and planning file
+│   └── core/
+│       ├── USER.md            # Shared user profile and preferences
+│       ├── MEMORY.md          # Shared durable notes, conventions, and lessons learned
+│       └── TASK.md            # Shared task and planning file
 └── {project-name}/
     └── core/
         ├── USER.md            # Project user profile and preferences
@@ -132,36 +140,36 @@ Call `memory_check` tool to verify setup is correct.
 START
   │
   ▼
-Run scripts/memory-init.sh
+Read settings and create local memory directories
   │
   ▼
-Script reads settings, clones/syncs repo, and creates project directories
+If repoUrl is configured and sync is desired, ensure localPath is git-backed
   │
   ▼
-Check script result: globalMemory enabled?
+Check settings: is globalMemory enabled?
   │
   ├─ NO ──► Continue with project setup
   │
   └─ YES
       │
       ▼
-  Ensure global memory directory exists
+  Ensure {globalMemory}/core directory exists
       │
       ▼
-  Ask: Create {globalMemory}/USER.md, {globalMemory}/MEMORY.md, and {globalMemory}/TASK.md?
+  Ask: Create {globalMemory}/core/USER.md, {globalMemory}/core/MEMORY.md, and {globalMemory}/core/TASK.md?
       │
       ├─ NO ──► Skip global files
       │
       └─ YES
           │
           ▼
-      Copy user-template.md to {globalMemory}/USER.md
+      Copy user-template.md to {globalMemory}/core/USER.md
           │
           ▼
-      Copy memory-template.md to {globalMemory}/MEMORY.md
+      Copy memory-template.md to {globalMemory}/core/MEMORY.md
           │
           ▼
-      Copy task-template.md to {globalMemory}/TASK.md
+      Copy task-template.md to {globalMemory}/core/TASK.md
           │
           ▼
 Continue with project setup
@@ -190,14 +198,14 @@ Ask: Import preferences from AGENTS.md?
   Read AGENTS.md and extract preferences
       │
       ▼
-  Ask: Confirm import to project core/USER.md and, if available, {globalMemory}/USER.md?
+  Ask: Confirm import to project core/USER.md and, if available, {globalMemory}/core/USER.md?
       │
       ├─ NO ──► Ask for additional preferences
       │
       └─ YES
           │
           ▼
-      Update project core/USER.md and, if available, {globalMemory}/USER.md
+      Update project core/USER.md and, if available, {globalMemory}/core/USER.md
           │
           ▼
       Ask: Additional preferences?
@@ -206,7 +214,10 @@ Ask: Import preferences from AGENTS.md?
 Ask: Create any additional folders?
   │
   ▼
-Verify with /memory-status
+Inspect with memory_check for project/shared-global structure and file counts
+  │
+  ▼
+Optionally use /memory-check for a lighter project-tree-only view
   │
   ▼
 DONE
@@ -214,13 +225,13 @@ DONE
 
 ## Error Handling
 
-| Error | Solution |
-|-------|----------|
-| `settings not found` | Configure `pi-memory-md` in settings file |
-| `repoUrl not configured` | Add `repoUrl` to settings |
-| `Permission denied` | Check SSH keys: `ssh -T git@github.com` |
-| `Directory exists but not git` | Remove directory manually and retry |
-| `Connection timeout` | Check network, try again |
+| Error                              | Solution                                                                         |
+| ---------------------------------- | -------------------------------------------------------------------------------- |
+| `settings not found`               | Configure `pi-memory-md` in settings file                                        |
+| Pull/push reports missing repo URL | Local-only memory can continue; add `repoUrl` only if pull/push sync is required |
+| `Permission denied`                | Check SSH keys: `ssh -T git@github.com` if using git sync                        |
+| `Directory exists but not git`     | Use it as local-only memory, or initialize git if sync is required               |
+| `Connection timeout`               | Check network and try again if using git sync                                    |
 
 ## Templates
 
@@ -229,10 +240,6 @@ Copy these templates to start:
 - [templates/task-template.md](templates/task-template.md) — Project tasks and planning template
 - [templates/user-template.md](templates/user-template.md) — User profile and preferences template
 - [templates/memory-template.md](templates/memory-template.md) — Hermes-inspired durable notes, conventions, and lessons learned template for `globalMemory` only
-
-## Scripts
-
-- [scripts/memory-init.sh](scripts/memory-init.sh) — Initialize memory repository (clone repo, create minimal directories)
 
 ## Related Skills
 

@@ -35,7 +35,7 @@ pi/
 - MCP: registered in `mcp.json`; most servers are lazy
 - Memory: `pi-memory-md` delivers selected memory into the system prompt
 - Extensions: local commands, UI helpers, todos, and guardrails are auto-discovered from `extensions/`
-- Safety: prompt policy plus `extensions/guardrails.json` for destructive commands and configured secret paths; `permissions.json` is `yolo`, so sensitive-tool approvals are not runtime confirmations
+- Safety: prompt policy plus `extensions/guardrails.json` for configured destructive command patterns and protected paths; `permissions.json` is `yolo`, so sensitive-tool approvals are not runtime confirmations
 
 ## Enabled packages
 

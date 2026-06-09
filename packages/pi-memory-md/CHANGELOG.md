@@ -2,6 +2,15 @@
 
 The npm release may lag behind the GitHub version. To get the latest updates, install from GitHub: `pi install git:github.com/VandeeFeng/pi-memory-md`
 
+## [0.1.36] - 2026-06-09
+
+### Fixed
+
+- Rebuild memory/tape delivery context after successful compaction.
+  In `message-append` mode, memory is delivered again on the next agent turn so compaction does not permanently drop the earlier hidden memory message from active context.
+  `system-prompt` mode keeps its normal per-turn delivery behavior while using the refreshed context.
+- Removed repeated runtime reads of deprecated `injection`; settings loading still accepts `injection` and normalizes it into `delivery`.
+
 ## [0.1.35] - 2026-04-30
 
 For global and shared knowledge, I still personally prefer AGENTS.md + manual management. So I won't add global memory writes to `memory_write`; the native `write` tool + AGENTS.md is already convenient enough.
@@ -16,7 +25,7 @@ Those new Markdown files are not mandatory, they can work well alongside the use
 
 ## Changes
 
-- Updated memory layout naming and initialization paths: shared global files now live directly under `{globalMemory}/` as `USER.md`, `MEMORY.md`, and `TASK.md`, while project task memory now uses `core/TASK.md` instead of `core/task/task.md`.
+- Updated memory layout naming and initialization paths: shared global files now live under `{globalMemory}/core/` as `USER.md`, `MEMORY.md`, and `TASK.md`, while project task memory now uses `core/TASK.md` instead of `core/task/task.md`.
   `MEMORY.md` is only offered for `globalMemory`, and preference content is consolidated into `USER.md` instead of separate `prefer.md` files.
   This keeps the structure closer to agent conventions like Hermes/OpenClaw and only affects newly initialized files and context selection behavior, not existing memory files.
 
@@ -54,6 +63,7 @@ I'm really happy to have such helpful contributions — everyone's support has h
 And I've learned a lot!
 
 Special thanks to:
+
 - [@nqh-packages](https://github.com/nqh-packages)'s PR [#7](https://github.com/VandeeFeng/pi-memory-md/pull/7) for the globalMemory feature contribution!
 - [@musaddiq-dev](https://github.com/musaddiq-dev)'s PR [#8](https://github.com/VandeeFeng/pi-memory-md/pull/8) for husky config to avoid `pi update` failure.
 
@@ -77,13 +87,15 @@ The experience of this part is the same as before, even smoother.
 ### Changes
 
 - **Unified `memoryDir` config block**: `repoUrl`, `localPath`, and `globalMemory` are now consolidated under `memoryDir` for cleaner configuration. Top-level fields remain supported for backward compatibility.
+
   ```md
   "memoryDir": {
-    "repoUrl": "git@github.com:username/repo.git", // Or HTTPS format
-    "localPath": "~/.pi/memory-md",
-    "globalMemory": "global"
+  "repoUrl": "git@github.com:username/repo.git", // Or HTTPS format
+  "localPath": "~/.pi/memory-md",
+  "globalMemory": "global"
   }
   ```
+
   Previously these were separate top-level fields. They still work, but `memoryDir` is the preferred structure.
 
 - **Replaced `/memory-init` command and built-in tool with `memory-init` skill**: Provides greater flexibility and user-driven configuration instead of hardcoded logic.
@@ -144,7 +156,7 @@ For now, this project needs to focus on the fundamentals — solid framework des
 ### Fixed
 
 - **Tape reader LRU caching**: Added `LRUCache` class to replace the unbounded `Map` caches in `tape-reader.ts`, preventing memory bloat during long sessions. `getSessionFilePath` now also validates session header cache via mtime/size before returning cached results.
-- **AnchorStore findById simplification**: `findById` now uses `allAnchors` instead of iterating nested index maps, reducing lookup complexity from O(n*m) to O(n).
+- **AnchorStore findById simplification**: `findById` now uses `allAnchors` instead of iterating nested index maps, reducing lookup complexity from O(n\*m) to O(n).
 - **Tape context warmup fix**: `initDeliveryContent` (formerly `initMemoryContext`) now returns `true` when tape is enabled (even without memory directory), preventing the repeated `cacheInitialContext` calls that used to happen on every `before_agent_start` when memory files don't exist.
 
 ## [0.1.31] - 2026-04-25
@@ -219,6 +231,7 @@ The npm release may lag behind the GitHub version. To get the latest updates, in
 - **Git sync noise reduction**: Session-start pull and session-end push now skip redundant syncs, and successful no-op syncs no longer notify the user.
 
   This was really annoying!
+
 - **Tape memory summary reuse**: Tape smart-mode delivery now normalizes selected paths under the memory directory and reuses the traditional memory summary output (`Description`/`Tags`) for them, even when selected via absolute paths.
 
 ### Fixed

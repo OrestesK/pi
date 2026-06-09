@@ -363,7 +363,7 @@ function registerLifecycleHandlers(
 			state.sessionStartHookPromise = null;
 		}
 
-		const mode = settings.delivery ?? settings.injection ?? "message-append";
+		const mode = settings.delivery ?? "message-append";
 		const shouldDeliverInitialContext =
 			mode === "system-prompt" || !state.hasDeliveredInitialContext;
 		const tapeEnabled = settings.tape?.enabled;
@@ -430,6 +430,17 @@ function registerLifecycleHandlers(
 		}
 
 		return undefined;
+	});
+
+	pi.on("session_compact", async (_event, ctx) => {
+		ensureTapeRuntime(settings, state, ctx, { recordSessionStart: false });
+		await cacheInitialContext(settings, state, ctx);
+
+		const mode = settings.delivery ?? "message-append";
+		if (mode === "message-append") {
+			state.hasDeliveredInitialContext = false;
+			state.hasNotifiedInitialContext = false;
+		}
 	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
@@ -580,7 +591,7 @@ function registerMemoryCommands(
 			state.hasDeliveredInitialContext = false;
 			state.hasNotifiedInitialContext = false;
 
-			const mode = settings.delivery ?? settings.injection ?? "message-append";
+			const mode = settings.delivery ?? "message-append";
 
 			const { content, fileCount } = state.initialMemoryContext;
 

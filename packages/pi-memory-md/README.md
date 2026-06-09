@@ -1,12 +1,13 @@
 # pi-memory-md
 
-Letta-like memory management for [pi](https://github.com/badlogic/pi-mono) using git-backed markdown files.
+Letta-like memory management for [pi](https://github.com/badlogic/pi-mono) using local markdown files with optional git sync.
 
 ## Features
 
 - **Persistent Memory**: Store context, preferences, and knowledge across sessions
-- **Git-backed**: Version control with full history
-- **Prompt append**: Memory index automatically appended to conversation at session start
+- **Local-first**: Read, write, list, and search memory from a local directory
+- **Optional Git sync**: Add `repoUrl` when you want version control and cross-device sync
+- **Prompt delivery**: Memory index is delivered before the first agent turn according to the configured delivery mode
 - **On-demand access**: LLM reads full content via tools when needed
 - **Multi-project**: Separate memory spaces per project
 
@@ -18,22 +19,25 @@ pi install npm:pi-memory-md
 # Or for latest from GitHub:
 pi install git:github.com/VandeeFeng/pi-memory-md
 
-# 2. Create a git repository (private recommended)
-
-# 3. Configure pi
+# 2. Configure pi
 # Add to ~/.pi/agent/settings.json:
 {
   "pi-memory-md": {
     "memoryDir": {
-      "repoUrl": "git@github.com:username/repo.git", // Or HTTPS format
       "localPath": "~/.pi/memory-md",
-      "globalMemory": "global" // optional, global as default
+      "globalMemory": "global" // optional shared memory folder
+    },
+    "hooks": {
+      "sessionStart": [],
+      "sessionEnd": []
     }
   }
 }
 
-# 4. Start a new pi session
-# type /skill:memory-init slash command to initialize the memory files
+# 3. Start a new pi session
+# type /skill:memory-init slash command to initialize local memory files
+
+# Optional: add memoryDir.repoUrl and restore pull/push hooks when you want git sync.
 ```
 
 > **Security recommendation**
@@ -49,13 +53,13 @@ pi install git:github.com/VandeeFeng/pi-memory-md
 ```
 Session Start
     ↓
-1. Git pull (sync latest changes)
+1. Prepare local memory context; run configured sync hooks when the current session lifecycle supports them
     ↓
-2. Scan all .md files in memory directory
+2. Scan visible, non-superseded `.md` files under the project memory root and configured shared-global memory
     ↓
 3. Build index (descriptions + tags only - NOT full content)
     ↓
-4. Deliver memory index via `message-append` or `system-prompt`
+4. Deliver memory index before the first agent turn via `message-append` or `system-prompt`
     ↓
 5. LLM reads full file content via tools when needed
 ```
@@ -64,12 +68,12 @@ Session Start
 
 You can also use these slash commands directly in pi:
 
-| Command | Description |
-|---------|-------------|
-| `/skill:memory-init` | Initialize memory repository (clone/sync repo, create minimal core directories, optionally add templates) |
-| `/memory-status` | Show memory repository status (project name, git status, path) |
-| `/memory-refresh` | Refresh memory context from files (rebuild cache and deliver into current session) |
-| `/memory-check` | Check memory folder structure (display directory tree) |
+| Command              | Description                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| `/skill:memory-init` | Initialize local memory directories, optionally using a configured git repo for sync |
+| `/memory-status`     | Show memory repository status (project name, git status, path)                       |
+| `/memory-refresh`    | Refresh memory context from files (rebuild cache and deliver into current session)   |
+| `/memory-check`      | Show the current project memory directory tree                                       |
 
 ## Available Tools
 
@@ -77,13 +81,13 @@ The LLM can use these tools to interact with memory:
 
 ### Memory Management Tools
 
-| Tool | Parameters | Description |
-|------|------------|-------------|
-| `memory_sync` | `{action: "pull" / "push" / "status"}` | Git operations |
-| `memory_write` | `{path, content, description, tags?}` | Write a project memory file by relative path |
-| `memory_list` | `{directory?: string}` | List visible memory by relative path; global paths stay absolute; `status: superseded` files are hidden |
-| `memory_search` | `{query?, grep?, rg?}` | Search by tags/description and custom grep/ripgrep patterns, including superseded files |
-| `memory_check` | `{}` | Check current project memory folder structure |
+| Tool            | Parameters                             | Description                                                                                             |
+| --------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `memory_sync`   | `{action: "pull" / "push" / "status"}` | Git status/sync when the memory directory is git-backed; status also reports local-only initialization  |
+| `memory_write`  | `{path, content, description, tags?}`  | Write a project memory file by relative path                                                            |
+| `memory_list`   | `{directory?: string}`                 | List visible memory by relative path; global paths stay absolute; `status: superseded` files are hidden |
+| `memory_search` | `{query?, grep?, rg?}`                 | Search by tags/description and custom grep/ripgrep patterns, including superseded files                 |
+| `memory_check`  | `{}`                                   | Inspect project memory plus configured shared-global memory, including file counts                      |
 
 ## Memory File Format
 
@@ -105,9 +109,10 @@ Markdown content...
 ```
 ~/.pi/memory-md/
 ├── global/                 # Optional shared memory when globalMemory is enabled
-│   ├── USER.md             # Optional shared user profile and preferences
-│   ├── MEMORY.md           # Optional shared durable notes, conventions, and lessons learned
-│   └── TASK.md             # Optional shared task template
+│   └── core/
+│       ├── USER.md         # Optional shared user profile and preferences
+│       ├── MEMORY.md       # Optional shared durable notes, conventions, and lessons learned
+│       └── TASK.md         # Optional shared task template
 └── project-name/
     ├── core/
     │   ├── USER.md         # Optional project user profile and preferences
@@ -127,18 +132,18 @@ Markdown content...
   "pi-memory-md": {
     // "enabled": false,
 
-    "memoryDir":{
-    // git remote url
-    "repoUrl": "git@github.com:username/repo.git", // Or HTTPS format
+    "memoryDir": {
+      // Optional git remote URL for pull/push sync. Omit for local-only memory.
+      // "repoUrl": "git@github.com:username/repo.git", // Or HTTPS format
 
-    // Root dir for all memory (cloned from repo) `~/.pi/memory-md` as default
-    "localPath": "~/.pi/memory-md",
+      // Root dir for all memory. `~/.pi/memory-md` as default.
+      "localPath": "~/.pi/memory-md",
 
-    // Shared memory folder name under localPath.
-    // Only enabled when explicitly configured
-    // "global" -> {localPath}/global, "foo/bar" -> {localPath}/bar.
-    // "" or omitted -> disabled, "   " -> {localPath}/global, ".." -> {localPath}/global.
-    "globalMemory": "global"
+      // Shared memory folder name under localPath.
+      // Only enabled when explicitly configured
+      // "global" -> {localPath}/global, "foo/bar" -> {localPath}/bar.
+      // "" or omitted -> disabled, "   " -> {localPath}/global, ".." -> {localPath}/global.
+      "globalMemory": "global"
     },
 
     // `injection` is still accepted as a legacy alias for `delivery`.
@@ -151,16 +156,16 @@ Markdown content...
 }
 ```
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `enabled` | `true` | Enable extension |
-| `memoryDir.repoUrl` | Required | Git repository URL |
-| `memoryDir.localPath` | `~/.pi/memory-md` | Local memory clone path |
-| `memoryDir.globalMemory` | disabled | Shared memory folder name (relative to `localPath`), enabled only when explicitly configured |
-| `delivery` | `"message-append"` | Memory delivery mode: `"message-append"`, `"system-prompt"` |
-| `hooks.sessionStart` | `["pull"]` | Actions to run when a session starts |
-| `hooks.sessionEnd` | `[]` | Actions to run when a session ends |
-| `tape.enabled` | `false` | Enable tape mode for dynamic context selection |
+| Setting                  | Default            | Description                                                                                                                   |
+| ------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`                | `true`             | Enable extension                                                                                                              |
+| `memoryDir.repoUrl`      | unset              | Optional git repository URL for pull/push sync                                                                                |
+| `memoryDir.localPath`    | `~/.pi/memory-md`  | Local memory root path                                                                                                        |
+| `memoryDir.globalMemory` | disabled           | Shared memory folder name (relative to `localPath`), enabled only when explicitly configured                                  |
+| `delivery`               | `"message-append"` | Memory delivery mode: `"message-append"`, `"system-prompt"`                                                                   |
+| `hooks.sessionStart`     | `["pull"]`         | Pull hook action for eligible session-start lifecycles; explicitly run `memory_sync` when deterministic freshness is required |
+| `hooks.sessionEnd`       | `[]`               | Actions to run when a session ends                                                                                            |
+| `tape.enabled`           | `false`            | Enable tape mode for dynamic context selection                                                                                |
 
 When settings change, run `/reload` to apply them.
 
@@ -168,23 +173,28 @@ Legacy config is still supported:
 
 ```json
 {
-  "autoSync": {
-    "onSessionStart": true
+  "pi-memory-md": {
+    "autoSync": {
+      "onSessionStart": true
+    }
   }
 }
 ```
 
 ```json
 {
-  "localPath": "~/.pi/memory-md",
-  "repoUrl": "git@github.com:username/repo.git", // Or HTTPS format
+  "pi-memory-md": {
+    "localPath": "~/.pi/memory-md",
+    "repoUrl": "git@github.com:username/repo.git" // Or HTTPS format
+  }
 }
 ```
 
 ### Hooks
 
-- `sessionStart: ["pull"]`: pull latest memory before the first prompt.
-- `sessionEnd: ["push"]`: commit and push memory when the session ends.
+- `sessionStart: ["pull"]`: pull latest memory for eligible session-start lifecycles. New and forked sessions currently initialize delivery without running session-start hooks, so explicitly request `memory_sync(action="pull")` when deterministic freshness is required. Requires `repoUrl` and a git-backed `localPath`.
+- `sessionEnd: ["push"]`: commit and push memory when the session ends. Requires `repoUrl` and a git-backed `localPath`.
+- For local-only memory, set both hook arrays to `[]`.
 
 More trigger actions can be added later, even custom hooks.
 
@@ -205,11 +215,11 @@ When tape mode is enabled, the same delivery mode still applies, but tape change
 }
 ```
 
-- Memory is sent as a custom message before the user's first message
+- Memory is sent as a hidden custom message on the first agent turn and once again after each successful compaction
 - Not visible in the TUI (`display: false` in pi-tui)
 - This hidden message is delivered in the same agent turn, so it does not create a second LLM request; it only adds tokens to the current request
 - Persists in the session history
-- Delivered only once per session (on first agent turn)
+- Delivered once per session, then re-delivered after successful compaction because compaction can remove the earlier hidden memory message from active context
 - **Pros**: Lower token usage, memory persists naturally in conversation
 - **Cons**: Only visible when the model scrolls back to earlier messages
 
@@ -250,9 +260,10 @@ You: Sync my changes to the repository.
 ```
 
 The LLM automatically:
-- Reads memory index at session start (appended to conversation)
+
+- Reads memory index before the first agent turn according to the configured delivery mode
 - Writes new information when you ask to remember something
-- Syncs changes when needed
+- Syncs changes only when hooks are configured or when you explicitly request `memory_sync`
 
 ## Tape Mode (Dynamic Context Delivery)
 
@@ -282,6 +293,7 @@ Minimal setting:
   }
 }
 ```
+
 Then use `/memory-anchor` to create an anchor manually, or let anchors be created automatically when configured keywords are triggered.
 
 If you want to jump to the conversation around an anchor and restart from there, `/tree` and the anchors in this session are all there with a customizable anchor label in pi TUI.
@@ -291,12 +303,12 @@ If you want to jump to the conversation around an anchor and restart from there,
 **Tape** is an independent feature that can be enabled alongside either delivery mode.
 It does not change the delivery mechanism; it changes **which memory files** are selected.
 
-| Tape | Delivery mode | Behavior |
-|------|----------------|----------|
-| Disabled | `message-append` | Sends memory once as a hidden custom message on the first agent turn |
-| Disabled | `system-prompt` | Rebuilds memory and appends it to the system prompt on every agent turn |
-| Enabled | `message-append` | Sends tape-selected memory once as a hidden custom message on the first agent turn |
-| Enabled | `system-prompt` | Rebuilds tape-selected memory and appends it to the system prompt on every agent turn |
+| Tape     | Delivery mode    | Behavior                                                                                                      |
+| -------- | ---------------- | ------------------------------------------------------------------------------------------------------------- |
+| Disabled | `message-append` | Sends memory as a hidden custom message on the first agent turn and after successful compaction               |
+| Disabled | `system-prompt`  | Rebuilds memory and appends it to the system prompt on every agent turn                                       |
+| Enabled  | `message-append` | Sends tape-selected memory as a hidden custom message on the first agent turn and after successful compaction |
+| Enabled  | `system-prompt`  | Rebuilds tape-selected memory and appends it to the system prompt on every agent turn                         |
 
 With tape enabled, the delivered content is still a memory index/summary for the model, but the file list is chosen by tape-aware selection logic instead of the basic project scan. In smart mode, the delivered list can also include recently active project file paths inferred from tool usage, plus a `recent focus` summary for each selected file showing the most recently attended `read` / `edit` ranges inside the same effective smart-scan window. Stale paths from old tape history are ignored when the file no longer exists.
 
@@ -324,6 +336,7 @@ Recently active project files (full paths from read/edit/write tool usage):
   recent focus: read 340-420, read 590-677, edit 340-399
 
 ---
+
 💡 Tape is enabled for this conversation. Use tape tools when you need anchors or tape history.
 ```
 
@@ -333,7 +346,9 @@ Recently active project files (full paths from read/edit/write tool usage):
 {
   "pi-memory-md": {
     ...
-    "localPath": "~/.pi/memory-md",
+    "memoryDir": {
+      "localPath": "~/.pi/memory-md"
+    },
     "tape": {
       // Run tape only inside a Git repository by default
       // Uses `git rev-parse --show-toplevel`; if it fails, tape is skipped
@@ -412,11 +427,25 @@ Anchors are named checkpoints that correspond to pi session entries, marking imp
 <img src="docs/pi-tree.png" width="400" />
 
 Each line in the tape anchor store is a JSON record:
+
 ```json
-{"id":"1234567890-abc123","timestamp":"2026-04-04T12:00:00.000Z","name":"task/begin","type":"handoff","meta":{"summary":"Working on feature X","purpose":"feature","trigger":"manual"},"sessionId":"019dbd12-90b7-72b1-a88d-843706db32de","sessionEntryId":"446b6c33"}
+{
+  "id": "1234567890-abc123",
+  "timestamp": "2026-04-04T12:00:00.000Z",
+  "name": "task/begin",
+  "type": "handoff",
+  "meta": {
+    "summary": "Working on feature X",
+    "purpose": "feature",
+    "trigger": "manual"
+  },
+  "sessionId": "019dbd12-90b7-72b1-a88d-843706db32de",
+  "sessionEntryId": "446b6c33"
+}
 ```
 
 Each anchor has:
+
 - **`id`**: A stable unique identifier, auto-generated from `sessionEntryId:timestamp:name`
 - **`name`**: A human-readable label (e.g., `session/new`, `task/begin`)
 - **`type`**: Anchor type - `session` for lifecycle anchors, `handoff` for manual/semantic transitions
@@ -437,22 +466,22 @@ The combination of anchors and keywords balances the agent's autonomy with user 
 
 ### Tape Tools (Anchor-based Context)
 
-| Tool | Parameters | Description |
-|------|------------|-------------|
-| `/memory-anchor` | `<prompt>` | Slash command that asks the LLM to derive and create a manually authorized handoff anchor |
-| `tape_handoff` | `{name, summary?, purpose?}` | Create a handoff anchor checkpoint in the tape |
-| `tape_list` | `{limit?: number}` | List all anchor checkpoints |
-| `tape_delete` | `{id}` | Delete an anchor checkpoint by id |
-| `tape_info` | `{}` | Get tape statistics and information |
-| `tape_search` | `{query?, kinds?, limit?, sinceAnchor?, anchorName?, anchorType?, anchorSummary?, anchorPurpose?, anchorKeywords?}` | Search tape entries by text or type, with structured anchor-field filters |
-| `tape_read` | `{afterAnchor?, lastAnchor?, betweenAnchors?, betweenDates?, query?, kinds?, limit?}` | Read tape entries as formatted messages |
-| `tape_reset` | `{archive?: boolean}` | Reset the tape with a new session lifecycle anchor |
+| Tool             | Parameters                                                                                                          | Description                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `/memory-anchor` | `<prompt>`                                                                                                          | Slash command that asks the LLM to derive and create a manually authorized handoff anchor |
+| `tape_handoff`   | `{name, summary?, purpose?}`                                                                                        | Create a handoff anchor checkpoint in the tape                                            |
+| `tape_list`      | `{limit?: number}`                                                                                                  | List all anchor checkpoints                                                               |
+| `tape_delete`    | `{id}`                                                                                                              | Delete an anchor checkpoint by id                                                         |
+| `tape_info`      | `{}`                                                                                                                | Get tape statistics and information                                                       |
+| `tape_search`    | `{query?, kinds?, limit?, sinceAnchor?, anchorName?, anchorType?, anchorSummary?, anchorPurpose?, anchorKeywords?}` | Search tape entries by text or type, with structured anchor-field filters                 |
+| `tape_read`      | `{afterAnchor?, lastAnchor?, betweenAnchors?, betweenDates?, query?, kinds?, limit?}`                               | Read tape entries as formatted messages                                                   |
+| `tape_reset`     | `{archive?: boolean}`                                                                                               | Reset the tape with a new session lifecycle anchor                                        |
 
 > **Note**: Tape tools are registered when a `tape` block exists in config (opt-out: set `"enabled": false`). They provide anchor-based context management inspired by [bub](https://bub.build)'s tape mechanism.
 
 ## Reference
+
 - [Introducing Context Repositories: Git-based Memory for Coding Agents | Letta](https://www.letta.com/blog/context-repositories)
 - https://tape.systems
 - https://bub.build/
 - https://github.com/bubbuild/bub/tree/main/src/bub
-

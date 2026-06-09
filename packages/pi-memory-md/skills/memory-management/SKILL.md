@@ -6,23 +6,25 @@ description: Core memory operations guide for pi-memory-md - create, read, updat
 ## Design Philosophy
 
 - **File-based memory**: Each memory is a `.md` file with YAML frontmatter
-- **Git-backed**: Full version control and cross-device sync
-- **Auto-delivery**: Files in `core/` are automatically delivered into context based on the active delivery mode
+- **Local-first**: Read, write, list, and search local markdown memory without git
+- **Optional Git sync**: Configure `repoUrl` only when pull/push sync is needed
+- **Auto-delivery**: In base non-tape delivery, non-superseded markdown files under the project memory root and configured shared-global memory are indexed for delivery; `core/` is the canonical high-priority organization area, not the only delivered scope
 - **Minimal fixed core**: `memory-init` now only guarantees `core/project/`
 - **Organized by purpose**: Fixed structure for core info, flexible for everything else
 
 ## Directory Structure
 
-**Base path**: Configured via `settings["pi-memory-md"].localPath` (default: `~/.pi/memory-md`)
+**Base path**: Prefer `settings["pi-memory-md"].memoryDir.localPath` (default: `~/.pi/memory-md`). Legacy top-level `settings["pi-memory-md"].localPath` is still supported.
 
 ```
 {localPath}/
 ├── {globalMemory}/                # Optional shared memory root when globalMemory is enabled
-│   ├── USER.md                    # Optional shared user profile and preferences
-│   ├── MEMORY.md                  # Optional shared durable notes, conventions, and lessons learned
-│   └── TASK.md                    # Optional shared task template
+│   └── core/
+│       ├── USER.md                # Optional shared user profile and preferences
+│       ├── MEMORY.md              # Optional shared durable notes, conventions, and lessons learned
+│       └── TASK.md                # Optional shared task template
 └── {project-name}/                # Project memory root
-    ├── core/                      # Auto-delivered into context (selection may be tape-aware)
+    ├── core/                      # Canonical high-priority memory organization
     │   ├── USER.md                # Optional project user profile and preferences
     │   ├── MEMORY.md              # Optional project durable notes, conventions, and lessons learned
     │   ├── TASK.md                # Optional project task template
@@ -45,18 +47,19 @@ These are the only directories `memory-init` guarantees for a project:
 
 If `globalMemory` is enabled, it also ensures:
 
-- `{globalMemory}/`
+- `{globalMemory}/core/`
 
 ### Common optional files
 
 These files are common, but created only if the user chooses templates or imports preferences:
 
 - `core/USER.md`
-- `core/MEMORY.md`
 - `core/TASK.md`
-- `{globalMemory}/USER.md`
-- `{globalMemory}/MEMORY.md`
-- `{globalMemory}/TASK.md`
+- `{globalMemory}/core/USER.md`
+- `{globalMemory}/core/MEMORY.md`
+- `{globalMemory}/core/TASK.md`
+
+Project `core/MEMORY.md` is not created by `memory-init`; create it later only when the project needs a durable notes file.
 
 ### Flexible root-level organization
 
@@ -70,7 +73,9 @@ Everything outside `core/` is flexible. Common examples:
 
 ## Decision Tree
 
-### Does this need to be in EVERY conversation?
+Base non-tape delivery indexes visible, non-superseded markdown files under the project memory root and configured shared-global memory. Tape mode narrows and ranks selected files differently. `core/` is still the canonical place for high-priority memory that should be easy to find and likely to appear in regular context, but root-level folders are also visible to the base memory index.
+
+### Is this canonical memory the agent should see often?
 
 **Yes** → Place under `core/`
 
@@ -79,19 +84,21 @@ Everything outside `core/` is flexible. Common examples:
 - Project tasks/plans → `core/TASK.md`
 - General project knowledge → `core/project/`
 
-**Maybe shared across ALL projects?** → Place under `{globalMemory}/` when `globalMemory` is enabled
+**Maybe shared across ALL projects?** → Place under `{globalMemory}/core/` when `globalMemory` is enabled
 
-- Shared user profile and preferences → `{globalMemory}/USER.md`
-- Shared durable notes, conventions, and lessons learned → `{globalMemory}/MEMORY.md`
-- Shared tasks/plans → `{globalMemory}/TASK.md`
+- Shared user profile and preferences → `{globalMemory}/core/USER.md`
+- Shared durable notes, conventions, and lessons learned → `{globalMemory}/core/MEMORY.md`
+- Shared tasks/plans → `{globalMemory}/core/TASK.md`
 
-**No** → Place at project root level (same level as `core/`)
+**No, but still useful memory** → Place at project root level (same level as `core/`)
 
 - Reference docs → `docs/`
 - Historical → `archive/`
 - Research → `research/`
 - Notes → `notes/`
 - Other? → Create appropriate folder
+
+Root-level memory files still appear in the base memory index under non-tape delivery. Keep them focused and mark obsolete files with `status: superseded` when they should be hidden from normal listing/delivery.
 
 **Important:** `core/project/` is a fixed subdirectory under `core/`. Always use `core/project/` for project-specific memory files, never create a `project/` folder at the root level.
 
@@ -215,12 +222,12 @@ The extension preserves existing `created` date and updates `updated` automatica
 **Directories guaranteed by `memory-init`:**
 
 - `project/` - Project-specific information
-- `TASK.md` - Task and planning file
 
 **Common optional files at `core/` root:**
 
 - `USER.md` - User profile and preferences
 - `MEMORY.md` - Durable notes, conventions, and lessons learned
+- `TASK.md` - Task and planning file
 
 Avoid inventing extra `core/` subfolders unless there is a clear reason and the structure is intentionally being extended.
 
@@ -247,8 +254,8 @@ Avoid inventing extra `core/` subfolders unless there is a clear reason and the 
 - Use `core/MEMORY.md` for durable notes, conventions, and lessons learned
 - Use `core/TASK.md` for task and planning memory
 - Use `core/project/` for project-specific knowledge meant for regular delivery
-- Use `{globalMemory}/` only for truly cross-project memory
-- Use root level for reference, historical, and research content
+- Use `{globalMemory}/core/` only for truly cross-project memory
+- Use root level for reference, historical, and research content that can still appear in the memory index
 - Keep files focused on a single topic
 - Organize root level folders by content type
 
@@ -256,7 +263,7 @@ Avoid inventing extra `core/` subfolders unless there is a clear reason and the 
 
 - Create a `project/` folder at root level (use `core/project/` instead)
 - Assume `core/USER.md`, `core/MEMORY.md`, or task files already exist unless templates were created
-- Put reference docs in `core/` when they are not part of recurring context
+- Put reference docs in `core/` when they are not canonical high-priority memory
 - Create giant files (split into focused topics)
 - Mix unrelated content in same file
 
@@ -297,19 +304,23 @@ Use `memory-management` when:
 
 ## Before Syncing
 
-**IMPORTANT**: Before running `memory_sync(action="push")`, ALWAYS run `memory_check()` first to verify the folder structure is correct:
+**IMPORTANT**: Before running `memory_sync(action="push")`, run `memory_check()` first to inspect the folder structure:
 
 ```bash
-# Check structure first
+# Inspect structure first
 memory_check()
 
-# Then push if structure is correct
+# Then push after reviewing the structure
 memory_sync(action="push")
 ```
 
 ## Related Skills
 
 - `memory-sync` - Git synchronization operations
-- `memory-init` - Initial repository setup
+- `memory-init` - Set up local memory directories and optional git sync
 - `memory-search` - Finding specific information
-- `memory-check` - Validate folder structure before syncing
+
+Related command/tool:
+
+- `memory_check` tool - Show project memory plus configured shared-global memory, including folder structure and file counts before syncing
+- `/memory-check` command - Show the current project memory folder tree before syncing

@@ -214,6 +214,66 @@ test("global memory delivery supports message append mode", async () => {
 	);
 });
 
+test("message append memory is delivered again after compaction", async () => {
+	await withGlobalOnlyMemory(
+		async ({ root, cwd }) => {
+			const harness = createHarness();
+			const ctx = createContext(cwd, harness.notifications);
+
+			await harness.handlers.get("session_start")?.({ reason: "new" }, ctx);
+			const initialResult = (await harness.handlers.get("before_agent_start")?.(
+				{ prompt: "hello", systemPrompt: "BASE" },
+				ctx,
+			)) as { message?: { customType?: string; content?: string } } | undefined;
+			assert.match(initialResult?.message?.content ?? "", /test-global-memory/);
+
+			const secondResult = await harness.handlers.get("before_agent_start")?.(
+				{ prompt: "again", systemPrompt: "BASE" },
+				ctx,
+			);
+			assert.equal(secondResult, undefined);
+
+			await writeFile(
+				path.join(root, "memory", "common", "core", "AFTER_COMPACT.md"),
+				[
+					"---",
+					"description: Memory added after initial delivery",
+					"tags:",
+					"  - after-compaction-memory",
+					"---",
+					"",
+					"# After Compaction Memory",
+				].join("\n"),
+			);
+
+			await harness.handlers.get("session_compact")?.(
+				{
+					compactionEntry: {
+						summary: "compacted",
+						firstKeptEntryId: "entry-1",
+						tokensBefore: 1000,
+					},
+					fromExtension: false,
+				},
+				ctx,
+			);
+
+			const afterCompactResult = (await harness.handlers.get(
+				"before_agent_start",
+			)?.({ prompt: "after compact", systemPrompt: "BASE" }, ctx)) as
+				| { message?: { customType?: string; content?: string } }
+				| undefined;
+
+			assert.equal(afterCompactResult?.message?.customType, "pi-memory-md");
+			assert.match(
+				afterCompactResult?.message?.content ?? "",
+				/after-compaction-memory/,
+			);
+		},
+		{ delivery: "message-append" },
+	);
+});
+
 test("startup delivery hides superseded memories", async () => {
 	await withGlobalOnlyMemory(async ({ root, cwd }) => {
 		await writeFile(

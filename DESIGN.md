@@ -36,7 +36,7 @@ The agent can inspect git state but does not mutate staging, history, refs, or b
 
 ### Guardrails plus prompt policy
 
-Prompt rules are not enough for high-risk operations. `extensions/guardrails.json` blocks destructive shell patterns, git mutations, and configured auth/token paths, while `AGENTS.md` states the operating policy. Guardrails are not a full sandbox; with `permissions.json` in `yolo`, external/private MCP approval gates are prompt policy rather than runtime-enforced confirmations.
+Prompt rules are not enough for high-risk operations. `extensions/guardrails.json` blocks configured destructive shell patterns, common git mutation patterns, and protected paths, while `AGENTS.md` states the operating policy. Guardrails are not a full sandbox or exhaustive command parser; with `permissions.json` in `yolo`, external/private MCP approval gates are prompt policy rather than runtime-enforced confirmations.
 
 ### Skills over prompt bloat
 

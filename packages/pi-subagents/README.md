@@ -473,7 +473,7 @@ Important fields:
 | `defaultReads`          | Files to read before running in chain/parallel behavior.                                                                                                                   |
 | `defaultProgress`       | Maintain `progress.md`.                                                                                                                                                    |
 | `interactive`           | Parsed for compatibility but not enforced in v1.                                                                                                                           |
-| `maxSubagentDepth`      | Tightens nested delegation for this agent’s children.                                                                                                                      |
+| `maxSubagentDepth`      | Tightens the inherited depth guard for this agent’s child process if the `subagent` tool is exposed.                                                                       |
 
 ### Tool and extension selection
 
@@ -849,7 +849,7 @@ Session directory precedence is: `params.sessionDir`, then `config.defaultSessio
 { "maxSubagentDepth": 1 }
 ```
 
-Controls nested delegation when no inherited `PI_SUBAGENT_MAX_DEPTH` is already in effect. Per-agent `maxSubagentDepth` can tighten the limit for that agent’s child runs, but cannot relax an inherited stricter limit.
+Defense-in-depth limit for any runtime context where the `subagent` tool is available with an inherited depth. Normal spawned child sessions still do not receive the `subagent` tool; this setting caps accidental or custom nested delegation if the tool is exposed. Per-agent `maxSubagentDepth` can tighten the inherited limit for that agent’s child process, but cannot relax an inherited stricter limit.
 
 ### `intercomBridge`
 
@@ -945,25 +945,22 @@ Pass `share: true` to export a full session to HTML, upload it to a secret GitHu
 
 This is disabled by default. Session data may contain source code, paths, environment variables, credentials, or other sensitive output. You need `gh` installed and authenticated.
 
-## Recursion guard
+## Depth guard
 
-Subagents can call `subagent`, which can get expensive and hard to observe. A depth guard prevents unbounded nesting.
+Normal spawned child sessions do not receive the `subagent` tool and must not propose or run subagents. The depth guard is a defense-in-depth runtime check for any context where the tool is available with an inherited depth, such as custom/manual extension setups or future role configurations.
 
-By default, nesting is limited to two levels: main session → subagent → sub-subagent. Deeper calls are blocked with guidance to complete the current task directly.
-
-Configure the limit with:
+Configure the maximum inherited depth with:
 
 1. `PI_SUBAGENT_MAX_DEPTH` before starting Pi
 2. `config.maxSubagentDepth`
 3. `maxSubagentDepth` in agent frontmatter, which can only tighten the inherited limit
 
 ```bash
-export PI_SUBAGENT_MAX_DEPTH=3
 export PI_SUBAGENT_MAX_DEPTH=1
 export PI_SUBAGENT_MAX_DEPTH=0
 ```
 
-`PI_SUBAGENT_DEPTH` is internal and propagated automatically. Do not set it manually.
+Use the default child-safety boundary for normal workflows. Do not raise the depth limit to make packaged child agents orchestrate more subagents; keep orchestration in the parent. `PI_SUBAGENT_DEPTH` is internal and propagated automatically. Do not set it manually.
 
 ## Events
 
