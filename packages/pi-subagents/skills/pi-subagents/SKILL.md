@@ -74,7 +74,7 @@ Packaged prompt shortcuts are also available for repeatable workflows. Treat the
 
 This section is the canonical owner for subagent natural-language recipe routing. Root and manager workflow docs should point here instead of duplicating the full recipe matrix.
 
-The user does not need to name a slash command. Treat ordinary language as workflow intent when the shape is clear, then run the matching pattern directly with `subagent(...)`. Do not wait for the user to say `/quality-gate`, `/adversarial-debate`, or another exact shortcut.
+The user does not need to name a slash command. Treat ordinary language as workflow intent when the shape is clear, then run the matching pattern directly with `subagent(...)`. Do not wait for the user to say `/quality-gate`, `/adversarial-debate`, or another exact shortcut. If a canonical recipe matches, use it directly; if none matches, design a dynamic runtime chain/swarm before launch.
 
 ### Observed user-language swarm triggers
 
@@ -82,7 +82,7 @@ Adapt to the user's actual phrasing, including typos, shorthand, and repetition.
 
 - `review`, `review please`, `review everything`, `review again`, `review with fresh eyes`, `check the diff`, `double check`, `triple check`, `verify one last time` -> review or quality-gate depending on whether a verdict is needed.
 - `review your proposal`, `review your plan and then do it`, `pressure-test ... and do it only if it survives`, `if it survives`, `don't start by finding where code lives` -> proposal gate before scouting or implementation.
-- `spawn many subagnets`, `spawn many many review subgantes`, `spawn a bunch of subagents`, `spawn 20 subagnets`, `wave of reviewers`, `different goals and perspectives` -> sectioned read-only fanout with distinct angles; keep no-edit/no-live constraints. Do not interpret requested numbers literally: `spawn 20` means broad section coverage, never launch 20 children unless the task is a truly shardable matrix with an explicit reducer. Cap to the smallest material fanout.
+- `spawn many subagnets`, `spawn many many review subgantes`, `spawn a bunch of subagents`, `spawn 20 subagnets`, `wave of reviewers`, `different goals and perspectives`, `10 review agents`, `different goals`, `validate what the other agents found` -> sectioned read-only fanout with distinct angles, or `review-matrix-reduce` when validation/reduction is requested; keep no-edit/no-live constraints. Do not interpret requested numbers literally: `spawn 20` means broad section coverage, never launch 20 children unless the task is a truly shardable matrix with an explicit reducer. Do not minimize explicit 8-10 reviewer requests when the target has distinct sections or validators.
 - `give you ideas`, `come up with ideas for tests`, `think of tests`, `prune`, `filter`, `strongest few`, `what do you recommend`, `compare everything between X and Y`, `help me decide between concrete options`, `least bad option` -> generate/filter or research-decision; do not stop at raw generator output when filtering or concrete decision support is requested. Vague `explain the options better` / `help me decide` requests enter brainstorming first until the options and rubric are clear. `Compare everything between named targets` is review, research-decision, or parallel-review depending on scope; use at least one advisory child unless it is a tiny parent-verifiable lookup. `Do the checks again` plus `compare everything` is not tiny; use an advisory child before the parent synthesis.
 - `look at all the words I usually say`, `throughout my pi usage`, `grab many many examples`, `all the times I ask`, `go through each code path`, `go through all edge cases`, `ALL flows`, `review al lcombiatoins` -> parallel context build, session-history analysis, or broad audit swarm.
 - `go on`, `don't stop`, `keep going`, `review ... and go on`, `until no more review feedback`, `iterate`, `fix review fix`, `spawn more targeted reviews` -> continue the approved loop; use review-feedback evaluation or fix-review-fix when writing is already authorized.
@@ -125,6 +125,62 @@ For options, ideas, test cases, names, comparisons, decisions, and “strongest 
 
 Saved `.chain.md` workflows are useful for repeatable sequential pipelines. Use runtime `chain` arrays for fan-out/fan-in patterns with parallel groups until saved-chain serialization supports parallel groups.
 
+### Canonical workflow catalog
+
+Use the small catalog below as grammar, not as a large menu of rigid names. Do not wait for exact slash commands; choose by task shape and compose with `subagent(...)`.
+
+| Recipe | Shape | Use when |
+| --- | --- | --- |
+| `parallel-review` | 3-5 independent reviewers -> parent synthesis | Normal nontrivial review |
+| `large-review-matrix` | named first-pass reviewers by section/angle -> parent synthesis | Broad review where many distinct surfaces exist |
+| `review-matrix-reduce` | first-pass reviewers -> validators/reducer -> parent synthesis | 8-10 review agents, high-stakes reviews, or disagreement validation |
+| `quality-gate` | review swarm -> parent `PASS`/`FAIL`/`INCONCLUSIVE` | Before claiming ready/good enough |
+| `generate-filter` | parallel generators -> reviewer/filter -> parent shortlist | Ideas, options, tests, names, pruning, recommendations |
+| `research-decision` | researcher + local scout/context -> tradeoff critic -> recommendation | External/local evidence plus decision |
+| `adversarial-debate` | positions -> attacks -> optional repair -> synthesis | Architecture, workflow, or taste-heavy decisions |
+| `context-build-synthesis` | context slices -> synthesis/meta-prompt | Planning large work or unfamiliar areas |
+| `handoff-plan` | external/local/strategy passes -> final handoff | Preparing worker-ready implementation briefs |
+| `fix-review-fix` | one writer -> fresh reviewers -> targeted fix pass | Explicitly authorized iterative fixing |
+| `cleanup/deslop` | cleanup reviewers -> parent-selected fixes | Slop, verbosity, simplicity, and maintainability cleanup |
+| `dynamic-composer` | parent-designed runtime chain/swarm | Novel task shape not covered above |
+
+### Large review matrix and review reduction
+
+8-10 review agents are valid when the target is broad enough and roles are distinct or chained through validation. Do not collapse explicit large-review requests to three reviewers when the work has many independent attack surfaces; also do not satisfy them with duplicate vague reviewers.
+
+Default 10-reviewer matrix:
+
+| Stage | Count | Roles |
+| --- | ---: | --- |
+| First-pass reviewers | 6 | correctness/regressions; tests/verification; architecture/source-of-truth; edge cases/data flow; security/privacy/ops; simplicity/slop |
+| Validators | 3 | validate severe findings and false positives; search for missed cross-cutting issues; compare reviewer disagreement and evidence quality |
+| Reducer | 1 | dedupe/rank findings, classify blockers/non-blockers, produce synthesis for parent |
+
+Runtime shape:
+
+```text
+parallel[6 first-pass reviewers]
+-> parallel[3 validators reading first-pass output]
+-> reviewer reducer
+-> parent synthesis/verdict
+```
+
+Use `review-matrix-reduce` when the user asks for many/10 reviewers with different goals, asks agents to examine or validate what other agents found, previous reviewers materially disagree, or a high-stakes target needs false-positive control. The reducer/validator stage must see concrete first-pass findings before the parent decides.
+
+### Dynamic composer protocol
+
+When no catalog recipe fits, design a runtime shape before launch:
+
+1. Objective: what outcome the workflow must produce.
+2. Why parent-only is insufficient.
+3. Child roles and why each is distinct.
+4. Swarm vs chain decision.
+5. Required fan-in/reducer stage.
+6. Artifact/output/progress policy.
+7. Stop condition and parent synthesis format.
+
+State the chosen shape briefly when it is non-obvious. The user should not have to choose or run slash commands manually.
+
 ### Sectioned swarm protocol
 
 Use sectioned swarms when independent agents can add distinct evidence, attack surfaces, or verification paths across two or more independent concerns, or when stakes/uncertainty justify parallel review. Do not use subagents as ritual compliance: ordinary factual questions, tiny wording/name tasks, one narrow parent-verifiable lookup, one bounded review concern, and pure user-intent clarification should stay direct.
@@ -138,7 +194,7 @@ Default to sectioned swarms for these shapes:
 - broad test, edge-case, live-validation, safety, observability, UX, or resource-risk ideation;
 - nontrivial final readiness claims.
 
-Use the smallest recipe-specific fanout that still adds material evidence. Numeric guidance is non-binding and subordinate to each recipe: normal review and quality gates usually use three reviewers; large, security-sensitive, ops-heavy, architecture-heavy, or ambiguous work may use four or five; broad multi-section ideation or audits may use six to nine across named sections; 12+ children fit only shardable matrices with explicit slices, artifacts, and reducer/filter stages. Do not add duplicate vague agents.
+Use the smallest recipe-specific fanout that still adds material evidence. Numeric guidance is non-binding and subordinate to each recipe: normal review and quality gates usually use three reviewers; large, security-sensitive, ops-heavy, architecture-heavy, or ambiguous work may use four or five; broad multi-section ideation or audits may use six to nine across named sections; 8-10 reviewers are appropriate for `large-review-matrix` or `review-matrix-reduce` when roles are distinct or chained through validators/reducers; 12+ children fit only shardable matrices with explicit slices, artifacts, and reducer/filter stages. Do not add duplicate vague agents.
 
 Group children by independent concern, not by count: for example correctness, tests/verification, maintainability, security/privacy, ops/resource, UX/docs, local-code scout, external researcher, edge cases, observability, or simplification. The parent classifies sections before launch, passes concrete targets into every child, waits for any group needed for the next synthesis, and then dedupes/ranks across sections.
 
@@ -151,6 +207,7 @@ Use foreground or wait-and-inspect when the next answer, verdict, or final claim
 Compact recipe names:
 
 - Idea generation -> chain fan-out -> filter/reducer fan-in -> targeted second swarm only for named gaps.
+- Large review matrix -> first-pass reviewers -> validators/reducer -> parent synthesis.
 - Review -> fix -> fresh re-review.
 - Design debate -> decision.
 - Research + local recon -> handoff plan.
@@ -161,6 +218,8 @@ Natural-language routing examples:
 | User says or implies                                                                                        | Parent should usually run                                                                                                                                                                                      |
 | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | “review this”, “check this”, “does this look right?”                                                        | `review` skill first; escalate to `/parallel-review` with fresh reviewers when independent review adds value                                                                                                   |
+| “10 review agents”, “different goals”                                                                     | `large-review-matrix` when the target is broad and roles are independent; use distinct first-pass reviewer sections and parent synthesis                                                                          |
+| “validate what the other agents found”, “review the reviewers”, material reviewer disagreement              | runtime `review-matrix-reduce`: first-pass reviewers, validators/reducer, then parent synthesis                                                                                                                   |
 | “before finalizing”, “is this good enough?”, “quality gate this”                                            | `/quality-gate` pattern; review and synthesis only, ending with a parent `PASS` / `FAIL` / `INCONCLUSIVE` verdict                                                                                              |
 | “verify your proposal and do it”, “pressure-test this approach, then start”, “if it survives, implement it” | proposal-verification gate first: attack the parent proposal itself before implementation scouting, worker handoff, or file hunting                                                                            |
 | “address review feedback”, “evaluate these review comments”                                                 | review-feedback evaluation first; apply fixes only when the user explicitly authorizes writing                                                                                                                 |

@@ -427,6 +427,117 @@ test("user-language swarm corpus captures observed trigger phrasing", () => {
   assert.equal(byName.get("31-tiny-one-sentence").expected.route, "direct");
 });
 
+test("workflow catalog documents large-review and dynamic composer protocols", () => {
+  const skill = readPackageFile("skills/pi-subagents/SKILL.md");
+  const rootAgents = readRepoFile("AGENTS.md");
+  const parallelReview = readPackageFile("prompts/parallel-review.md");
+
+  assert.match(skill, /Canonical workflow catalog/i);
+  assert.match(skill, /large-review-matrix/i);
+  assert.match(skill, /review-matrix-reduce/i);
+  assert.match(skill, /dynamic-composer/i);
+  assert.match(skill, /8-10 review agents/i);
+  assert.match(skill, /First-pass reviewers[\s\S]*Validators[\s\S]*Reducer/i);
+  assert.match(skill, /parallel\[6 first-pass reviewers\][\s\S]*parallel\[3 validators/i);
+  assert.match(skill, /Dynamic composer protocol/i);
+  assert.match(skill, /why parent-only is insufficient/i);
+  assert.match(skill, /fan-in\/reducer/i);
+  assert.match(skill, /Do not wait for exact slash commands/i);
+
+  assert.match(rootAgents, /canonical recipe matches/i);
+  assert.match(rootAgents, /dynamic runtime chain\/swarm/i);
+  assert.match(rootAgents, /8-10 review agents/i);
+  assert.match(rootAgents, /review-matrix-reduce/i);
+
+  assert.match(
+    skill,
+    /validate what the other agents found[\s\S]*runtime `review-matrix-reduce`/i,
+  );
+  assert.doesNotMatch(
+    skill,
+    /“10 review agents”[\s\S]*“validate what the other agents found”[\s\S]*large-review-matrix or runtime `review-matrix-reduce`/i,
+  );
+
+  assert.match(parallelReview, /large review matrix/i);
+  assert.match(parallelReview, /review-matrix-reduce/i);
+  assert.match(parallelReview, /validators/i);
+  assert.match(parallelReview, /reducer/i);
+});
+
+test("real user-language route corpus covers new chain and large-swarm shapes", () => {
+  const cases = JSON.parse(
+    readPackageFile("test/nl-routing/user-language-swarm-cases.json"),
+  );
+  const byName = new Map(cases.map((testCase) => [testCase.name, testCase]));
+  const quoteManifest = JSON.parse(
+    readPackageFile("test/nl-routing/real-user-quotes.json"),
+  );
+
+  for (const route of [
+    "large-review-matrix",
+    "review-matrix-reduce",
+    "dynamic-composer",
+    "context-build-synthesis",
+  ]) {
+    assert.ok(
+      cases.some((testCase) => testCase.expected?.route === route),
+      `missing real-language route ${route}`,
+    );
+  }
+
+  assert.match(
+    byName.get("37-real-10-subagents-accepted-rejected")?.prompt ?? "",
+    /past converation[\s\S]*spawn like 10 subagents[\s\S]*idffernet/i,
+  );
+  assert.equal(
+    byName.get("37-real-10-subagents-accepted-rejected")?.expected.route,
+    "large-review-matrix",
+  );
+  assert.match(
+    byName.get("38-real-10-review-validate")?.prompt ?? "",
+    /10 review agents[\s\S]*different goals[\s\S]*validates/i,
+  );
+  assert.equal(
+    byName.get("38-real-10-review-validate")?.expected.route,
+    "review-matrix-reduce",
+  );
+  assert.match(
+    byName.get("39-real-subagents-to-launch-subagents")?.prompt ?? "",
+    /subagetns jus to give you ideas[\s\S]*be creative/i,
+  );
+  assert.equal(
+    byName.get("39-real-subagents-to-launch-subagents")?.expected.route,
+    "dynamic-composer",
+  );
+  assert.match(
+    byName.get("40-real-go-on-control")?.prompt ?? "",
+    /go on/i,
+  );
+  assert.match(
+    byName.get("40-real-go-on-control")?.expected.must,
+    /continue approved current loop/i,
+  );
+
+  for (const route of [
+    "large-review-matrix",
+    "review-matrix-reduce",
+    "generate-filter",
+    "dynamic-composer",
+    "context-build-synthesis",
+    "direct",
+  ]) {
+    assert.ok(
+      quoteManifest.some(
+        (quote) =>
+          quote.route === route &&
+          quote.source &&
+          /^2026-06-(1[0-6])T/.test(quote.observedAt),
+      ),
+      `missing audited last-7-day quote source for ${route}`,
+    );
+  }
+});
+
 test("sectioned-swarm corpus covers required semantic routing expectations", () => {
   const cases = JSON.parse(
     readPackageFile("test/nl-routing/sectioned-swarm-cases.json"),

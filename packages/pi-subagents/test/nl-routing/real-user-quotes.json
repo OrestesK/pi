@@ -1,0 +1,50 @@
+[
+  {
+    "name": "01-large-review-matrix-real-10-subagents",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. ok. now can you go through as many accepted summaries and also rejected summaries as you can from my past converation from the past week. spawn like 10 subagents to analyze them for idffernet kinds of points, like concise, not lokcing in the model too much, co",
+    "thinking": "low",
+    "route": "large-review-matrix",
+    "observedAt": "2026-06-12T21:27:36Z",
+    "source": "/home/orestes/.pi/agent/sessions/--home-orestes-.config-pi--/2026-06-12T19-06-10-345Z_019ebd3a-3a28-7666-a781-16759f1328f5.jsonl:200"
+  },
+  {
+    "name": "02-review-matrix-reduce-real-10-validate",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. yes. review on what yu pla nto do. core things is taht th agnet shold actually use it and be encouraged to use it. also i do want 10 review agents, just make sure htey ahve different goals, or are chained to exmaine waht the other finds nad validates it, etc.",
+    "thinking": "low",
+    "route": "review-matrix-reduce",
+    "observedAt": "2026-06-16T22:54:48Z",
+    "source": "/home/orestes/.pi/agent/sessions/--home-orestes-.config-pi--/2026-06-16T21-47-43-809Z_019ed267-9340-70b8-b08d-0db2fab61fb2.jsonl:123"
+  },
+  {
+    "name": "03-dynamic-composer-real-subagents-to-launch-subagents",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. even laucn hsubagetns jus to give you ideas of waht subganets to laucnh, be creative, try things and see what the subagnets comes back with",
+    "thinking": "low",
+    "route": "dynamic-composer",
+    "observedAt": "2026-06-11T01:21:57Z",
+    "source": "/home/orestes/.pi/agent/sessions/--home-orestes-Vals-platform-backend-model-proxy--/2026-05-28T22-37-57-695Z_019e70bc-bc3f-7705-8b9d-a63c8731f2bb.jsonl:7772"
+  },
+  {
+    "name": "04-generate-filter-real-best-visuals",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. think about the best visuals for this",
+    "thinking": "low",
+    "route": "generate-filter",
+    "observedAt": "2026-06-11T07:22:53Z",
+    "source": "/home/orestes/.pi/agent/sessions/--home-orestes-Vals-platform-backend-model-proxy--/2026-05-28T22-37-57-695Z_019e70bc-bc3f-7705-8b9d-a63c8731f2bb.jsonl:9410"
+  },
+  {
+    "name": "05-context-build-synthesis-real-past-conversation-audit",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. look at my sbagent result. I have chain, swarms, etc as command and such. I know I have them manually to run (which I don't do, I don't want to manuallydo it). can you look at past conversation of this past week and see if the agent is using these defualt swarms, and chains, and such",
+    "thinking": "low",
+    "route": "context-build-synthesis",
+    "observedAt": "2026-06-16T21:48:22Z",
+    "source": "/home/orestes/.pi/agent/sessions/--home-orestes-.config-pi--/2026-06-16T21-47-43-809Z_019ed267-9340-70b8-b08d-0db2fab61fb2.jsonl:4"
+  },
+  {
+    "name": "06-direct-real-go-on-control",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. go on",
+    "thinking": "low",
+    "route": "direct",
+    "observedAt": "2026-06-16T23:31:58Z",
+    "source": "/home/orestes/.pi/agent/sessions/--home-orestes-.config-pi--/2026-06-16T21-47-43-809Z_019ed267-9340-70b8-b08d-0db2fab61fb2.jsonl:146"
+  }
+]

@@ -322,5 +322,59 @@
       "route": "block-or-ask",
       "must": "strict no-artifact wording forbids subagent launch; ask to relax to no repo artifacts for swarms"
     }
+  },
+  {
+    "name": "37-real-10-subagents-accepted-rejected",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. ok. now can you go through as many accepted summaries and also rejected summaries as you can from my past converation from the past week. spawn like 10 subagents to analyze them for idffernet kinds of points, like concise, not lokcing in the model too much, co",
+    "thinking": "low",
+    "expected": {
+      "route": "large-review-matrix",
+      "must": "10-agent request must use distinct review/context sections, not duplicate vague reviewers"
+    }
+  },
+  {
+    "name": "38-real-10-review-validate",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. yes. review on what yu pla nto do. core things is taht th agnet shold actually use it and be encouraged to use it. also i do want 10 review agents, just make sure htey ahve different goals, or are chained to exmaine waht the other finds nad validates it, etc.",
+    "thinking": "low",
+    "expected": {
+      "route": "review-matrix-reduce",
+      "must": "first-pass reviewers plus validators/reducer because the user asked for different goals and validation"
+    }
+  },
+  {
+    "name": "39-real-subagents-to-launch-subagents",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. even laucn hsubagetns jus to give you ideas of waht subganets to laucnh, be creative, try things and see what the subagnets comes back with",
+    "thinking": "low",
+    "expected": {
+      "route": "dynamic-composer",
+      "must": "compose a custom generate/filter or meta-workflow chain instead of a generic swarm"
+    }
+  },
+  {
+    "name": "40-real-go-on-control",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. go on",
+    "thinking": "low",
+    "expected": {
+      "route": "direct",
+      "must": "continue approved current loop; do not launch a swarm solely because of continuation wording"
+    }
+  },
+  {
+    "name": "41-real-best-visuals-filter",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. think about the best visuals for this",
+    "thinking": "low",
+    "expected": {
+      "route": "generate-filter",
+      "must": "generate visual options then filter/reduce before recommending"
+    }
+  },
+  {
+    "name": "42-real-past-conversation-audit",
+    "prompt": "Evaluation case. Do not edit files and do not write repo artifacts. look at my sbagent result. I have chain, swarms, etc as command and such. I know I have them manually to run (which I don't do, I don't want to manuallydo it). can you look at past conversation of this past week and see if the agent is using these defualt swarms, and chains, and such",
+    "thinking": "low",
+    "expected": {
+      "route": "context-build-synthesis",
+      "must": "session-history audit with synthesis across chain/swarms usage"
+    }
   }
 ]
