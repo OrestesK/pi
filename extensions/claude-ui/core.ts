@@ -1495,6 +1495,7 @@ type SubagentProgress = {
   index?: number;
   agent?: string;
   status?: string;
+  activityState?: string;
   currentTool?: string;
   currentToolArgs?: string;
   currentToolStartedAt?: number;
@@ -1516,11 +1517,17 @@ type SubagentSingleResult = {
   exitCode?: number;
   detached?: boolean;
   interrupted?: boolean;
+  error?: string;
+  sessionFile?: string;
+  messages?: unknown[];
   progress?: SubagentProgress;
   progressSummary?: SubagentProgress;
   artifactPaths?: { outputPath?: string };
+  finalOutput?: string;
+  outputMode?: string;
   savedOutputPath?: string;
   outputReference?: { path?: string };
+  outputSaveError?: string;
   toolCalls?: Array<{ text?: string; expandedText?: string }>;
 };
 
@@ -1531,6 +1538,8 @@ type SubagentDetails = {
   progress?: SubagentProgress[];
   progressSummary?: SubagentProgress;
   totalSteps?: number;
+  chainAgents?: string[];
+  currentStepIndex?: number;
   artifacts?: { dir?: string };
 };
 
@@ -1567,6 +1576,8 @@ const COLLAPSED_WRITE_DIFF_LINES = 40;
 const EXPANDED_PREVIEW_LINES = 20;
 const SUBAGENT_RECENT_TOOL_LIMIT = 5;
 const SUBAGENT_HIDDEN_TOOL_TYPE_LIMIT = 5;
+const SUBAGENT_LARGE_RESULT_THRESHOLD = 6;
+const SUBAGENT_LARGE_ATTENTION_LIMIT = 4;
 const MAX_WRITE_SNAPSHOTS = 25;
 const MAX_INLINE_IMAGE_CACHE_ENTRIES = 50;
 const RESULT_INDENT = "  ";
@@ -2207,6 +2218,18 @@ function recordArray(value: Record<string, unknown>, name: string): unknown[] {
   return Array.isArray(array) ? array : [];
 }
 
+function recordStringArray(
+  value: Record<string, unknown>,
+  name: string,
+): string[] | undefined {
+  const array = value[name];
+  if (!Array.isArray(array)) return undefined;
+  const strings = array.filter(
+    (item): item is string => typeof item === "string",
+  );
+  return strings.length > 0 ? strings : undefined;
+}
+
 function todoListSummary(output: string): string | undefined {
   const parsed = parseJsonRecord(output);
   if (!parsed) return undefined;
@@ -2340,6 +2363,7 @@ function parseSubagentProgress(value: unknown): SubagentProgress | undefined {
     index: detailNumber(value, "index"),
     agent: detailString(value, "agent"),
     status: detailString(value, "status"),
+    activityState: detailString(value, "activityState"),
     currentTool: detailString(value, "currentTool"),
     currentToolArgs: detailString(value, "currentToolArgs"),
     currentToolStartedAt: detailNumber(value, "currentToolStartedAt"),
@@ -2386,11 +2410,17 @@ function parseSubagentDetails(details: unknown): SubagentDetails | undefined {
         exitCode: detailNumber(item, "exitCode"),
         detached: detailBoolean(item, "detached"),
         interrupted: detailBoolean(item, "interrupted"),
+        error: detailString(item, "error"),
+        sessionFile: detailString(item, "sessionFile"),
+        messages: recordArray(item, "messages"),
         progress: parseSubagentProgress(item.progress),
         progressSummary: parseSubagentProgress(item.progressSummary),
         artifactPaths,
+        finalOutput: detailString(item, "finalOutput"),
+        outputMode: detailString(item, "outputMode"),
         savedOutputPath: detailString(item, "savedOutputPath"),
         outputReference,
+        outputSaveError: detailString(item, "outputSaveError"),
         toolCalls,
       };
     })
@@ -2405,6 +2435,8 @@ function parseSubagentDetails(details: unknown): SubagentDetails | undefined {
       .filter((item): item is SubagentProgress => item !== undefined),
     progressSummary: parseSubagentProgress(details.progressSummary),
     totalSteps: detailNumber(details, "totalSteps"),
+    chainAgents: recordStringArray(details, "chainAgents"),
+    currentStepIndex: detailNumber(details, "currentStepIndex"),
     artifacts: isRecord(details.artifacts)
       ? { dir: detailString(details.artifacts, "dir") }
       : undefined,
@@ -2473,6 +2505,295 @@ function subagentResultDone(
   return result.exitCode === 0;
 }
 
+type SubagentResultState =
+  | "done"
+  | "running"
+  | "pending"
+  | "failed"
+  | "paused"
+  | "detached";
+
+function subagentResultState(
+  result: SubagentSingleResult,
+  progress: SubagentProgress | undefined,
+): SubagentResultState {
+  if (progress?.status === "running") return "running";
+  if (progress?.status === "pending") return "pending";
+  if (result.interrupted || progress?.status === "paused") return "paused";
+  if (result.detached || progress?.status === "detached") return "detached";
+  if (progress?.status === "failed" || (result.exitCode ?? 0) !== 0)
+    return "failed";
+  return subagentResultDone(result, progress) ? "done" : "pending";
+}
+
+function parseSubagentChainGroupCount(label: string | undefined): number {
+  if (!label?.startsWith("[") || !label.endsWith("]")) return 1;
+  const inner = label.slice(1, -1).trim();
+  if (!inner) return 0;
+  return inner.split("+").filter((part) => part.trim().length > 0).length;
+}
+
+function subagentChainPosition(
+  details: SubagentDetails,
+  flatIndex: number,
+): { stepIndex: number; groupIndex: number; groupCount: number } | undefined {
+  if (details.mode !== "chain" || !details.chainAgents?.length)
+    return undefined;
+  let start = 0;
+  for (let stepIndex = 0; stepIndex < details.chainAgents.length; stepIndex++) {
+    const groupCount = parseSubagentChainGroupCount(
+      details.chainAgents[stepIndex],
+    );
+    if (flatIndex < start + groupCount) {
+      return { stepIndex, groupIndex: flatIndex - start, groupCount };
+    }
+    start += groupCount;
+  }
+  return undefined;
+}
+
+function subagentRowLabel(details: SubagentDetails, index: number): string {
+  if (details.mode === "parallel")
+    return `Agent ${index + 1}/${details.totalSteps ?? details.results.length}`;
+  const chainPosition = subagentChainPosition(details, index);
+  if (chainPosition) {
+    const totalSteps =
+      details.totalSteps ??
+      details.chainAgents?.length ??
+      details.results.length;
+    const step = `Step ${chainPosition.stepIndex + 1}/${totalSteps}`;
+    return chainPosition.groupCount > 1
+      ? `${step} Agent ${chainPosition.groupIndex + 1}/${chainPosition.groupCount}`
+      : step;
+  }
+  return `Step ${index + 1}`;
+}
+
+function subagentAttentionReason(
+  result: SubagentSingleResult,
+  progress: SubagentProgress | undefined,
+): string | undefined {
+  if (progress?.activityState === "needs_attention") return "needs attention";
+  if (result.outputSaveError) return `save error: ${result.outputSaveError}`;
+  const state = subagentResultState(result, progress);
+  if (state === "running")
+    return progress?.currentTool
+      ? `running: ${formatSubagentTool(progress.currentTool, progress.currentToolArgs ?? "", true)}`
+      : "running";
+  if (state === "failed")
+    return result.error ? `failed: ${result.error}` : "failed";
+  if (state === "paused") return "paused";
+  if (state === "detached") return "detached";
+  return undefined;
+}
+
+function subagentStatusCounts(
+  details: SubagentDetails,
+): Record<SubagentResultState, number> {
+  return details.results.reduce<Record<SubagentResultState, number>>(
+    (counts, result, index) => {
+      counts[
+        subagentResultState(
+          result,
+          subagentProgressForResult(details, result, index),
+        )
+      ] += 1;
+      return counts;
+    },
+    { done: 0, running: 0, pending: 0, failed: 0, paused: 0, detached: 0 },
+  );
+}
+
+function subagentStatusCountsLine(details: SubagentDetails): string {
+  const total = details.results.length;
+  const counts = subagentStatusCounts(details);
+  const parts = [
+    counts.done > 0 ? `${counts.done} done` : undefined,
+    counts.running > 0 ? `${counts.running} running` : undefined,
+    counts.pending > 0 ? `${counts.pending} pending` : undefined,
+    counts.failed > 0 ? `${counts.failed} failed` : undefined,
+    counts.paused > 0 ? `${counts.paused} paused` : undefined,
+    counts.detached > 0 ? `${counts.detached} detached` : undefined,
+  ].filter((part): part is string => part !== undefined);
+  const outcome = parts.join(" · ") || "0 done";
+  if (details.mode === "chain") {
+    const steps = details.totalSteps ?? details.chainAgents?.length;
+    return steps
+      ? `${steps} ${steps === 1 ? "step" : "steps"}: ${plural(total, "agent")} · ${outcome}`
+      : `${plural(total, "agent")}: ${outcome}`;
+  }
+  return `${plural(total, "agent")}: ${outcome}`;
+}
+
+function subagentRole(result: SubagentSingleResult): string {
+  const text = `${result.agent} ${result.task ?? ""}`.toLowerCase();
+  if (/reduc|synth|dedupe|rank|filter|shortlist/.test(text)) return "reducer";
+  if (/validat|false positive|evidence quality/.test(text)) return "validator";
+  if (/research/.test(text)) return "researcher";
+  if (/review|audit|check/.test(text)) return "reviewer";
+  if (/scout|recon|context/.test(text)) return "scout";
+  if (/plan/.test(text)) return "planner";
+  if (/worker|implement|fix/.test(text)) return "worker";
+  return result.agent;
+}
+
+function pluralRole(count: number, role: string): string {
+  return `${count} ${count === 1 ? role : `${role}s`}`;
+}
+
+function subagentStageSummary(details: SubagentDetails): string | undefined {
+  const counts = new Map<string, number>();
+  for (const result of details.results) {
+    const role = subagentRole(result);
+    counts.set(role, (counts.get(role) ?? 0) + 1);
+  }
+  const preferredOrder = [
+    "reviewer",
+    "validator",
+    "reducer",
+    "researcher",
+    "scout",
+    "planner",
+    "worker",
+  ];
+  const ordered = [
+    ...preferredOrder.filter((role) => counts.has(role)),
+    ...[...counts.keys()]
+      .filter((role) => !preferredOrder.includes(role))
+      .sort((left, right) => left.localeCompare(right)),
+  ];
+  if (
+    ordered.length <= 1 &&
+    !details.chainAgents?.some((agent) => agent.startsWith("["))
+  )
+    return undefined;
+  return ordered
+    .map((role) => pluralRole(counts.get(role) ?? 0, role))
+    .join(" → ");
+}
+
+function subagentOutputSummary(details: SubagentDetails): string | undefined {
+  const savedOutputs = details.results.filter(
+    (result) => result.savedOutputPath,
+  );
+  const plannedOutputs = details.results.filter(
+    (result) => !result.savedOutputPath && subagentOutputPath(result),
+  );
+  const fileOnly = details.results.filter(
+    (result) => result.outputMode === "file-only",
+  );
+  const saveErrors = details.results.filter((result) => result.outputSaveError);
+  const parts = [
+    savedOutputs.length > 0 ? `${savedOutputs.length} saved` : undefined,
+    plannedOutputs.length > 0 ? `${plannedOutputs.length} planned` : undefined,
+    fileOnly.length > 0 ? `${fileOnly.length} file-only` : undefined,
+    saveErrors.length > 0
+      ? `${saveErrors.length} save error${saveErrors.length === 1 ? "" : "s"}`
+      : undefined,
+  ].filter((part): part is string => part !== undefined);
+  if (parts.length === 0) return undefined;
+  const outputPaths = [...savedOutputs, ...plannedOutputs];
+  if (outputPaths.length === 1) {
+    const path = subagentOutputPath(outputPaths[0]!);
+    const state = savedOutputs.length === 1 ? "output" : "planned output";
+    return `${state}: ${path ? compactOneLine(path, 90) : parts.join(" · ")}${fileOnly.length ? " · file-only" : ""}${saveErrors.length ? " · save error" : ""}`;
+  }
+  return `outputs: ${parts.join(" · ")}`;
+}
+
+function subagentDisplayAgent(
+  details: SubagentDetails,
+  result: SubagentSingleResult,
+): string {
+  if (details.mode !== "chain") return result.agent;
+  return subagentRole(result);
+}
+
+function textFromUnknown(value: unknown): string[] {
+  if (typeof value === "string") return value.length > 0 ? [value] : [];
+  if (Array.isArray(value)) return value.flatMap(textFromUnknown);
+  if (!isRecord(value)) return [];
+  return [
+    textFromUnknown(value.text),
+    textFromUnknown(value.content),
+    textFromUnknown(value.message),
+  ].flat();
+}
+
+function subagentInlineOutput(
+  result: SubagentSingleResult,
+): string | undefined {
+  if (result.finalOutput) return result.finalOutput;
+  const text = textFromUnknown(result.messages).join("\n").trim();
+  return text.length > 0 ? text : undefined;
+}
+
+function subagentDebugOutputLines(
+  theme: Theme,
+  result: SubagentSingleResult,
+  expanded: boolean,
+): string[] {
+  const output = subagentInlineOutput(result);
+  if (!output) return [];
+  const lines = contentLines(output)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return [];
+  const maxLines = expanded ? 6 : 2;
+  const rendered = lines
+    .slice(0, maxLines)
+    .map((line, index) =>
+      muted(
+        theme,
+        `${DETAIL_INDENT}│   ${index === 0 ? "debug" : "     "}: ${truncateVisible(line, 96)}`,
+      ),
+    );
+  if (lines.length > maxLines) {
+    rendered.push(
+      muted(
+        theme,
+        `${DETAIL_INDENT}│   … ${plural(lines.length - maxLines, "more debug line")}`,
+      ),
+    );
+  }
+  return rendered;
+}
+
+function subagentOutputLines(
+  theme: Theme,
+  result: SubagentSingleResult,
+): string[] {
+  const lines: string[] = [];
+  const outputPath = subagentOutputPath(result);
+  if (outputPath) {
+    const labelText = result.savedOutputPath ? "output" : "planned output";
+    const suffix = result.outputMode === "file-only" ? " · file-only" : "";
+    lines.push(
+      muted(
+        theme,
+        `${DETAIL_INDENT}│   ${labelText}: ${compactOneLine(outputPath, 110)}${suffix}`,
+      ),
+    );
+  }
+  if (result.outputMode === "file-only") {
+    lines.push(
+      muted(
+        theme,
+        `${DETAIL_INDENT}│   mode: file-only · read artifact before relying on contents`,
+      ),
+    );
+  }
+  if (result.outputSaveError) {
+    lines.push(
+      theme.fg(
+        "warning",
+        `${DETAIL_INDENT}│   save error: ${truncateVisible(result.outputSaveError, 110)}`,
+      ),
+    );
+  }
+  return lines;
+}
+
 function subagentResultGlyph(
   result: SubagentSingleResult,
   progress: SubagentProgress | undefined,
@@ -2480,7 +2801,9 @@ function subagentResultGlyph(
 ): string {
   if (progress?.status === "running") return theme.fg("accent", "●");
   if (progress?.status === "pending") return theme.fg("dim", "◦");
-  if (result.detached || result.interrupted || progress?.status === "detached")
+  if (result.interrupted || progress?.status === "paused")
+    return theme.fg("warning", "Ⅱ");
+  if (result.detached || progress?.status === "detached")
     return theme.fg("warning", "■");
   if (progress?.status === "completed" || result.exitCode === 0)
     return theme.fg("success", "✓");
@@ -2530,14 +2853,11 @@ function collectSubagentToolEntries(
   index: number,
 ): SubagentToolDisplayEntry[] {
   const progress = subagentProgressForResult(details, result, index);
-  const rowLabel =
-    details.mode === "parallel"
-      ? `Agent ${index + 1}/${details.totalSteps ?? details.results.length}`
-      : `Step ${index + 1}`;
+  const rowLabel = subagentRowLabel(details, index);
   const entries = (progress?.recentTools ?? []).map(
     (tool, toolIndex): SubagentToolDisplayEntry => ({
       rowLabel,
-      agent: result.agent,
+      agent: subagentDisplayAgent(details, result),
       tool: tool.tool,
       args: tool.args,
       endMs: tool.endMs ?? toolIndex,
@@ -2560,7 +2880,7 @@ function collectSubagentToolEntries(
         : text;
       entries.push({
         rowLabel,
-        agent: result.agent,
+        agent: subagentDisplayAgent(details, result),
         tool,
         args,
         endMs: toolIndex,
@@ -2571,7 +2891,7 @@ function collectSubagentToolEntries(
   if (progress?.currentTool) {
     entries.push({
       rowLabel,
-      agent: result.agent,
+      agent: subagentDisplayAgent(details, result),
       tool: progress.currentTool,
       args: progress.currentToolArgs ?? "",
       endMs: progress.currentToolStartedAt ?? Date.now(),
@@ -2606,21 +2926,7 @@ function subagentAgentToolSummary(
 }
 
 function subagentSummaryLine(details: SubagentDetails): string {
-  const total = details.totalSteps ?? details.results.length;
-  const done = details.results.filter((result, index) =>
-    subagentResultDone(
-      result,
-      subagentProgressForResult(details, result, index),
-    ),
-  ).length;
-  const running = details.results.filter(
-    (result, index) =>
-      subagentProgressForResult(details, result, index)?.status === "running",
-  ).length;
-  const status =
-    running > 0
-      ? `${running} running · ${done}/${total} done`
-      : `${done}/${total} done`;
+  const status = subagentStatusCountsLine(details);
   const stats = subagentProgressStats(
     details.progressSummary ?? {
       toolCount: details.results.reduce(
@@ -2655,6 +2961,152 @@ function subagentSummaryLine(details: SubagentDetails): string {
     .join(" · ");
 }
 
+function subagentErrorBlock(
+  result: AgentToolResult<unknown>,
+  theme: Theme,
+  expanded: boolean,
+): string {
+  const lines = contentLines(textContent(result))
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return errorLine(theme, "Error");
+  const visible = lines.slice(0, expanded ? 6 : 1);
+  const rendered = [errorLine(theme, visible[0] ?? "Error")];
+  for (const line of visible.slice(1)) {
+    rendered.push(
+      muted(theme, `${DETAIL_INDENT}│ ${truncateVisible(line, 120)}`),
+    );
+  }
+  if (lines.length > visible.length) {
+    rendered.push(
+      muted(
+        theme,
+        `${DETAIL_INDENT}│ … ${plural(lines.length - visible.length, "more line")}`,
+      ),
+    );
+  }
+  return rendered.join("\n");
+}
+
+function compactPathTail(value: string, maxWidth: number): string {
+  if (visibleWidth(value) <= maxWidth) return value;
+  if (maxWidth <= 1) return "…";
+  let suffix = "";
+  for (const char of [...value].reverse()) {
+    const next = `${char}${suffix}`;
+    if (visibleWidth(`…${next}`) > maxWidth) break;
+    suffix = next;
+  }
+  return `…${suffix}`;
+}
+
+function subagentSavedOutputLines(
+  details: SubagentDetails,
+  theme: Theme,
+): string[] {
+  if (details.mode !== "chain") return [];
+  const saved = details.results
+    .map((child, index) => ({ child, index, path: child.savedOutputPath }))
+    .filter(
+      (
+        row,
+      ): row is { child: SubagentSingleResult; index: number; path: string } =>
+        typeof row.path === "string" && row.path.length > 0,
+    );
+  if (saved.length === 0 || saved.length > 6) return [];
+  return [
+    muted(theme, `${DETAIL_INDENT}│ saved outputs:`),
+    ...saved.map((row) => {
+      const prefix = `${DETAIL_INDENT}│ ${subagentRowLabel(details, row.index)} ${subagentDisplayAgent(details, row.child)}: `;
+      const suffix = row.child.outputMode === "file-only" ? " · file-only" : "";
+      const pathWidth = Math.max(
+        8,
+        78 - visibleWidth(prefix) - visibleWidth(suffix),
+      );
+      return muted(
+        theme,
+        `${prefix}${compactPathTail(row.path, pathWidth)}${suffix}`,
+      );
+    }),
+  ];
+}
+
+function renderSubagentLargeSummary(
+  details: SubagentDetails,
+  theme: Theme,
+  title: string,
+): string[] {
+  const lines = [treeLine(theme, title, subagentSummaryLine(details))];
+  const stageSummary = subagentStageSummary(details);
+  if (stageSummary)
+    lines.push(muted(theme, `${DETAIL_INDENT}│ stages: ${stageSummary}`));
+  const outputSummary = subagentOutputSummary(details);
+  if (outputSummary)
+    lines.push(muted(theme, `${DETAIL_INDENT}│ ${outputSummary}`));
+  lines.push(...subagentSavedOutputLines(details, theme));
+
+  const attentionRows = details.results.flatMap((child, index) => {
+    const progress = subagentProgressForResult(details, child, index);
+    const reason = subagentAttentionReason(child, progress);
+    const debug = subagentInlineOutput(child)
+      ?.split("\n")
+      .find((line) => line.trim().length > 0)
+      ?.trim();
+    return reason ? [{ child, index, progress, reason, debug }] : [];
+  });
+  if (attentionRows.length > 0) {
+    const hasActive = attentionRows.some((row) =>
+      row.reason.startsWith("running"),
+    );
+    const hasAttention = attentionRows.some(
+      (row) => !row.reason.startsWith("running"),
+    );
+    const labelText =
+      hasActive && hasAttention
+        ? "active / attention"
+        : hasAttention
+          ? "attention"
+          : "active";
+    lines.push(muted(theme, `${DETAIL_INDENT}│ ${labelText}:`));
+    for (const row of attentionRows.slice(0, SUBAGENT_LARGE_ATTENTION_LIMIT)) {
+      lines.push(
+        muted(
+          theme,
+          `${DETAIL_INDENT}│ ${subagentResultGlyph(row.child, row.progress, theme)} ${subagentRowLabel(details, row.index)}: ${subagentDisplayAgent(details, row.child)} · ${truncateVisible(`${row.reason}${row.debug && !row.reason.startsWith("running") ? ` · ${row.debug}` : ""}`, 90)}`,
+        ),
+      );
+    }
+    if (attentionRows.length > SUBAGENT_LARGE_ATTENTION_LIMIT) {
+      const hiddenLabel =
+        hasActive && !hasAttention
+          ? "more active row"
+          : hasAttention && !hasActive
+            ? "more attention row"
+            : "more row";
+      lines.push(
+        muted(
+          theme,
+          `${DETAIL_INDENT}│ … ${plural(attentionRows.length - SUBAGENT_LARGE_ATTENTION_LIMIT, hiddenLabel)}`,
+        ),
+      );
+    }
+  }
+  lines.push(
+    muted(
+      theme,
+      `${DETAIL_INDENT}│ Press Ctrl+O for recent activity and all agent rows`,
+    ),
+  );
+  if (details.artifacts?.dir)
+    lines.push(
+      muted(
+        theme,
+        `${DETAIL_INDENT}│ artifacts: ${compactOneLine(details.artifacts.dir, 110)}`,
+      ),
+    );
+  return lines;
+}
+
 function renderSubagentToolResult(
   result: AgentToolResult<unknown>,
   options: ToolRenderOptions,
@@ -2667,8 +3119,19 @@ function renderSubagentToolResult(
   if (context.isError)
     return setText(
       context.lastComponent,
-      errorLine(theme, firstTextLine(result)),
+      subagentErrorBlock(result, theme, options.expanded),
     );
+
+  if (
+    !options.expanded &&
+    (details.results.length >= SUBAGENT_LARGE_RESULT_THRESHOLD ||
+      details.mode === "chain")
+  ) {
+    return setText(
+      context.lastComponent,
+      renderSubagentLargeSummary(details, theme, title).join("\n"),
+    );
+  }
 
   const entriesByIndex = details.results.map((child, index) =>
     collectSubagentToolEntries(details, child, index),
@@ -2707,10 +3170,7 @@ function renderSubagentToolResult(
   for (let index = 0; index < details.results.length; index++) {
     const child = details.results[index];
     const progress = subagentProgressForResult(details, child, index);
-    const rowLabel =
-      details.mode === "parallel"
-        ? `Agent ${index + 1}/${details.totalSteps ?? details.results.length}`
-        : `Step ${index + 1}`;
+    const rowLabel = subagentRowLabel(details, index);
     const entries = entriesByIndex[index] ?? [];
     const agentToolCount = subagentToolCount(child, progress, entries);
     const agentSummary = subagentAgentToolSummary(entries, agentToolCount);
@@ -2718,7 +3178,7 @@ function renderSubagentToolResult(
     lines.push(
       muted(
         theme,
-        `${DETAIL_INDENT}│ ${subagentResultGlyph(child, progress, theme)} ${rowLabel}: ${child.agent}${stats ? ` · ${stats}` : ""}${agentSummary ? ` · ${agentSummary}` : ""}`,
+        `${DETAIL_INDENT}│ ${subagentResultGlyph(child, progress, theme)} ${rowLabel}: ${subagentDisplayAgent(details, child)}${stats ? ` · ${stats}` : ""}${agentSummary ? ` · ${agentSummary}` : ""}`,
       ),
     );
     if (options.expanded && entries.length > 0) {
@@ -2740,14 +3200,29 @@ function renderSubagentToolResult(
       if (hiddenSummary)
         lines.push(muted(theme, `${DETAIL_INDENT}│   ${hiddenSummary}`));
     }
-    const outputPath = subagentOutputPath(child);
-    if (outputPath)
+    if (child.error) {
+      lines.push(
+        theme.fg(
+          "error",
+          `${DETAIL_INDENT}│   error: ${truncateVisible(child.error, 110)}`,
+        ),
+      );
+    }
+    if (
+      child.sessionFile &&
+      (options.expanded || child.error || child.outputSaveError)
+    ) {
       lines.push(
         muted(
           theme,
-          `${DETAIL_INDENT}│   output: ${compactOneLine(outputPath, 110)}`,
+          `${DETAIL_INDENT}│   session: ${compactPathTail(child.sessionFile, 78)}`,
         ),
       );
+    }
+    lines.push(...subagentOutputLines(theme, child));
+    if (child.error || child.outputSaveError || (child.exitCode ?? 0) !== 0) {
+      lines.push(...subagentDebugOutputLines(theme, child, options.expanded));
+    }
   }
   if (details.artifacts?.dir)
     lines.push(
