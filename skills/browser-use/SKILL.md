@@ -18,31 +18,33 @@ For setup details, see https://github.com/browser-use/browser-use/blob/main/brow
 
 ## Core Workflow
 
-1. **Navigate**: `browser-use open <url>` — launches headless browser and opens page
+Default to the managed browser-use browser. Do **not** start by trying to attach to the user's existing Chrome unless the task explicitly requires existing cookies/profile state.
+
+1. **Navigate**: `browser-use open <url>` — launches managed Chromium and opens the page
 2. **Inspect**: `browser-use state` — returns clickable elements with indices
 3. **Interact**: use indices from state (`browser-use click 5`, `browser-use input 3 "text"`)
-4. **Verify**: `browser-use state` or `browser-use screenshot` to confirm
-5. **Repeat**: browser stays open between commands
+4. **Probe when needed**: use `browser-use eval "js"` to inspect app state, DOM, local/session storage, network-visible globals, or rendered text
+5. **Verify visually**: use `browser-use screenshot <path.png>` for UI evidence
+6. **Repeat**: browser stays open between commands
 
-If a command fails, run `browser-use close` first to clear any broken session, then retry.
+If a command fails, run `browser-use close` first to clear any broken session, then retry the same managed-browser flow.
 
-To use the user's existing Chrome (preserves logins/cookies): run `browser-use connect` first.
-To use a cloud browser instead: run `browser-use cloud connect` first.
-After either, commands work the same way.
+For local dev-server testing, the expected default is:
 
-### If `browser-use connect` fails
+```bash
+browser-use open http://127.0.0.1:<port>
+browser-use state
+browser-use eval "(() => ({ url: location.href, text: document.body.innerText.slice(0, 1000) }))()"
+browser-use screenshot .scratch/ui-screenshots/<name>.png
+```
 
-When `browser-use connect` cannot find a running Chrome with remote debugging, prompt the user with two options:
+Only use the user's existing Chrome/profile when managed Chromium is insufficient because the exact task needs an already-authenticated external/private session.
 
-1. **Use their real Chrome browser** — they need to enable remote debugging first:
-   - Open `chrome://inspect/#remote-debugging` in Chrome, or relaunch Chrome with `--remote-debugging-port=9222`
-   - Then retry `browser-use connect`
-2. **Use managed Chromium with their Chrome profile** — no Chrome setup needed:
-   - Run `browser-use profile list` to show available profiles
-   - Ask which profile they want, then use `browser-use --profile "ProfileName" open <url>`
-   - This launches a separate Chromium instance with their profile data (cookies, logins, extensions)
+### Auth and session strategy
 
-Let the user choose — don't assume one path over the other.
+1. **Local dev apps:** first use managed Chromium (`browser-use open`, `state`, `eval`, `screenshot`). If it lands on a login screen, inspect the app's local dev auth path, test-user setup, local API/session mechanism, or documented auth bypass before asking the user to relaunch Chrome. Use app-supported local auth/test setup when available; do not invent production auth bypasses.
+2. **External/private sites:** if existing cookies are required, try `browser-use connect` or `browser-use profile list`.
+3. **If `browser-use connect` fails:** do not get stuck on remote debugging. Fall back to managed Chromium/profile discovery and continue with whatever can be tested. Ask the user about Chrome remote debugging only when existing browser cookies are strictly required and no profile/session alternative exists.
 
 ## Browser Modes
 
@@ -185,7 +187,15 @@ Chain when you don't need intermediate output. Run separately when you need to p
 
 ### Authenticated Browsing
 
-When a task requires an authenticated site (Gmail, GitHub, internal tools), use Chrome profiles:
+For local dev apps, do not assume an existing Chrome profile is required. Start with managed Chromium and inspect what the app exposes locally:
+
+```bash
+browser-use open http://127.0.0.1:<port>
+browser-use state
+browser-use eval "(() => ({ url: location.href, text: document.body.innerText.slice(0, 1000), localStorage: Object.keys(localStorage), sessionStorage: Object.keys(sessionStorage) }))()"
+```
+
+If the app requires auth, check its documented local-dev login/test-user/session flow before asking the user to intervene. For external/private sites where the user's existing cookies are actually required, use Chrome profiles:
 
 ```bash
 browser-use profile list                           # Check available profiles
