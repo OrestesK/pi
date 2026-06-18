@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { AgentToolResult } from "@mariozechner/pi-agent-core";
+import type { AgentToolResult as CoreAgentToolResult } from "@mariozechner/pi-agent-core";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
@@ -31,6 +31,7 @@ import {
 	suppressProgressForReadOnlyTask,
 	taskDisallowsFileUpdates,
 	type ChainStep,
+	type ParallelTaskItem,
 	type ResolvedStepBehavior,
 	type SequentialStep,
 	type StepOverrides,
@@ -115,6 +116,8 @@ import {
 	type IntercomEventBus,
 	type MaxOutputConfig,
 	type ResolvedControlConfig,
+	type AcceptanceInput,
+	type JsonSchemaObject,
 	type SingleResult,
 	type SubagentRunMode,
 	type SubagentState,
@@ -130,6 +133,8 @@ import {
 	wrapForkTask,
 } from "../../shared/types.ts";
 
+type AgentToolResult<T> = CoreAgentToolResult<T> & { isError?: boolean };
+
 const ASYNC_INTERRUPT_SIGNAL: NodeJS.Signals =
 	process.platform === "win32" ? "SIGBREAK" : "SIGUSR2";
 
@@ -140,6 +145,8 @@ interface TaskParam {
 	count?: number;
 	output?: string | boolean;
 	outputMode?: "inline" | "file-only";
+	outputSchema?: JsonSchemaObject;
+	acceptance?: AcceptanceInput;
 	reads?: string[] | boolean;
 	progress?: boolean;
 	model?: string;
@@ -176,6 +183,8 @@ export interface SubagentParamsLike {
 	skill?: string | string[] | boolean;
 	output?: string | boolean;
 	outputMode?: "inline" | "file-only";
+	outputSchema?: JsonSchemaObject;
+	acceptance?: AcceptanceInput;
 	agentScope?: string;
 	chainDir?: string;
 }
@@ -429,19 +438,13 @@ function resumeTargetExact(
 	return target?.runId === requested;
 }
 
-function escapeRegExp(value: string): string {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function isExactResumeError(
 	error: unknown,
 	source: "async" | "foreground",
 	requested: string,
 ): boolean {
 	if (!(error instanceof Error) || !requested) return false;
-	return new RegExp(`\\b${source} run '${escapeRegExp(requested)}'`, "i").test(
-		error.message,
-	);
+	return error.message.toLowerCase().includes(`${source} run '${requested}`.toLowerCase());
 }
 
 function resolveResumeTarget(
@@ -1106,7 +1109,7 @@ function expandChainParallelCounts(chain: ChainStep[]): {
 			expandedChain.push(step);
 			continue;
 		}
-		const expandedParallel = [];
+		const expandedParallel: ParallelTaskItem[] = [];
 		for (let taskIndex = 0; taskIndex < step.parallel.length; taskIndex++) {
 			const task = step.parallel[taskIndex]!;
 			const rawCount = (task as typeof task & { count?: unknown }).count;
@@ -1479,6 +1482,8 @@ function runAsyncPath(
 			skills,
 			output: effectiveOutput,
 			outputMode: effectiveOutputMode,
+			...(params.outputSchema ? { outputSchema: params.outputSchema } : {}),
+			...(params.acceptance ? { acceptance: params.acceptance } : {}),
 			modelOverride,
 			maxSubagentDepth,
 			worktreeSetupHook: deps.config.worktreeSetupHook,
@@ -1888,6 +1893,9 @@ async function runForegroundParallelTasks(
 				maxOutput: input.maxOutput,
 				outputPath,
 				outputMode: behavior?.outputMode,
+				...(behavior?.outputSchema ? { outputSchema: behavior.outputSchema } : {}),
+				...(behavior?.acceptance ? { acceptance: behavior.acceptance } : {}),
+				acceptanceContext: { mode: "parallel" },
 				maxSubagentDepth: input.maxSubagentDepths[index],
 				controlConfig: input.controlConfig,
 				onControlEvent: input.onControlEvent,
@@ -2052,6 +2060,8 @@ async function runParallelPath(
 				}
 			: {}),
 		...(task.outputMode !== undefined ? { outputMode: task.outputMode } : {}),
+		...(task.outputSchema ? { outputSchema: task.outputSchema } : {}),
+		...(task.acceptance ? { acceptance: task.acceptance } : {}),
 		...(task.reads !== undefined && task.reads !== true
 			? { reads: task.reads }
 			: {}),
@@ -2164,6 +2174,12 @@ async function runParallelPath(
 						: {}),
 					...(behaviorOverrides[i]?.outputMode !== undefined
 						? { outputMode: behaviorOverrides[i]!.outputMode }
+						: {}),
+					...(behaviorOverrides[i]?.outputSchema !== undefined
+						? { outputSchema: behaviorOverrides[i]!.outputSchema }
+						: {}),
+					...(behaviorOverrides[i]?.acceptance !== undefined
+						? { acceptance: behaviorOverrides[i]!.acceptance }
 						: {}),
 					...(behaviorOverrides[i]?.reads !== undefined
 						? { reads: behaviorOverrides[i]!.reads }
@@ -2551,6 +2567,8 @@ async function runSinglePath(
 				skills: skillOverride === false ? [] : skillOverride,
 				output: effectiveOutput,
 				outputMode: effectiveOutputMode,
+				...(params.outputSchema ? { outputSchema: params.outputSchema } : {}),
+				...(params.acceptance ? { acceptance: params.acceptance } : {}),
 				modelOverride,
 				maxSubagentDepth,
 				worktreeSetupHook: deps.config.worktreeSetupHook,
@@ -2648,6 +2666,9 @@ async function runSinglePath(
 		maxOutput: params.maxOutput,
 		outputPath,
 		outputMode: effectiveOutputMode,
+		...(params.outputSchema ? { outputSchema: params.outputSchema } : {}),
+		...(params.acceptance ? { acceptance: params.acceptance } : {}),
+		acceptanceContext: { mode: "single" },
 		maxSubagentDepth,
 		onUpdate: forwardSingleUpdate,
 		controlConfig,
@@ -2821,7 +2842,10 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 						deps.pi.getSessionName(),
 						ctx.sessionManager.getSessionId(),
 					);
-				} catch {}
+				} catch (error) {
+					const targetError = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+					sessionError = sessionError ? `${sessionError}; intercom target: ${targetError}` : `intercom target: ${targetError}`;
+				}
 				return {
 					content: [
 						{
@@ -2849,7 +2873,12 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					paramsWithResolvedCwd.id ?? paramsWithResolvedCwd.runId,
 				);
 				if (foreground) return foregroundStatusResult(foreground);
-				return inspectSubagentStatus(paramsWithResolvedCwd);
+				return inspectSubagentStatus({
+					action: "status",
+					id: paramsWithResolvedCwd.id,
+					runId: paramsWithResolvedCwd.runId,
+					dir: paramsWithResolvedCwd.dir,
+				}) as AgentToolResult<Details>;
 			}
 			if (paramsWithResolvedCwd.action === "resume") {
 				return resumeAsyncRun({
@@ -3009,7 +3038,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			undefined;
 		try {
 			sessionFileForIndex = createForkContextResolver(
-				ctx.sessionManager,
+				ctx.sessionManager as unknown as Parameters<typeof createForkContextResolver>[0],
 				effectiveParams.context,
 			).sessionFileForIndex;
 		} catch (error) {

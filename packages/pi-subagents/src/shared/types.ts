@@ -19,6 +19,8 @@ export interface MaxOutputConfig {
 
 export type OutputMode = "inline" | "file-only";
 
+export type JsonSchemaObject = Record<string, unknown>;
+
 export interface SavedOutputReference {
 	path: string;
 	bytes: number;
@@ -176,6 +178,175 @@ export interface ModelAttempt {
 	usage?: Usage;
 }
 
+export type AcceptanceProvenanceLevel = "none" | "attested" | "checked" | "verified" | "reviewed";
+
+export type AcceptanceEvidenceKind =
+	| "changed-files"
+	| "tests-added"
+	| "commands-run"
+	| "validation-output"
+	| "residual-risks"
+	| "no-staged-files"
+	| "diff-summary"
+	| "review-findings"
+	| "manual-notes";
+
+export interface AcceptanceGate {
+	id: string;
+	must: string;
+	evidence?: AcceptanceEvidenceKind[];
+	severity?: "required" | "recommended";
+}
+
+export interface AcceptanceVerifyCommand {
+	id: string;
+	command: string;
+	timeoutMs?: number;
+	cwd?: string;
+	env?: Record<string, string>;
+	allowFailure?: boolean;
+}
+
+export interface AcceptanceReviewGate {
+	agent?: string;
+	focus?: string;
+	required?: boolean;
+}
+
+export interface AcceptanceConfig {
+	criteria?: Array<string | AcceptanceGate>;
+	evidence?: AcceptanceEvidenceKind[];
+	verify?: AcceptanceVerifyCommand[];
+	review?: AcceptanceReviewGate;
+	stopRules?: string[];
+	maxFinalizationTurns?: number;
+}
+
+export type AcceptanceInput = AcceptanceConfig;
+
+export interface ResolvedAcceptanceGate extends AcceptanceGate {
+	id: string;
+	must: string;
+	evidence: AcceptanceEvidenceKind[];
+	severity: "required" | "recommended";
+}
+
+export interface ResolvedAcceptanceConfig {
+	level: AcceptanceProvenanceLevel;
+	explicit: boolean;
+	inferredReason: string[];
+	criteria: ResolvedAcceptanceGate[];
+	evidence: AcceptanceEvidenceKind[];
+	verify: AcceptanceVerifyCommand[];
+	review?: AcceptanceReviewGate;
+	stopRules: string[];
+	finalization: {
+		mode: "none" | "self-review-loop";
+		maxTurns: number;
+	};
+}
+
+export interface AcceptanceReport {
+	criteriaSatisfied?: Array<{
+		id?: string;
+		status: "satisfied" | "not-satisfied" | "not-applicable";
+		evidence: string;
+	}>;
+	changedFiles?: string[];
+	testsAddedOrUpdated?: string[];
+	commandsRun?: Array<{
+		command: string;
+		result: "passed" | "failed" | "not-run";
+		summary: string;
+	}>;
+	validationOutput?: string[];
+	residualRisks?: string[];
+	noStagedFiles?: boolean;
+	diffSummary?: string;
+	reviewFindings?: string[];
+	manualNotes?: string;
+	notes?: string;
+}
+
+export type AcceptanceRuntimeCheckStatus = "passed" | "failed" | "not-applicable";
+
+export interface AcceptanceRuntimeCheck {
+	id: string;
+	status: AcceptanceRuntimeCheckStatus;
+	message: string;
+}
+
+export interface AcceptanceVerifyResult {
+	id: string;
+	command: string;
+	cwd?: string;
+	exitCode: number | null;
+	status: "passed" | "failed" | "timed-out" | "allowed-failure";
+	stdout?: string;
+	stderr?: string;
+	durationMs: number;
+}
+
+export interface AcceptanceReviewResult {
+	status: "no-blockers" | "blockers" | "needs-parent-decision";
+	findings: Array<{
+		severity: "blocker" | "non-blocking";
+		file?: string;
+		issue: string;
+		rationale: string;
+	}>;
+}
+
+export type AcceptanceLedgerStatus =
+	| "not-required"
+	| "claimed"
+	| "attested"
+	| "checked"
+	| "verified"
+	| "reviewed"
+	| "accepted"
+	| "rejected";
+
+export interface AcceptanceFinalizationTurn {
+	turn: number;
+	prompt: string;
+	status: AcceptanceLedgerStatus;
+	rawOutput?: string;
+	report?: AcceptanceReport;
+	parseError?: string;
+	runtimeChecks: AcceptanceRuntimeCheck[];
+	verifyRuns: AcceptanceVerifyResult[];
+	failureMessage?: string;
+}
+
+export interface AcceptanceFinalizationLedger {
+	mode: "self-review-loop";
+	status: "not-run" | "completed" | "failed";
+	maxTurns: number;
+	turns: AcceptanceFinalizationTurn[];
+}
+
+export interface AcceptanceLedger {
+	status: AcceptanceLedgerStatus;
+	explicit: boolean;
+	effectiveAcceptance: ResolvedAcceptanceConfig;
+	inferredReason: string[];
+	criteria: ResolvedAcceptanceGate[];
+	childReport?: AcceptanceReport;
+	childReportParseError?: string;
+	initialChildReport?: AcceptanceReport;
+	initialChildReportParseError?: string;
+	runtimeChecks: AcceptanceRuntimeCheck[];
+	verifyRuns: AcceptanceVerifyResult[];
+	reviewResult?: AcceptanceReviewResult;
+	finalization?: AcceptanceFinalizationLedger;
+	parentDecision?: {
+		status: "accepted" | "rejected";
+		at: string;
+		reason?: string;
+	};
+}
+
 export interface SingleResult {
 	agent: string;
 	task: string;
@@ -203,6 +374,10 @@ export interface SingleResult {
 	savedOutputPath?: string;
 	outputReference?: SavedOutputReference;
 	outputSaveError?: string;
+	structuredOutput?: unknown;
+	structuredOutputPath?: string;
+	structuredOutputSchemaPath?: string;
+	acceptance?: AcceptanceLedger;
 }
 
 export interface Details {
@@ -481,6 +656,19 @@ export interface RunSyncOptions {
 	preferredModelProvider?: string;
 	/** Skills to inject (overrides agent default if provided) */
 	skills?: string[];
+	outputSchema?: JsonSchemaObject;
+	structuredOutput?: {
+		schema: JsonSchemaObject;
+		schemaPath: string;
+		outputPath: string;
+	};
+	acceptance?: AcceptanceInput;
+	acceptanceContext?: {
+		mode?: SubagentRunMode;
+		async?: boolean;
+		dynamic?: boolean;
+		dynamicGroup?: boolean;
+	};
 }
 
 export type IntercomBridgeMode = "off" | "fork-only" | "always";
@@ -540,7 +728,7 @@ export function resolveTempScopeId(options?: {
 	homedir?: (() => string) | undefined;
 }): string {
 	const env = options?.env ?? process.env;
-	const getuid = options && Object.hasOwn(options, "getuid")
+	const getuid = options && Object.prototype.hasOwnProperty.call(options, "getuid")
 		? options.getuid
 		: process.getuid?.bind(process);
 	if (typeof getuid === "function") {
@@ -552,7 +740,7 @@ export function resolveTempScopeId(options?: {
 		if (value) return `user-${sanitizeTempScopeSegment(value)}`;
 	}
 
-	const userInfo = options && Object.hasOwn(options, "userInfo")
+	const userInfo = options && Object.prototype.hasOwnProperty.call(options, "userInfo")
 		? options.userInfo
 		: os.userInfo;
 	try {
@@ -565,7 +753,7 @@ export function resolveTempScopeId(options?: {
 	const homedir = env.USERPROFILE ?? env.HOME;
 	if (homedir) return `home-${sanitizeTempScopeSegment(homedir)}`;
 
-	const resolveHomedir = options && Object.hasOwn(options, "homedir")
+	const resolveHomedir = options && Object.prototype.hasOwnProperty.call(options, "homedir")
 		? options.homedir
 		: os.homedir;
 	try {

@@ -18,6 +18,7 @@ import {
 } from "../shared/single-output.ts";
 import {
 	type ActivityState,
+	type AcceptanceLedger,
 	type ArtifactConfig,
 	type ArtifactPaths,
 	type AsyncParallelGroupStatus,
@@ -49,6 +50,8 @@ import {
 	MAX_PARALLEL_CONCURRENCY,
 } from "../shared/parallel-utils.ts";
 import { buildPiArgs, cleanupTempDir } from "../shared/pi-args.ts";
+import { acceptanceFailureMessage, evaluateAcceptance, stripAcceptanceReport } from "../shared/acceptance.ts";
+import { readStructuredOutput } from "../shared/structured-output.ts";
 import {
 	formatModelAttemptNote,
 	isRetryableModelFailure,
@@ -127,6 +130,10 @@ interface StepResult {
 	modelAttempts?: ModelAttempt[];
 	artifactPaths?: ArtifactPaths;
 	truncated?: boolean;
+	structuredOutput?: unknown;
+	structuredOutputPath?: string;
+	structuredOutputSchemaPath?: string;
+	acceptance?: AcceptanceLedger;
 }
 
 const ASYNC_INTERRUPT_SIGNAL: NodeJS.Signals =
@@ -231,6 +238,9 @@ interface RunPiStreamingResult {
 	finalOutput: string;
 	interrupted?: boolean;
 	observedMutationAttempt?: boolean;
+	structuredOutput?: unknown;
+	structuredOutputPath?: string;
+	structuredOutputSchemaPath?: string;
 }
 
 function runPiStreaming(
@@ -673,6 +683,10 @@ async function runSingleStep(
 	sessionFile?: string;
 	intercomTarget?: string;
 	completionGuardTriggered?: boolean;
+	structuredOutput?: unknown;
+	structuredOutputPath?: string;
+	structuredOutputSchemaPath?: string;
+	acceptance?: AcceptanceLedger;
 }> {
 	const placeholderRegex = new RegExp(
 		ctx.placeholder.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
@@ -718,6 +732,13 @@ async function runSingleStep(
 	for (let index = 0; index < candidates.length; index++) {
 		const candidate = candidates[index];
 		const outputSnapshot = captureSingleOutputSnapshot(step.outputPath);
+		if (step.structuredOutput) {
+			try {
+				if (fs.existsSync(step.structuredOutput.outputPath)) fs.unlinkSync(step.structuredOutput.outputPath);
+			} catch {
+				// Missing/stale structured-output files are handled after the child exits.
+			}
+		}
 		const { args, env, tempDir } = buildPiArgs({
 			baseArgs: ["--mode", "json", "-p"],
 			task,
@@ -738,6 +759,7 @@ async function runSingleStep(
 			runId: ctx.id,
 			childAgentName: step.agent,
 			childIndex: ctx.flatIndex,
+			structuredOutput: step.structuredOutput,
 		});
 		const run = await runPiStreaming(
 			args,
@@ -815,12 +837,41 @@ async function runSingleStep(
 		attemptNotes.push(formatModelAttemptNote(attempt, candidates[index + 1]));
 	}
 
+	if (step.structuredOutput && finalResult && finalResult.exitCode === 0 && !finalResult.error) {
+		const structured = readStructuredOutput(step.structuredOutput);
+		if (structured.error) {
+			finalResult = { ...finalResult, exitCode: 1, error: structured.error };
+		} else {
+			finalResult = {
+				...finalResult,
+				structuredOutput: structured.value,
+				structuredOutputPath: step.structuredOutput.outputPath,
+				structuredOutputSchemaPath: step.structuredOutput.schemaPath,
+			};
+		}
+	}
 	const rawOutput = finalResult?.finalOutput ?? "";
+	let acceptance: AcceptanceLedger | undefined;
+	if (step.acceptance && finalResult) {
+		acceptance = await evaluateAcceptance({
+			acceptance: step.acceptance,
+			output: rawOutput,
+			cwd: step.cwd ?? ctx.cwd,
+		});
+		const acceptanceFailure = acceptanceFailureMessage(acceptance);
+		if (acceptanceFailure && acceptance.explicit && finalResult.exitCode === 0 && !finalResult.interrupted) {
+			finalResult = {
+				...finalResult,
+				exitCode: 1,
+				error: finalResult.error ? `${finalResult.error}\n${acceptanceFailure}` : acceptanceFailure,
+			};
+		}
+	}
 	const resolvedOutput =
 		step.outputPath && finalResult?.exitCode === 0
 			? resolveSingleOutput(step.outputPath, rawOutput, finalOutputSnapshot)
 			: { fullOutput: rawOutput };
-	const output = resolvedOutput.fullOutput;
+	const output = step.acceptance ? stripAcceptanceReport(resolvedOutput.fullOutput) : resolvedOutput.fullOutput;
 	const outputReference = resolvedOutput.savedPath
 		? formatSavedOutputReference(resolvedOutput.savedPath, output)
 		: undefined;
@@ -881,6 +932,10 @@ async function runSingleStep(
 		artifactPaths,
 		interrupted: finalResult?.interrupted,
 		completionGuardTriggered: completionGuardTriggeredFinal,
+		structuredOutput: finalResult?.structuredOutput,
+		structuredOutputPath: finalResult?.structuredOutputPath,
+		structuredOutputSchemaPath: finalResult?.structuredOutputSchemaPath,
+		acceptance,
 	};
 }
 

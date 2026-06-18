@@ -27,6 +27,62 @@ const OutputModeOverride = Type.String({
 		"Return saved output inline (default) or only a concise file reference. file-only requires output to be a path; the parent must read the saved artifact before making claims that depend on its contents.",
 });
 
+const JsonSchemaObject = Type.Unsafe({
+	type: "object",
+	additionalProperties: true,
+	description: "JSON Schema object used to validate structured output from a child subagent.",
+});
+
+const AcceptanceEvidenceKindSchema = Type.String({
+	enum: [
+		"changed-files",
+		"tests-added",
+		"commands-run",
+		"validation-output",
+		"residual-risks",
+		"no-staged-files",
+		"diff-summary",
+		"review-findings",
+		"manual-notes",
+	],
+});
+
+const AcceptanceGateSchema = Type.Object({
+	id: Type.String(),
+	must: Type.String(),
+	evidence: Type.Optional(Type.Array(AcceptanceEvidenceKindSchema)),
+	severity: Type.Optional(Type.String({ enum: ["required", "recommended"] })),
+}, { additionalProperties: false });
+
+const AcceptanceVerifyCommandSchema = Type.Object({
+	id: Type.String(),
+	command: Type.String(),
+	timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
+	cwd: Type.Optional(Type.String()),
+	env: Type.Optional(Type.Record(Type.String(), Type.String())),
+	allowFailure: Type.Optional(Type.Boolean()),
+}, { additionalProperties: false });
+
+const AcceptanceReviewGateSchema = Type.Object({
+	agent: Type.Optional(Type.String()),
+	focus: Type.Optional(Type.String()),
+	required: Type.Literal(false),
+}, { additionalProperties: false });
+
+const AcceptanceOverride = Type.Unsafe({
+	type: "object",
+	properties: {
+		criteria: { type: "array", items: { anyOf: [{ type: "string" }, AcceptanceGateSchema] } },
+		evidence: { type: "array", items: AcceptanceEvidenceKindSchema },
+		verify: { type: "array", items: AcceptanceVerifyCommandSchema },
+		review: AcceptanceReviewGateSchema,
+		stopRules: { type: "array", items: { type: "string" } },
+		maxFinalizationTurns: { type: "integer", minimum: 1, maximum: 10 },
+	},
+	additionalProperties: false,
+	description: "Optional acceptance contract for goal-style requests and implementation handoffs. Runtime validation requires at least one of criteria, evidence, verify, review, or stopRules.",
+});
+
 const ReadsOverride = Type.Unsafe({
 	anyOf: [{ type: "array", items: { type: "string" } }, { type: "boolean" }],
 	description:
@@ -55,6 +111,8 @@ const TaskItem = Type.Object({
 		}),
 	),
 	skill: Type.Optional(SkillOverride),
+	outputSchema: Type.Optional(JsonSchemaObject),
+	acceptance: Type.Optional(AcceptanceOverride),
 });
 
 // Parallel task item (within a parallel step)
@@ -83,6 +141,8 @@ const ParallelTaskSchema = Type.Object({
 	model: Type.Optional(
 		Type.String({ description: "Override model for this task" }),
 	),
+	outputSchema: Type.Optional(JsonSchemaObject),
+	acceptance: Type.Optional(AcceptanceOverride),
 });
 
 // Flattened so chain steps do not need an object-shape anyOf/oneOf union.
@@ -110,6 +170,8 @@ const ChainItem = Type.Object(
 		model: Type.Optional(
 			Type.String({ description: "Override model for this step" }),
 		),
+		outputSchema: Type.Optional(JsonSchemaObject),
+		acceptance: Type.Optional(AcceptanceOverride),
 		parallel: Type.Optional(
 			Type.Array(ParallelTaskSchema, {
 				minItems: 1,
@@ -365,4 +427,6 @@ export const SubagentParams = Type.Object({
 				"Override model for single agent (e.g. 'anthropic/claude-sonnet-4')",
 		}),
 	),
+	outputSchema: Type.Optional(JsonSchemaObject),
+	acceptance: Type.Optional(AcceptanceOverride),
 });

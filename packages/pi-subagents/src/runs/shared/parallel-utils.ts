@@ -1,3 +1,5 @@
+import type { JsonSchemaObject, ResolvedAcceptanceConfig } from "../../shared/types.ts";
+
 export interface RunnerSubagentStep {
 	agent: string;
 	task: string;
@@ -14,6 +16,12 @@ export interface RunnerSubagentStep {
 	skills?: string[];
 	outputPath?: string;
 	outputMode?: "inline" | "file-only";
+	structuredOutput?: {
+		schema: JsonSchemaObject;
+		schemaPath: string;
+		outputPath: string;
+	};
+	acceptance?: ResolvedAcceptanceConfig;
 	sessionFile?: string;
 	maxSubagentDepth?: number;
 }

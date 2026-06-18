@@ -1,4 +1,8 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { JsonSchemaObject } from "../../shared/types.ts";
+import { STRUCTURED_OUTPUT_CAPTURE_ENV, STRUCTURED_OUTPUT_SCHEMA_ENV, validateStructuredOutputValue } from "./structured-output.ts";
 
 const SUBAGENT_INHERIT_PROJECT_CONTEXT_ENV = "PI_SUBAGENT_INHERIT_PROJECT_CONTEXT";
 const SUBAGENT_INHERIT_SKILLS_ENV = "PI_SUBAGENT_INHERIT_SKILLS";
@@ -125,13 +129,54 @@ export function stripParentOnlySubagentMessages(messages: unknown[]): unknown[] 
 }
 
 export default function registerSubagentPromptRuntime(pi: ExtensionAPI): void {
-	pi.on("context", (event) => {
-		const messages = stripParentOnlySubagentMessages(event.messages);
-		if (messages === event.messages) return undefined;
+	const structuredOutputPath = process.env[STRUCTURED_OUTPUT_CAPTURE_ENV];
+	const structuredSchemaPath = process.env[STRUCTURED_OUTPUT_SCHEMA_ENV];
+	if (structuredOutputPath && structuredSchemaPath) {
+		const schema = JSON.parse(fs.readFileSync(structuredSchemaPath, "utf-8")) as JsonSchemaObject;
+		const parameters = {
+			type: "object",
+			properties: { value: schema },
+			required: ["value"],
+			additionalProperties: false,
+		};
+		const registerTool = pi.registerTool as unknown as (tool: {
+			name: string;
+			label: string;
+			description: string;
+			parameters: unknown;
+			execute: (_id: string, params: { value: unknown }) => Promise<unknown>;
+		}) => void;
+		registerTool({
+			name: "structured_output",
+			label: "Structured Output",
+			description: "Submit the required final structured output for this subagent step. This terminates the step.",
+			parameters: parameters as never,
+			async execute(_id: string, params: { value: unknown }) {
+				const validation = validateStructuredOutputValue(schema, params.value);
+				if (validation.status === "invalid") {
+					throw new Error(`Structured output validation failed: ${validation.message}`);
+				}
+				fs.mkdirSync(path.dirname(structuredOutputPath), { recursive: true });
+				fs.writeFileSync(structuredOutputPath, JSON.stringify(params.value), { mode: 0o600 });
+				return {
+					content: [{ type: "text", text: "Structured output captured." }],
+					details: { path: structuredOutputPath },
+					terminate: true,
+				};
+			},
+		});
+	}
+
+	const onRuntimeEvent = pi.on as unknown as (event: string, handler: (event: unknown) => unknown) => void;
+	onRuntimeEvent("context", (event: unknown) => {
+		const typedEvent = event as { messages: unknown[] };
+		const messages = stripParentOnlySubagentMessages(typedEvent.messages);
+		if (messages === typedEvent.messages) return undefined;
 		return { messages };
 	});
 
-	pi.on("before_agent_start", async (event) => {
+	onRuntimeEvent("before_agent_start", async (event: unknown) => {
+		const typedEvent = event as { systemPrompt: string };
 		const intercomSessionName = process.env[SUBAGENT_INTERCOM_SESSION_NAME_ENV]?.trim();
 		if (intercomSessionName && typeof pi.setSessionName === "function") {
 			pi.setSessionName(intercomSessionName);
@@ -140,11 +185,11 @@ export default function registerSubagentPromptRuntime(pi: ExtensionAPI): void {
 		const inheritProjectContext = readBooleanEnv(SUBAGENT_INHERIT_PROJECT_CONTEXT_ENV);
 		const inheritSkills = readBooleanEnv(SUBAGENT_INHERIT_SKILLS_ENV);
 		if (inheritProjectContext === undefined && inheritSkills === undefined) return;
-		const rewritten = rewriteSubagentPrompt(event.systemPrompt, {
+		const rewritten = rewriteSubagentPrompt(typedEvent.systemPrompt, {
 			inheritProjectContext: inheritProjectContext ?? true,
 			inheritSkills: inheritSkills ?? true,
 		});
-		if (rewritten === event.systemPrompt) return;
+		if (rewritten === typedEvent.systemPrompt) return;
 		return { systemPrompt: rewritten };
 	});
 }

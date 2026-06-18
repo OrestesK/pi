@@ -4,13 +4,14 @@
 
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { AgentConfig } from "../../agents/agents.ts";
 import { applyThinkingSuffix } from "../shared/pi-args.ts";
+import { formatAcceptancePrompt, resolveEffectiveAcceptance } from "../shared/acceptance-contract.ts";
+import { createStructuredOutputRuntime } from "../shared/structured-output.ts";
 import {
 	injectSingleOutputInstruction,
 	resolveSingleOutputPath,
@@ -49,6 +50,8 @@ import {
 	type MaxOutputConfig,
 	type ResolvedControlConfig,
 	type SubagentRunMode,
+	type AcceptanceInput,
+	type JsonSchemaObject,
 	ASYNC_DIR,
 	RESULTS_DIR,
 	SUBAGENT_ASYNC_STARTED_EVENT,
@@ -136,6 +139,8 @@ interface AsyncSingleParams {
 	skills?: string[];
 	output?: string | false;
 	outputMode?: "inline" | "file-only";
+	outputSchema?: JsonSchemaObject;
+	acceptance?: AcceptanceInput;
 	modelOverride?: string;
 	availableModels?: AvailableModelInfo[];
 	maxSubagentDepth: number;
@@ -321,6 +326,8 @@ export function executeAsyncChain(
 		return {
 			...(s.output !== undefined ? { output: s.output } : {}),
 			...(s.outputMode !== undefined ? { outputMode: s.outputMode } : {}),
+			...(s.outputSchema ? { outputSchema: s.outputSchema } : {}),
+			...(s.acceptance ? { acceptance: s.acceptance } : {}),
 			...(s.reads !== undefined ? { reads: s.reads } : {}),
 			...(s.progress !== undefined ? { progress: s.progress } : {}),
 			...(stepSkillInput !== undefined ? { skills: stepSkillInput } : {}),
@@ -383,10 +390,21 @@ export function executeAsyncChain(
 		);
 		if (validationError) throw new AsyncStartValidationError(validationError);
 		validateUniqueAsyncOutputPath(outputPath, owner);
-		const task = injectSingleOutputInstruction(
+		const outputTask = injectSingleOutputInstruction(
 			`${readInstructions.prefix}${s.task ?? "{previous}"}${progressInstructions.suffix}`,
 			outputPath,
 		);
+		const acceptance = resolveEffectiveAcceptance({
+			explicit: behavior.acceptance,
+			agentName: s.agent,
+			task: outputTask,
+			mode: resultMode,
+			async: true,
+			dynamicGroup: resultMode === "parallel",
+		});
+		const acceptancePrompt = formatAcceptancePrompt(acceptance);
+		const task = acceptancePrompt ? `${outputTask}\n${acceptancePrompt}` : outputTask;
+		const structuredOutput = behavior.outputSchema ? createStructuredOutputRuntime(behavior.outputSchema, asyncDir) : undefined;
 
 		const primaryModel = resolveModelCandidate(
 			behavior.model ?? a.model,
@@ -403,7 +421,9 @@ export function executeAsyncChain(
 				a.fallbackModels,
 				availableModels,
 				ctx.currentModelProvider,
-			).map((candidate) => applyThinkingSuffix(candidate, a.thinking)),
+			)
+				.map((candidate) => applyThinkingSuffix(candidate, a.thinking))
+				.filter((candidate): candidate is string => typeof candidate === "string"),
 			tools: a.tools,
 			extensions: a.extensions,
 			mcpDirectTools: a.mcpDirectTools,
@@ -414,6 +434,8 @@ export function executeAsyncChain(
 			skills: resolvedSkills.map((r) => r.name),
 			outputPath,
 			outputMode: behavior.outputMode,
+			...(structuredOutput ? { structuredOutput } : {}),
+			...(acceptance.level !== "none" ? { acceptance } : {}),
 			sessionFile,
 			maxSubagentDepth: resolveChildMaxSubagentDepth(
 				maxSubagentDepth,
@@ -683,10 +705,20 @@ export function executeAsyncSingle(
 		`Async single run (${agent})`,
 	);
 	if (validationError) return formatAsyncStartError("single", validationError);
-	const taskWithOutputInstruction = injectSingleOutputInstruction(
+	const outputTask = injectSingleOutputInstruction(
 		task,
 		outputPath,
 	);
+	const acceptance = resolveEffectiveAcceptance({
+		explicit: params.acceptance,
+		agentName: agent,
+		task: outputTask,
+		mode: "single",
+		async: true,
+	});
+	const acceptancePrompt = formatAcceptancePrompt(acceptance);
+	const taskWithOutputInstruction = acceptancePrompt ? `${outputTask}\n${acceptancePrompt}` : outputTask;
+	const structuredOutput = params.outputSchema ? createStructuredOutputRuntime(params.outputSchema, asyncDir) : undefined;
 	let spawnResult: { pid?: number; error?: string } = {};
 	try {
 		spawnResult = spawnRunner(
@@ -723,6 +755,8 @@ export function executeAsyncSingle(
 						skills: resolvedSkills.map((r) => r.name),
 						outputPath,
 						outputMode,
+						...(structuredOutput ? { structuredOutput } : {}),
+						...(acceptance.level !== "none" ? { acceptance } : {}),
 						sessionFile,
 						maxSubagentDepth: resolveChildMaxSubagentDepth(
 							maxSubagentDepth,

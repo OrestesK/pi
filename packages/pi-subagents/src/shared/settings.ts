@@ -6,7 +6,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { AgentConfig } from "../agents/agents.ts";
 import { normalizeSkillInput } from "../agents/skills.ts";
-import { CHAIN_RUNS_DIR, type OutputMode } from "./types.ts";
+import { CHAIN_RUNS_DIR, type AcceptanceInput, type JsonSchemaObject, type OutputMode } from "./types.ts";
 const CHAIN_DIR_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const INITIAL_PROGRESS_CONTENT = "# Progress\n\n## Status\nIn Progress\n\n## Tasks\n\n## Files Changed\n\n## Notes\n";
 
@@ -17,6 +17,8 @@ const INITIAL_PROGRESS_CONTENT = "# Progress\n\n## Status\nIn Progress\n\n## Tas
 export interface ResolvedStepBehavior {
 	output: string | false;
 	outputMode: OutputMode;
+	outputSchema?: JsonSchemaObject;
+	acceptance?: AcceptanceInput;
 	reads: string[] | false;
 	progress: boolean;
 	skills: string[] | false;
@@ -26,6 +28,8 @@ export interface ResolvedStepBehavior {
 export interface StepOverrides {
 	output?: string | false;
 	outputMode?: OutputMode;
+	outputSchema?: JsonSchemaObject;
+	acceptance?: AcceptanceInput;
 	reads?: string[] | false;
 	progress?: boolean;
 	skills?: string[] | false;
@@ -47,6 +51,8 @@ export interface SequentialStep {
 	cwd?: string;
 	output?: string | false;
 	outputMode?: OutputMode;
+	outputSchema?: JsonSchemaObject;
+	acceptance?: AcceptanceInput;
 	reads?: string[] | false;
 	progress?: boolean;
 	skill?: string | string[] | false;
@@ -54,13 +60,15 @@ export interface SequentialStep {
 }
 
 /** Parallel task item within a parallel step */
-interface ParallelTaskItem {
+export interface ParallelTaskItem {
 	agent: string;
 	task?: string;
 	cwd?: string;
 	count?: number;
 	output?: string | false;
 	outputMode?: OutputMode;
+	outputSchema?: JsonSchemaObject;
+	acceptance?: AcceptanceInput;
 	reads?: string[] | false;
 	progress?: boolean;
 	skill?: string | string[] | false;
@@ -70,6 +78,7 @@ interface ParallelTaskItem {
 /** Parallel step: multiple agents running concurrently */
 interface ParallelStep {
 	parallel: ParallelTaskItem[];
+	cwd?: string;
 	concurrency?: number;
 	failFast?: boolean;
 	worktree?: boolean;
@@ -217,12 +226,21 @@ export function resolveStepBehavior(
 
 	const outputMode = stepOverrides.outputMode ?? "inline";
 	const model = stepOverrides.model ?? agentConfig.model;
-	return { output, outputMode, reads, progress, skills, model };
+	return {
+		output,
+		outputMode,
+		...(stepOverrides.outputSchema ? { outputSchema: stepOverrides.outputSchema } : {}),
+		...(stepOverrides.acceptance ? { acceptance: stepOverrides.acceptance } : {}),
+		reads,
+		progress,
+		skills,
+		model,
+	};
 }
 
 export function resolveTaskTextForFileUpdatePolicy(task: string | undefined, originalTask?: string): string | undefined {
 	if (!task) return originalTask;
-	return originalTask ? task.replaceAll("{task}", originalTask) : task;
+	return originalTask ? task.split("{task}").join(originalTask) : task;
 }
 
 export function taskDisallowsFileUpdates(task: string | undefined): boolean {

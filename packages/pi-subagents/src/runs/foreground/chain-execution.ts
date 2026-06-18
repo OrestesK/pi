@@ -122,6 +122,10 @@ interface ParallelChainRunInput {
 		lastActivityAt?: number;
 		currentTool?: string;
 		currentToolStartedAt?: number;
+		currentPath?: string;
+		turnCount?: number;
+		tokens?: number;
+		toolCount?: number;
 		interrupt?: () => boolean;
 	};
 	results: SingleResult[];
@@ -312,6 +316,9 @@ async function runParallelChainTasks(
 					artifactConfig: input.artifactConfig,
 					outputPath,
 					outputMode: behavior.outputMode,
+					...(behavior.outputSchema ? { outputSchema: behavior.outputSchema } : {}),
+					...(behavior.acceptance ? { acceptance: behavior.acceptance } : {}),
+					acceptanceContext: { mode: "chain" },
 					maxSubagentDepth,
 					controlConfig: input.controlConfig,
 					onControlEvent: input.onControlEvent,
@@ -415,6 +422,10 @@ interface ChainExecutionParams {
 		lastActivityAt?: number;
 		currentTool?: string;
 		currentToolStartedAt?: number;
+		currentPath?: string;
+		turnCount?: number;
+		tokens?: number;
+		toolCount?: number;
 		interrupt?: () => boolean;
 	};
 	chainSkills?: string[];
@@ -513,6 +524,8 @@ export async function executeChain(
 		const stepOverrides: StepOverrides[] = seqSteps.map((step) => ({
 			output: step.output,
 			outputMode: step.outputMode,
+			outputSchema: step.outputSchema,
+			acceptance: step.acceptance,
 			reads: step.reads,
 			progress: step.progress,
 			skills: normalizeSkillInput(step.skill),
@@ -565,6 +578,8 @@ export async function executeChain(
 					...(override?.output !== undefined
 						? { output: override.output }
 						: {}),
+					...(step.outputSchema ? { outputSchema: step.outputSchema } : {}),
+					...(step.acceptance ? { acceptance: step.acceptance } : {}),
 					...("outputMode" in step && step.outputMode !== undefined
 						? { outputMode: step.outputMode }
 						: {}),
@@ -906,6 +921,8 @@ export async function executeChain(
 						? tuiOverride.output
 						: seqStep.output,
 				outputMode: seqStep.outputMode,
+				outputSchema: seqStep.outputSchema,
+				acceptance: seqStep.acceptance,
 				reads:
 					tuiOverride?.reads !== undefined ? tuiOverride.reads : seqStep.reads,
 				progress:
@@ -1017,6 +1034,9 @@ export async function executeChain(
 				artifactConfig,
 				outputPath,
 				outputMode: behavior.outputMode,
+				...(behavior.outputSchema ? { outputSchema: behavior.outputSchema } : {}),
+				...(behavior.acceptance ? { acceptance: behavior.acceptance } : {}),
+				acceptanceContext: { mode: "chain" },
 				maxSubagentDepth,
 				controlConfig,
 				onControlEvent,

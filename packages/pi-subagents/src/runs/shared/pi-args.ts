@@ -2,6 +2,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { JsonSchemaObject } from "../../shared/types.ts";
+import { STRUCTURED_OUTPUT_CAPTURE_ENV, STRUCTURED_OUTPUT_SCHEMA_ENV } from "./structured-output.ts";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
 const TASK_ARG_LIMIT = 8000;
@@ -33,6 +35,11 @@ interface BuildPiArgsInput {
 	runId?: string;
 	childAgentName?: string;
 	childIndex?: number;
+	structuredOutput?: {
+		schema: JsonSchemaObject;
+		schemaPath: string;
+		outputPath: string;
+	};
 }
 
 interface BuildPiArgsResult {
@@ -143,6 +150,10 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 		env.MCP_DIRECT_TOOLS = input.mcpDirectTools.join(",");
 	} else {
 		env.MCP_DIRECT_TOOLS = "__none__";
+	}
+	if (input.structuredOutput) {
+		env[STRUCTURED_OUTPUT_CAPTURE_ENV] = input.structuredOutput.outputPath;
+		env[STRUCTURED_OUTPUT_SCHEMA_ENV] = input.structuredOutput.schemaPath;
 	}
 
 	return { args, env, tempDir };
