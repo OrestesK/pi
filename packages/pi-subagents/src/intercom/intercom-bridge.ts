@@ -68,6 +68,7 @@ interface ResolveIntercomBridgeInput {
 	cwd?: string;
 	agentDir?: string;
 	globalNpmRoot?: string | null;
+	piBinPath?: string | null;
 }
 
 export function resolveIntercomSessionTarget(sessionName: string | undefined, sessionId: string): string {
@@ -177,6 +178,7 @@ function findNearestProjectConfigDir(cwd: string): string | undefined {
 }
 
 let cachedGlobalNpmRoot: string | null | undefined;
+let cachedPiBinPath: string | null | undefined;
 
 function getGlobalNpmRoot(): string | null {
 	if (cachedGlobalNpmRoot !== undefined) return cachedGlobalNpmRoot;
@@ -189,6 +191,36 @@ function getGlobalNpmRoot(): string | null {
 	}
 }
 
+function getPiBinPath(): string | null {
+	if (cachedPiBinPath !== undefined) return cachedPiBinPath;
+	try {
+		cachedPiBinPath = execSync("command -v pi", { encoding: "utf-8", timeout: 5000 }).trim();
+		return cachedPiBinPath;
+	} catch {
+		cachedPiBinPath = null;
+		return null;
+	}
+}
+
+function npmRootFromPiBinPath(piBinPath: string | null | undefined): string | undefined {
+	if (!piBinPath) return undefined;
+	const resolved = path.resolve(piBinPath);
+	if (path.basename(path.dirname(resolved)) === "bin") {
+		return path.join(path.dirname(path.dirname(resolved)), "lib", "node_modules");
+	}
+	const libNodeModules = `${path.sep}lib${path.sep}node_modules`;
+	const libIndex = resolved.indexOf(`${libNodeModules}${path.sep}`);
+	if (libIndex >= 0) return resolved.slice(0, libIndex + libNodeModules.length);
+	const nodeModules = `${path.sep}node_modules`;
+	const nodeModulesIndex = resolved.indexOf(`${nodeModules}${path.sep}`);
+	if (nodeModulesIndex >= 0) return resolved.slice(0, nodeModulesIndex + nodeModules.length);
+	return undefined;
+}
+
+function uniquePaths(paths: Array<string | undefined>): string[] {
+	return [...new Set(paths.filter((entry): entry is string => Boolean(entry)))];
+}
+
 function configuredPiIntercomPackageDir(input: ResolveIntercomBridgeInput, agentDir: string): string | undefined {
 	const cwd = path.resolve(input.cwd ?? process.cwd());
 	const projectConfigDir = findNearestProjectConfigDir(cwd);
@@ -197,6 +229,7 @@ function configuredPiIntercomPackageDir(input: ResolveIntercomBridgeInput, agent
 		{ file: path.join(agentDir, "settings.json"), configDir: agentDir, scope: "user" as const },
 	];
 	const globalNpmRoot = input.globalNpmRoot === undefined ? getGlobalNpmRoot() : input.globalNpmRoot;
+	const piBinaryNpmRoot = npmRootFromPiBinPath(input.piBinPath === undefined ? getPiBinPath() : input.piBinPath);
 
 	for (const { file, configDir, scope } of settingsFiles) {
 		const settings = readJsonBestEffort(file);
@@ -212,10 +245,11 @@ function configuredPiIntercomPackageDir(input: ResolveIntercomBridgeInput, agent
 			if (packageName !== PI_INTERCOM_PACKAGE_NAME) continue;
 			const candidates = scope === "project"
 				? [path.join(configDir, "npm", "node_modules", packageName)]
-				: [
-					...(globalNpmRoot ? [path.join(globalNpmRoot, packageName)] : []),
+				: uniquePaths([
+					piBinaryNpmRoot ? path.join(piBinaryNpmRoot, packageName) : undefined,
+					globalNpmRoot ? path.join(globalNpmRoot, packageName) : undefined,
 					path.join(agentDir, "npm", "node_modules", packageName),
-				];
+				]);
 			const packageRoot = candidates.find(packageHasPiExtension);
 			if (packageRoot) return path.resolve(packageRoot);
 		}
@@ -356,9 +390,11 @@ export function resolveIntercomBridge(input: ResolveIntercomBridgeInput): Interc
 
 export function applyIntercomBridgeToAgent(agent: AgentConfig, bridge: IntercomBridgeState): AgentConfig {
 	if (!bridge.active || !bridge.orchestratorTarget) return agent;
-	if (!extensionSandboxAllowsIntercom(agent.extensions, bridge.extensionDir)) return agent;
+	const wantsBridgeTool = agent.tools === undefined || agent.tools.some((tool) => tool === "contact_supervisor" || tool === "intercom");
+	if (!wantsBridgeTool) return agent;
+	if (agent.extensions && agent.extensions.length > 0 && !extensionSandboxAllowsIntercom(agent.extensions, bridge.extensionDir)) return agent;
 
-	const bridgeTools = ["intercom", "contact_supervisor"];
+	const bridgeTools = ["intercom", "contact_supervisor", bridge.extensionDir];
 	const tools = agent.tools
 		? [...agent.tools, ...bridgeTools.filter((tool) => !agent.tools?.includes(tool))]
 		: agent.tools;

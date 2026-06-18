@@ -8,6 +8,7 @@
   "followUpMode": "all",
   "collapseChangelog": true,
   "enableInstallTelemetry": false,
+  "npmCommand": ["sh", "-lc", "npm --prefix \"$HOME/.npm-global\" \"$@\"", "npm"],
   "branchSummary": {
     "skipPrompt": true
   },

@@ -35,6 +35,11 @@ const extensionAgent = {
 	tools: ["read"],
 	extensions: ["./custom-writer.ts"],
 };
+const intercomBridgedReviewer = {
+	name: "intercom-bridged-reviewer",
+	tools: ["read", "contact_supervisor", "intercom", "/home/user/.npm-global/lib/node_modules/pi-intercom"],
+	extensions: [],
+};
 const unrestricted = { name: "custom" };
 
 test("detects workspace-mutation-capable agents", () => {
@@ -44,6 +49,7 @@ test("detects workspace-mutation-capable agents", () => {
 	assert.equal(agentCanMutateWorkspace(genericMcpAgent), true);
 	assert.equal(agentCanMutateWorkspace(directMcpAgent), true);
 	assert.equal(agentCanMutateWorkspace(extensionAgent), true);
+	assert.equal(agentCanMutateWorkspace(intercomBridgedReviewer), false);
 	assert.equal(agentCanMutateWorkspace(reviewer), false);
 	assert.equal(agentCanMutateWorkspace(scout), false);
 	assert.equal(agentCanMutateWorkspace(unrestricted), true);
@@ -164,6 +170,21 @@ test("rejects multiple extension-loaded agents sharing cwd without worktree", ()
 			label: "Parallel",
 		}),
 		/workspace-mutation-capable/,
+	);
+});
+
+test("allows parallel advisory agents bridged only with pi-intercom", () => {
+	assert.equal(
+		findSharedCwdParallelWriterError({
+			tasks: [
+				{ agent: "intercom-bridged-reviewer" },
+				{ agent: "intercom-bridged-reviewer" },
+			],
+			agents: [intercomBridgedReviewer],
+			baseCwd: "/repo",
+			label: "Parallel",
+		}),
+		undefined,
 	);
 });
 

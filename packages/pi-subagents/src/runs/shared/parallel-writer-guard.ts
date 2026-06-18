@@ -42,16 +42,24 @@ const KNOWN_ADVISORY_TOOLS = new Set([
 	"get_search_content",
 ]);
 
+function isPiIntercomExtensionPath(value: string): boolean {
+	const normalized = value.trim().replaceAll("\\", "/").toLowerCase();
+	return normalized === "pi-intercom"
+		|| normalized.endsWith("/pi-intercom")
+		|| normalized.includes("/pi-intercom/");
+}
+
 export function agentCanMutateWorkspace(
 	agent: ParallelWriterGuardAgent | undefined,
 ): boolean {
 	if (!agent) return false;
 	if ((agent.mcpDirectTools?.length ?? 0) > 0) return true;
-	if ((agent.extensions?.length ?? 0) > 0) return true;
+	if (agent.extensions?.some((extension) => !isPiIntercomExtensionPath(extension))) return true;
 	if (!agent.tools) return true;
 	return agent.tools.some(
 		(tool) =>
-			WORKSPACE_MUTATION_TOOLS.has(tool) || !KNOWN_ADVISORY_TOOLS.has(tool),
+			!isPiIntercomExtensionPath(tool)
+			&& (WORKSPACE_MUTATION_TOOLS.has(tool) || !KNOWN_ADVISORY_TOOLS.has(tool)),
 	);
 }
 
