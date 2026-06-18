@@ -48,6 +48,7 @@ For parent/orchestrator async subagent use:
 - **One approval does not generalize** — approval for one action does not authorize related future actions
 - **Defer ambiguous/significant choices** — when multiple reasonable paths affect behavior, architecture, data, security, UX, tests, or workflow, present the smallest useful decision and wait
 - **No over-engineering** — use minimum complexity. No abstractions, backwards-compat shims, or fallback code without concrete need
+- **Verify compatibility needs** — before preserving old APIs, import paths, formats, or behavior for compatibility, check whether the previous version is actually in production/released/consumed; unmerged or unreleased changes usually do not need compatibility shims
 - **Preserve comments** — ask before removing commented-out code; update comments when behavior changes
 - **Clean up** — remove debugging artifacts before completion
 - **Match local patterns** — follow project conventions and check repo instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.github/copilot-instructions.md`); flag bad patterns separately
