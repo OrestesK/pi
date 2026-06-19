@@ -1290,7 +1290,7 @@ function patchToolExecutionRenderers(): void {
       return (args: unknown, theme: Theme, context: ToolRenderContextLike) => {
         if (
           PRESERVE_ORIGINAL_TOOL_RENDERERS.has(toolName) &&
-          shouldUseOriginalToolRenderer(toolName, args) &&
+          shouldUseOriginalToolCallRenderer(args) &&
           original
         ) {
           return original(args, theme, context);
@@ -1792,6 +1792,10 @@ function shouldUseOriginalToolRenderer(
   return !isRecord(args) || typeof args.action !== "string";
 }
 
+function shouldUseOriginalToolCallRenderer(args: unknown): boolean {
+  return !isRecord(args);
+}
+
 function argStringArray(args: unknown, name: string): string[] {
   if (!isRecord(args)) return [];
   const value = args[name];
@@ -1907,6 +1911,45 @@ function isToolPending(context: ToolRenderContextLike): boolean {
   return pendingToolCalls.has(context.toolCallId);
 }
 
+function positiveCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : undefined;
+}
+
+function subagentEffectiveTaskCount(tasks: unknown[]): number {
+  return tasks.reduce<number>(
+    (total, task) =>
+      total + (isRecord(task) ? (positiveCount(task.count) ?? 1) : 1),
+    0,
+  );
+}
+
+function compactParallelAgentLabels(parallel: unknown[]): string[] {
+  const counts = new Map<string, number>();
+  for (const item of parallel) {
+    if (!isRecord(item)) continue;
+    const name = detailString(item, "agent");
+    if (!name) continue;
+    counts.set(name, (counts.get(name) ?? 0) + (positiveCount(item.count) ?? 1));
+  }
+  return [...counts.entries()].map(([name, count]) =>
+    count > 1 ? `${name}×${count}` : name,
+  );
+}
+
+function subagentChainStepLabel(step: unknown): string {
+  if (!isRecord(step)) return "step";
+  const agent = detailString(step, "agent");
+  if (agent) return agent;
+  const parallel = recordArray(step, "parallel");
+  if (parallel.length === 0) return "step";
+  const agents = compactParallelAgentLabels(parallel);
+  return `[${(agents.length > 0 ? agents : [plural(parallel.length, "agent")]).join(
+    " + ",
+  )}]`;
+}
+
 function webToolCallBody(name: string, args: unknown, theme: Theme): string {
   switch (name) {
     case "web_search": {
@@ -1972,12 +2015,39 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
           : undefined,
         argValueLabel(args, "action"),
       ]);
-    case "subagent":
+    case "subagent": {
+      if (!isRecord(args)) return muted(theme, "…");
+      const action = argValueLabel(args, "action");
+      if (action)
+        return joinBodyParts(theme, [
+          action,
+          argValueLabel(args, "agent") ?? argValueLabel(args, "chainName"),
+          argValueLabel(args, "id"),
+        ]);
+      const chain = recordArray(args, "chain");
+      if (chain.length > 0)
+        return joinBodyParts(theme, [
+          pathText(theme, `chain ${plural(chain.length, "step")}`),
+          compactOneLine(chain.map(subagentChainStepLabel).join(" → "), 90),
+          args.async === true ? "async" : undefined,
+        ]);
+      const tasks = recordArray(args, "tasks");
+      if (tasks.length > 0)
+        return joinBodyParts(theme, [
+          pathText(
+            theme,
+            `parallel ${plural(subagentEffectiveTaskCount(tasks), "agent")}`,
+          ),
+          compactOneLine(tasks.map(subagentChainStepLabel).join(" + "), 90),
+        ]);
       return joinBodyParts(theme, [
-        argValueLabel(args, "action") ?? "run",
-        argValueLabel(args, "agent") ?? argValueLabel(args, "chainName"),
-        argValueLabel(args, "id"),
+        argValueLabel(args, "workflow"),
+        argValueLabel(args, "agent") ??
+          argValueLabel(args, "chainName") ??
+          "run",
+        args.async === true ? "async" : undefined,
       ]);
+    }
     case "todo":
       return joinBodyParts(theme, [
         argValueLabel(args, "action"),
@@ -4430,6 +4500,31 @@ function renderIntercomMessage(
     },
   };
 }
+
+export const __claudeUiTestInternals = {
+  allowlistedToolNames: [...EXTENSION_TOOL_WRAPPER_ALLOWLIST],
+  agentToolCallBody,
+  formatBashCall,
+  formatEditCall,
+  formatFindCall,
+  formatGrepCall,
+  formatLsCall,
+  formatReadCall,
+  formatWriteCall,
+  genericToolCall,
+  renderBashResult,
+  renderEditResult,
+  renderFindResult,
+  renderGrepResult,
+  renderIntercomMessage,
+  renderLsResult,
+  renderReadResult,
+  renderSubagentToolResult,
+  renderWriteResult,
+  shouldUseOriginalToolCallRenderer,
+  webToolCallBody,
+  wrappedToolResult,
+};
 
 export default function (pi: ExtensionAPI) {
   let activeCtx: ExtensionContext | undefined;
