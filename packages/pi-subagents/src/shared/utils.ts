@@ -7,7 +7,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Message } from "@mariozechner/pi-ai";
 import { formatToolCall } from "./formatters.ts";
-import type { AgentProgress, AsyncStatus, Details, DisplayItem, ErrorInfo, SingleResult, ToolCallSummary } from "./types.ts";
+import type { AgentProgress, AsyncStatus, ControlEvent, Details, DisplayItem, ErrorInfo, SingleResult, ToolCallSummary } from "./types.ts";
 
 // ============================================================================
 // File System Utilities
@@ -42,9 +42,7 @@ export function readStatus(asyncDir: string): AsyncStatus | null {
 		stat = fs.statSync(statusPath);
 	} catch (error) {
 		if (isNotFoundError(error)) return null;
-		throw new Error(`Failed to inspect async status file '${statusPath}': ${getErrorMessage(error)}`, {
-			cause: error instanceof Error ? error : undefined,
-		});
+		throw new Error(`Failed to inspect async status file '${statusPath}': ${getErrorMessage(error)}`);
 	}
 
 	const cached = statusCache.get(statusPath);
@@ -57,18 +55,14 @@ export function readStatus(asyncDir: string): AsyncStatus | null {
 		content = fs.readFileSync(statusPath, "utf-8");
 	} catch (error) {
 		if (isNotFoundError(error)) return null;
-		throw new Error(`Failed to read async status file '${statusPath}': ${getErrorMessage(error)}`, {
-			cause: error instanceof Error ? error : undefined,
-		});
+		throw new Error(`Failed to read async status file '${statusPath}': ${getErrorMessage(error)}`);
 	}
 
 	let status: AsyncStatus;
 	try {
 		status = JSON.parse(content) as AsyncStatus;
 	} catch (error) {
-		throw new Error(`Failed to parse async status file '${statusPath}': ${getErrorMessage(error)}`, {
-			cause: error instanceof Error ? error : undefined,
-		});
+		throw new Error(`Failed to parse async status file '${statusPath}': ${getErrorMessage(error)}`);
 	}
 
 	statusCache.set(statusPath, { mtime: stat.mtimeMs, status });
@@ -84,7 +78,7 @@ const outputTailCache = new Map<string, { mtime: number; size: number; lines: st
 /**
  * Get the last N lines from an output file (with mtime/size-based caching)
  */
-function getOutputTail(outputFile: string | undefined, maxLines: number = 3): string[] {
+export function getOutputTail(outputFile: string | undefined, maxLines: number = 3): string[] {
 	if (!outputFile) return [];
 	let fd: number | null = null;
 	try {
@@ -164,7 +158,7 @@ export function findLatestSessionFile(sessionDir: string): string | null {
 /**
  * Write a prompt to a temporary file
  */
-function writePrompt(agent: string, prompt: string): { dir: string; path: string } {
+export function writePrompt(agent: string, prompt: string): { dir: string; path: string } {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagent-"));
 	const p = path.join(dir, `${agent.replace(/[^\w.-]/g, "_")}.md`);
 	fs.writeFileSync(p, prompt, { mode: 0o600 });
@@ -260,9 +254,15 @@ export function compactForegroundResult(result: SingleResult): SingleResult {
 	};
 }
 
+export function collectResultControlEvents(results: SingleResult[]): ControlEvent[] | undefined {
+	const events = results.flatMap((result) => result.controlEvents ?? []);
+	return events.length ? events : undefined;
+}
+
 export function compactForegroundDetails(details: Details): Details {
 	return {
 		...details,
+		controlEvents: details.controlEvents ?? collectResultControlEvents(details.results),
 		results: details.results.map(compactForegroundResult),
 		progress: details.progress
 			? details.progress.map(compactCompletedProgress)

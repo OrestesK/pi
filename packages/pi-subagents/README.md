@@ -541,6 +541,8 @@ Each `## agent-name` section is a step. Config lines such as `output`, `outputMo
 
 For `output`, `reads`, `skills`, and `progress`, chain behavior is three-state: omitted inherits from the agent, a value overrides, and `false` disables.
 
+Runtime `subagent({ chain: [...] })` arrays also support named outputs and dynamic fanout. Use `as` on a successful step or parallel child to store text output, or structured JSON when `outputSchema` is present. Later tasks can reference `{outputs.name}`. A dynamic step uses `expand.from` to read an array from a prior structured named output, runs one `parallel` task template per item up to required `expand.maxItems`, then stores the ordered collection with `collect.as`. `.chain.md` files do not have dynamic fanout syntax.
+
 Create sequential chains by writing `.chain.md` files directly or with the `subagent({ action: "create", config: ... })` management action. Saved `.chain.md` files and management `config.steps` currently persist sequential steps only; runtime `chain` arrays still support parallel fan-out/fan-in groups. Run saved chains with natural language or:
 
 ```text
@@ -556,6 +558,7 @@ Task templates support:
 | `{task}`      | Original task from the first step.                                     |
 | `{previous}`  | Output from the prior step, or aggregated output from a parallel step. |
 | `{chain_dir}` | Path to the chain artifact directory.                                  |
+| `{outputs.name}` | Text or JSON value from a prior named step, parallel child, or dynamic collection. |
 
 Parallel outputs are aggregated with clear separators before being passed to the next step:
 

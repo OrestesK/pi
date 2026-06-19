@@ -100,6 +100,13 @@ function sumUsage(target: Usage, source: Usage): void {
 	target.turns += source.turns;
 }
 
+function supervisorDecisionMessage(agentName: string, toolArgs: Record<string, unknown>): string {
+	const message = typeof toolArgs.message === "string" && toolArgs.message.trim()
+		? `: ${toolArgs.message.trim().slice(0, 240)}`
+		: "";
+	return `${agentName} needs supervisor decision${message}`;
+}
+
 function stripAcceptanceReportsFromMessages(messages: Message[] | undefined): void {
 	for (const message of messages ?? []) {
 		if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
@@ -474,6 +481,14 @@ async function runSingleAttempt(
 				const mutates = isMutatingTool(evt.toolName, toolArgs);
 				observedMutationAttempt = observedMutationAttempt || mutates;
 				pendingToolResult = { tool: evt.toolName ?? "tool", path: progress.currentPath, mutates, startedAt: now };
+				if (evt.toolName === "contact_supervisor" && toolArgs.reason === "need_decision") {
+					emitNeedsAttention(now, {
+						message: supervisorDecisionMessage(agent.name, toolArgs),
+						reason: "supervisor_decision",
+						currentTool: evt.toolName,
+						currentToolDurationMs: 0,
+					});
+				}
 				fireUpdate();
 			}
 
@@ -674,6 +689,7 @@ async function runSingleAttempt(
 	if (result.detached) {
 		result.exitCode = 0;
 		result.finalOutput = "Detached for intercom coordination.";
+		result.controlEvents = allControlEvents.length ? allControlEvents : undefined;
 		return result;
 	}
 

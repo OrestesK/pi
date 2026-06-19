@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { JsonSchemaObject } from "../../shared/types.ts";
-import { STRUCTURED_OUTPUT_CAPTURE_ENV, STRUCTURED_OUTPUT_SCHEMA_ENV } from "./structured-output.ts";
+import { STRUCTURED_OUTPUT_CAPTURE_ENV, STRUCTURED_OUTPUT_SCHEMA_ENV, STRUCTURED_OUTPUT_TOOL_NAME } from "./structured-output.ts";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
 const TASK_ARG_LIMIT = 8000;
@@ -77,9 +77,12 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 	}
 
 	const toolExtensionPaths: string[] = [];
-	if (input.tools?.length) {
+	const effectiveTools = input.structuredOutput && input.tools?.length
+		? [...input.tools, STRUCTURED_OUTPUT_TOOL_NAME]
+		: input.tools;
+	if (effectiveTools?.length) {
 		const builtinTools: string[] = [];
-		for (const tool of input.tools) {
+		for (const tool of effectiveTools) {
 			if (tool.includes("/") || tool.endsWith(".ts") || tool.endsWith(".js")) {
 				toolExtensionPaths.push(tool);
 			} else {

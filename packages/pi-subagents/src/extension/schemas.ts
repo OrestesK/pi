@@ -118,6 +118,9 @@ const TaskItem = Type.Object({
 // Parallel task item (within a parallel step)
 const ParallelTaskSchema = Type.Object({
 	agent: Type.String(),
+	phase: Type.Optional(Type.String()),
+	label: Type.Optional(Type.String()),
+	as: Type.Optional(Type.String()),
 	task: Type.Optional(
 		Type.String({
 			description:
@@ -146,11 +149,28 @@ const ParallelTaskSchema = Type.Object({
 });
 
 // Flattened so chain steps do not need an object-shape anyOf/oneOf union.
+const ChainExpandSchema = Type.Object({
+	from: Type.Object({
+		output: Type.String({ description: "Named structured output to expand from" }),
+		path: Type.Optional(Type.String({ description: "JSON Pointer path to the array inside the named output" })),
+	}),
+	item: Type.Optional(Type.String({ description: "Template variable name for each expanded item (default: item)" })),
+	key: Type.Optional(Type.String({ description: "JSON Pointer path inside each item for a stable display key" })),
+	maxItems: Type.Integer({ minimum: 1, description: "Required maximum number of dynamic fanout items" }),
+});
+
+const ChainCollectSchema = Type.Object({
+	as: Type.String({ description: "Name for the ordered dynamic fanout result collection" }),
+});
+
 const ChainItem = Type.Object(
 	{
 		agent: Type.Optional(
 			Type.String({ description: "Sequential step agent name" }),
 		),
+		phase: Type.Optional(Type.String()),
+		label: Type.Optional(Type.String()),
+		as: Type.Optional(Type.String()),
 		task: Type.Optional(
 			Type.String({
 				description:
@@ -172,11 +192,16 @@ const ChainItem = Type.Object(
 		),
 		outputSchema: Type.Optional(JsonSchemaObject),
 		acceptance: Type.Optional(AcceptanceOverride),
+		expand: Type.Optional(ChainExpandSchema),
+		collect: Type.Optional(ChainCollectSchema),
 		parallel: Type.Optional(
-			Type.Array(ParallelTaskSchema, {
-				minItems: 1,
-				description: "Tasks to run in parallel",
-			}),
+			Type.Union([
+				Type.Array(ParallelTaskSchema, {
+					minItems: 1,
+					description: "Tasks to run in parallel",
+				}),
+				ParallelTaskSchema,
+			]),
 		),
 		concurrency: Type.Optional(
 			Type.Number({ description: "Max concurrent tasks (default: 4)" }),

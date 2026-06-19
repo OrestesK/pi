@@ -24,14 +24,24 @@ import {
 	createParallelDirs,
 	suppressProgressForReadOnlyTask,
 	aggregateParallelOutputs,
+	isDynamicFanoutStep,
 	isParallelStep,
 	type StepOverrides,
 	type ChainStep,
 	type SequentialStep,
+	type ParallelStep,
 	type ParallelTaskResult,
 	type ResolvedStepBehavior,
 	type ResolvedTemplates,
 } from "../../shared/settings.ts";
+import {
+	collectDynamicResults,
+	namedOutputFromResult,
+	renderChainTemplate,
+	resolveDynamicFanout,
+	validateChainOutputNames,
+	type NamedChainOutputs,
+} from "../../shared/chain-dynamic.ts";
 import {
 	discoverAvailableSkills,
 	normalizeSkillInput,
@@ -89,7 +99,7 @@ interface ChainExecutionDetailsInput {
 }
 
 interface ParallelChainRunInput {
-	step: Exclude<ChainStep, SequentialStep>;
+	step: ParallelStep;
 	parallelTemplates: string[];
 	parallelBehaviors: ResolvedStepBehavior[];
 	agents: AgentConfig[];
@@ -134,6 +144,7 @@ interface ParallelChainRunInput {
 	totalSteps: number;
 	worktreeSetup?: WorktreeSetup;
 	maxSubagentDepth: number;
+	namedOutputs: NamedChainOutputs;
 }
 
 function buildChainExecutionDetails(
@@ -234,10 +245,12 @@ async function runParallelChainTasks(
 				templateHasPrevious ? undefined : input.prev,
 			);
 
-			let taskStr = taskTemplate;
-			taskStr = taskStr.replace(/\{task\}/g, input.originalTask);
-			taskStr = taskStr.replace(/\{previous\}/g, input.prev);
-			taskStr = taskStr.replace(/\{chain_dir\}/g, input.chainDir);
+			let taskStr = renderChainTemplate(taskTemplate, {
+				originalTask: input.originalTask,
+				previous: input.prev,
+				chainDir: input.chainDir,
+				outputs: input.namedOutputs,
+			});
 			const cleanTask = taskStr;
 			taskStr = prefix + taskStr + suffix;
 
@@ -481,22 +494,34 @@ export async function executeChain(
 	const allProgress: AgentProgress[] = [];
 	const allArtifactPaths: ArtifactPaths[] = [];
 
-	const chainAgents: string[] = chainSteps.map((step) =>
-		isParallelStep(step)
+	const chainAgents: string[] = chainSteps.map((step) => {
+		if (isDynamicFanoutStep(step)) return `[dynamic ${step.parallel.agent}]`;
+		return isParallelStep(step)
 			? `[${step.parallel.map((t) => t.agent).join("+")}]`
-			: (step as SequentialStep).agent,
-	);
+			: (step as SequentialStep).agent;
+	});
 	const totalSteps = chainSteps.length;
 
 	const firstStep = chainSteps[0]!;
 	const originalTask =
 		params.task ??
-		(isParallelStep(firstStep)
-			? firstStep.parallel[0]!.task!
-			: (firstStep as SequentialStep).task!);
+		(isDynamicFanoutStep(firstStep)
+			? ""
+			: isParallelStep(firstStep)
+				? firstStep.parallel[0]!.task!
+				: (firstStep as SequentialStep).task!);
 
 	const chainDir = createChainDir(runId, chainDirBase);
-	const hasParallelSteps = chainSteps.some(isParallelStep);
+	const chainValidationError = validateChainOutputNames(chainSteps);
+	if (chainValidationError) {
+		removeChainDir(chainDir);
+		return {
+			content: [{ type: "text", text: chainValidationError }],
+			isError: true,
+			details: { mode: "chain" as const, results: [] },
+		};
+	}
+	const hasParallelSteps = chainSteps.some((step) => isParallelStep(step) || isDynamicFanoutStep(step));
 	let templates: ResolvedTemplates = resolveChainTemplates(chainSteps);
 	const shouldClarify = clarify === true && ctx.hasUI && !hasParallelSteps;
 	let tuiBehaviorOverrides: (BehaviorOverride | undefined)[] | undefined;
@@ -569,7 +594,7 @@ export async function executeChain(
 		if (result.runInBackground) {
 			removeChainDir(chainDir);
 			const updatedChain: ChainStep[] = chainSteps.map((step, i) => {
-				if (isParallelStep(step)) return step;
+				if (isParallelStep(step) || isDynamicFanoutStep(step)) return step;
 				const override = result.behaviorOverrides[i];
 				return {
 					...step,
@@ -606,10 +631,42 @@ export async function executeChain(
 	let globalTaskIndex = 0;
 	let progressCreated = false;
 	const seenOutputPaths = new Map<string, ChainOutputPathOwner>();
+	const namedOutputs: NamedChainOutputs = {};
 
 	for (let stepIndex = 0; stepIndex < chainSteps.length; stepIndex++) {
-		const step = chainSteps[stepIndex]!;
-		const stepTemplates = templates[stepIndex]!;
+		const rawStep = chainSteps[stepIndex]!;
+		let step: ChainStep = rawStep;
+		let stepTemplates = templates[stepIndex]!;
+		let dynamicItems: unknown[] | undefined;
+		let dynamicKeys: string[] | undefined;
+		let dynamicCollectAs: string | undefined;
+		if (isDynamicFanoutStep(rawStep)) {
+			const fanout = resolveDynamicFanout({
+				step: rawStep,
+				outputs: namedOutputs,
+				originalTask,
+				previous: prev,
+				chainDir,
+			});
+			if (fanout.error || !fanout.parallelStep || !fanout.items || !fanout.collectAs) {
+				return buildChainExecutionErrorResult(fanout.error ?? "Dynamic fanout failed to expand.", {
+					results,
+					includeProgress,
+					allProgress,
+					allArtifactPaths,
+					artifactsDir,
+					chainAgents,
+					totalSteps,
+					currentStepIndex: stepIndex,
+				});
+			}
+			step = fanout.parallelStep;
+			stepTemplates = fanout.parallelStep.parallel.map((task) => task.task ?? "{previous}");
+			dynamicItems = fanout.items;
+			dynamicKeys = fanout.keys;
+			dynamicCollectAs = fanout.collectAs;
+			chainAgents[stepIndex] = `[${fanout.parallelStep.parallel.map((task) => task.agent).join("+")}]`;
+		}
 
 		if (isParallelStep(step)) {
 			const parallelTemplates = stepTemplates as string[];
@@ -774,6 +831,7 @@ export async function executeChain(
 					foregroundControl,
 					worktreeSetup,
 					maxSubagentDepth: params.maxSubagentDepth,
+					namedOutputs,
 				});
 				globalTaskIndex += step.parallel.length;
 
@@ -871,6 +929,14 @@ export async function executeChain(
 					};
 				}
 
+				for (let resultIndex = 0; resultIndex < parallelResults.length; resultIndex++) {
+					const outputName = step.parallel[resultIndex]?.as;
+					if (outputName) namedOutputs[outputName] = namedOutputFromResult(parallelResults[resultIndex]!);
+				}
+				if (dynamicCollectAs && dynamicItems) {
+					namedOutputs[dynamicCollectAs] = collectDynamicResults(parallelResults, dynamicItems, dynamicKeys);
+				}
+
 				const taskResults: ParallelTaskResult[] = parallelResults.map(
 					(result, i) => {
 						const outputTargetPath = resolveChainOutputPath(
@@ -953,10 +1019,13 @@ export async function executeChain(
 				templateHasPrevious ? undefined : prev,
 			);
 
-			let stepTask = stepTemplate;
-			stepTask = stepTask.replace(/\{task\}/g, originalTask);
-			stepTask = stepTask.replace(/\{previous\}/g, prev);
-			stepTask = stepTask.replace(/\{chain_dir\}/g, chainDir);
+			const stepTaskRendered = renderChainTemplate(stepTemplate, {
+				originalTask,
+				previous: prev,
+				chainDir,
+				outputs: namedOutputs,
+			});
+			let stepTask = stepTaskRendered;
 			const cleanTask = stepTask;
 			stepTask = prefix + stepTask + suffix;
 
@@ -1166,6 +1235,8 @@ export async function executeChain(
 					isError: true,
 				};
 			}
+
+			if (seqStep.as) namedOutputs[seqStep.as] = namedOutputFromResult(r);
 
 			if (behavior.output) {
 				try {

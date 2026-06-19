@@ -19,6 +19,7 @@ import {
 } from "../shared/single-output.ts";
 import {
 	buildChainInstructions,
+	isDynamicFanoutStep,
 	isParallelStep,
 	resolveStepBehavior,
 	suppressProgressForReadOnlyTask,
@@ -28,6 +29,7 @@ import {
 	type SequentialStep,
 	type StepOverrides,
 } from "../../shared/settings.ts";
+import { validateChainOutputNames } from "../../shared/chain-dynamic.ts";
 import type { RunnerStep } from "../shared/parallel-utils.ts";
 import { resolvePiPackageRoot } from "../shared/pi-spawn.ts";
 import {
@@ -264,6 +266,23 @@ export function executeAsyncChain(
 	const chainSkills = params.chainSkills ?? [];
 	const availableModels = params.availableModels;
 	const runnerCwd = resolveChildCwd(ctx.cwd, cwd);
+	const chainValidationError = validateChainOutputNames(chain);
+	if (chainValidationError) {
+		return {
+			content: [{ type: "text", text: chainValidationError }],
+			isError: true,
+			details: { mode: resultMode, results: [] },
+		};
+	}
+	const dynamicStepIndex = chain.findIndex(isDynamicFanoutStep);
+	if (dynamicStepIndex !== -1) {
+		return {
+			content: [{ type: "text", text: `Dynamic fanout chain step ${dynamicStepIndex + 1} is not supported in async/background mode yet. Run the chain in the foreground.` }],
+			isError: true,
+			details: { mode: resultMode, results: [] },
+		};
+	}
+
 	const firstStep = chain[0];
 	const originalTask =
 		params.task ??

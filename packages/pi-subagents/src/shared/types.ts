@@ -86,7 +86,7 @@ export interface ControlEvent {
 	index?: number;
 	runId: string;
 	message: string;
-	reason?: "idle" | "completion_guard" | "active_long_running" | "tool_failures" | "time_threshold" | "turn_threshold" | "token_threshold";
+	reason?: "idle" | "completion_guard" | "active_long_running" | "tool_failures" | "supervisor_decision" | "time_threshold" | "turn_threshold" | "token_threshold";
 	turns?: number;
 	tokens?: number;
 	toolCount?: number;

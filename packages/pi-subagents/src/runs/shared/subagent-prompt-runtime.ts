@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { JsonSchemaObject } from "../../shared/types.ts";
-import { STRUCTURED_OUTPUT_CAPTURE_ENV, STRUCTURED_OUTPUT_SCHEMA_ENV, validateStructuredOutputValue } from "./structured-output.ts";
+import { STRUCTURED_OUTPUT_CAPTURE_ENV, STRUCTURED_OUTPUT_SCHEMA_ENV, STRUCTURED_OUTPUT_TOOL_NAME, validateStructuredOutputValue } from "./structured-output.ts";
 
 const SUBAGENT_INHERIT_PROJECT_CONTEXT_ENV = "PI_SUBAGENT_INHERIT_PROJECT_CONTEXT";
 const SUBAGENT_INHERIT_SKILLS_ENV = "PI_SUBAGENT_INHERIT_SKILLS";
@@ -147,7 +147,7 @@ export default function registerSubagentPromptRuntime(pi: ExtensionAPI): void {
 			execute: (_id: string, params: { value: unknown }) => Promise<unknown>;
 		}) => void;
 		registerTool({
-			name: "structured_output",
+			name: STRUCTURED_OUTPUT_TOOL_NAME,
 			label: "Structured Output",
 			description: "Submit the required final structured output for this subagent step. This terminates the step.",
 			parameters: parameters as never,

@@ -44,8 +44,14 @@ function normalizeOutputOverride(output: string | false | undefined): string | f
 // Chain Step Types
 // =============================================================================
 
+interface NamedChainStepFields {
+	phase?: string;
+	label?: string;
+	as?: string;
+}
+
 /** Sequential step: single agent execution */
-export interface SequentialStep {
+export interface SequentialStep extends NamedChainStepFields {
 	agent: string;
 	task?: string;
 	cwd?: string;
@@ -60,7 +66,7 @@ export interface SequentialStep {
 }
 
 /** Parallel task item within a parallel step */
-export interface ParallelTaskItem {
+export interface ParallelTaskItem extends NamedChainStepFields {
 	agent: string;
 	task?: string;
 	cwd?: string;
@@ -76,7 +82,7 @@ export interface ParallelTaskItem {
 }
 
 /** Parallel step: multiple agents running concurrently */
-interface ParallelStep {
+export interface ParallelStep {
 	parallel: ParallelTaskItem[];
 	cwd?: string;
 	concurrency?: number;
@@ -84,12 +90,36 @@ interface ParallelStep {
 	worktree?: boolean;
 }
 
+export interface DynamicFanoutStep {
+	expand: {
+		from: {
+			output: string;
+			path?: string;
+		};
+		item?: string;
+		key?: string;
+		maxItems?: number;
+	};
+	parallel: ParallelTaskItem;
+	collect: {
+		as: string;
+	};
+	cwd?: string;
+	concurrency?: number;
+	failFast?: boolean;
+	worktree?: boolean;
+}
+
 /** Union type for chain steps */
-export type ChainStep = SequentialStep | ParallelStep;
+export type ChainStep = SequentialStep | ParallelStep | DynamicFanoutStep;
 
 // =============================================================================
 // Type Guards
 // =============================================================================
+
+export function isDynamicFanoutStep(step: ChainStep): step is DynamicFanoutStep {
+	return "expand" in step && "collect" in step && "parallel" in step && !Array.isArray((step as { parallel?: unknown }).parallel);
+}
 
 export function isParallelStep(step: ChainStep): step is ParallelStep {
 	return "parallel" in step && Array.isArray((step as ParallelStep).parallel);
@@ -97,6 +127,7 @@ export function isParallelStep(step: ChainStep): step is ParallelStep {
 
 /** Get all agent names in a step (single for sequential, multiple for parallel) */
 export function getStepAgents(step: ChainStep): string[] {
+	if (isDynamicFanoutStep(step)) return [step.parallel.agent];
 	if (isParallelStep(step)) {
 		return step.parallel.map((t) => t.agent);
 	}
@@ -392,7 +423,16 @@ export function resolveParallelBehaviors(
 
 		const outputMode = task.outputMode ?? "inline";
 		const model = task.model ?? config.model;
-		return { output, outputMode, reads, progress, skills, model };
+		return {
+			output,
+			outputMode,
+			...(task.outputSchema ? { outputSchema: task.outputSchema } : {}),
+			...(task.acceptance ? { acceptance: task.acceptance } : {}),
+			reads,
+			progress,
+			skills,
+			model,
+		};
 	});
 }
 
