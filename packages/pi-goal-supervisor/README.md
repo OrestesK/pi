@@ -1,6 +1,6 @@
 # pi-goal-supervisor
 
-Local Pi extension that adds a session-scoped `/goal` command and continues work at safe idle boundaries until evidence-backed completion or a typed stop state. It has no built-in turn, no-progress, or wall-clock budget limit.
+Local Pi extension that adds a session-scoped `/goal` command and continues work at safe idle boundaries until evidence-backed completion or an explicit stop/clear. It has no built-in turn, no-progress, or wall-clock budget limit.
 
 ## Commands
 
@@ -21,7 +21,8 @@ This package is deliberately non-invasive:
 - It does not change tools, permissions, guardrails, MCP servers, memory, subagents, or Slipstream settings.
 - It does not auto-approve shell commands, sudo, destructive actions, mutating git operations, cloud/database mutations, or Google Docs/Drive changes.
 - It uses `pi.sendMessage(..., { deliverAs: "followUp", triggerTurn: true })` for supervisor continuations.
-- It does not stop automatically after a fixed number of turns, repeated no-progress turns, or elapsed wall-clock time; use `/goal pause`, `/goal stop`, or `GOAL_BLOCKED` to stop it.
+- It does not stop automatically after a fixed number of turns, repeated no-progress turns, or elapsed wall-clock time; use `/goal pause`, `/goal stop`, or `/goal clear` to stop it. `GOAL_BLOCKED` marks the goal as active-but-waiting until the next qualifying agent prompt or explicit `/goal resume`.
+- It instructs the agent not to block for internal plan approval, routine local work, minor/reversible local edits, tests, docs, formatting, routine implementation choices, or any safe local/read-only/reversible next step.
 
 ## Completion policy
 
@@ -29,8 +30,12 @@ The worker must emit one of these markers:
 
 ```text
 GOAL_DONE: <specific evidence from transcript/artifacts/verifications>
-GOAL_BLOCKED: <specific blocker and smallest safe requested human decision>
+GOAL_BLOCKED: <specific 100% blocker and smallest safe requested human decision>
 ```
+
+`GOAL_BLOCKED` should be used only after the agent verifies it is 100% blocked. Allowed blocker classes are an unapproved production/remote/external-account mutation; an unapproved privileged/destructive local action such as sudo, mutating git, or destructive filesystem/data changes; unapproved private/external-account reads or cross-source discovery; a material product/API/scope decision not implied by the goal; or impossibility because of a missing required permission, tool, or credential. If any safe local/read-only/reversible next step remains, the agent should take it instead of blocking.
+
+A marker-sourced `GOAL_BLOCKED` is not terminal: the goal remains active and resumes on the next qualifying agent prompt so the new user context can unblock the work. Judge/model failures may also put the goal in `blocked`, but those fail-closed blocks require explicit `/goal resume`; `/goal status` only reports state. Only `/goal stop`, `/goal clear`, and approved completion are terminal for the active goal.
 
 `GOAL_DONE` is not accepted by self-claim alone. The extension runs deterministic prechecks and then a model-backed judge when available. Judge failures are fail-closed as inconclusive/blocked rather than complete.
 

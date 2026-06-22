@@ -3,6 +3,7 @@ import { queueContinuation } from "./continuation.ts";
 import {
   assistantFingerprint,
   extractAssistantText,
+  isAllowedGoalBlocker,
   parseGoalMarkers,
 } from "./evidence.ts";
 import { applyJudgeResult, deterministicPrecheck } from "./judge.ts";
@@ -173,7 +174,7 @@ async function judgeCurrentClaim(
 }
 
 function supervisorPrompt(state: GoalSupervisorState): string {
-  return `\n\n## Goal Supervisor\nActive objective: ${state.objective}\nStatus: ${state.status}; turns: ${state.iteration}.\nUse the normal Pi tools/extensions already available. This supervisor does not change tools or permissions.\nDo not ask the human unless truly blocked. If blocked, write: GOAL_BLOCKED: <specific blocker>.\nWhen fully complete, write: GOAL_DONE: <specific evidence from transcript/artifacts/verifications>.`;
+  return `\n\n## Goal Supervisor\nActive objective: ${state.objective}\nStatus: ${state.status}; turns: ${state.iteration}.\nUse the normal Pi tools/extensions already available. This supervisor does not change tools or permissions.\nAutonomy rule: keep going unless you have verified you are 100% blocked. Do not block for internal plan approval, routine local work, minor/reversible local edits, tests, docs, formatting, routine implementation choices, or any other safe local/read-only/reversible next step.\nUse GOAL_BLOCKED only for an unapproved production/remote/external-account mutation; an unapproved privileged/destructive local action such as sudo, mutating git, or destructive filesystem/data changes; unapproved private/external-account reads or cross-source discovery; a material product/API/scope decision not implied by the goal; or impossible because of a missing required permission, tool, or credential. If blocked, write exactly: GOAL_BLOCKED: <specific 100% blocker and smallest safe requested human decision>.\nWhen fully complete, write: GOAL_DONE: <specific evidence from transcript/artifacts/verifications>.`;
 }
 
 export function registerGoalSupervisor(
@@ -244,6 +245,13 @@ export function registerGoalSupervisor(
     const event = rawEvent as BeforeAgentStartEvent;
     const ctx = rawCtx as ContextLike;
     restore(runtime, ctx);
+    if (
+      runtime.state?.status === "blocked" &&
+      runtime.state.lastBlocker?.source === "marker"
+    ) {
+      runtime.state = reduceState(runtime.state, { type: "resumed", now: now() });
+      appendState(pi, runtime.state);
+    }
     if (!runtime.state || runtime.state.status !== "running") return undefined;
     if (
       runtime.state.pendingContinuation &&
@@ -275,11 +283,12 @@ export function registerGoalSupervisor(
       now: now(),
     });
     const markers = parseGoalMarkers(assistantText);
-    if (markers.blocked)
+    if (markers.blocked && isAllowedGoalBlocker(markers.blocked))
       runtime.state = reduceState(runtime.state, {
         type: "blocked",
         reason: markers.blocked,
         now: now(),
+        source: "marker",
       });
     else if (markers.done) {
       runtime.state = reduceState(runtime.state, {

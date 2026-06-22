@@ -124,6 +124,7 @@ export function applyJudgeResult(
 				type: "blocked",
 				reason: normalized.reason,
 				now: normalized.at,
+				source: "judge_error",
 			})
 		: next;
 }

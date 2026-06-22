@@ -43,6 +43,65 @@ export function parseGoalMarkers(text: string): GoalMarkers {
 	return markers;
 }
 
+export function isAllowedGoalBlocker(reason: string): boolean {
+	const normalized = reason.toLowerCase();
+	if (
+		/\b(internal plan approval|plan approval|routine local work|minor\/reversible local edits|tests?|formatting|routine implementation choices|safe local|reversible next step)\b/.test(
+			normalized,
+		)
+	) {
+		return false;
+	}
+	const approvalGate =
+		/\b(unapproved|approval|approve|approved|permission|confirm|confirmation|required|need|needs)\b/.test(
+			normalized,
+		);
+	const externalResource =
+		/\b(production|remote|external-account|cloud|database|aws|gcp|azure|s3|slack|notion|google docs|google drive|gmail|calendar)\b/.test(
+			normalized,
+		);
+	const mutation =
+		/\b(mutation|mutate|write|update|delete|change|changes|modify|modification|trash|replace)\b/.test(
+			normalized,
+		);
+	const privateRead =
+		/\b(private|external-account|slack|notion|google docs|google drive|gmail|calendar)\b.*\b(read|content|discovery|search|source|access|inspect)\b/.test(
+			normalized,
+		) ||
+		/\b(read|content|discovery|search|source|access|inspect)\b.*\b(private|external-account|slack|notion|google docs|google drive|gmail|calendar)\b/.test(
+			normalized,
+		);
+	const crossSourceDiscovery =
+		/\bcross-source\b.*\b(discovery|search|read|inspect)\b/.test(
+			normalized,
+		) ||
+		/\b(discovery|search|read|inspect)\b.*\bcross-source\b/.test(
+			normalized,
+		);
+	return (
+		(approvalGate && externalResource && mutation) ||
+		/\b(sudo|privileged|destructive|rm -rf|mutating git|git add|git checkout|git push|git commit|git merge|git rebase|git reset|git stash|git clean)\b/.test(
+			normalized,
+		) ||
+		/\b(destructive|delete|deletion)\b.*\b(filesystem|file system|data)\b/.test(
+			normalized,
+		) ||
+		(approvalGate && (privateRead || crossSourceDiscovery)) ||
+		/\b(material|significant|not implied)\b.*\b(product|api|scope)\b.*\bdecision\b/.test(
+			normalized,
+		) ||
+		/\b(product|api|scope)\b.*\bdecision\b.*\b(not implied|material|significant)\b/.test(
+			normalized,
+		) ||
+		/\b(missing|unavailable|lacking|lack|no)\b.*\b(permission|tool|credential|credentials|auth|access|service)\b/.test(
+			normalized,
+		) ||
+		/\b(permission|tool|credential|credentials|auth|access|service)\b.*\b(missing|unavailable|required|needed)\b/.test(
+			normalized,
+		)
+	);
+}
+
 export function detectDirectHumanQuestion(text: string): boolean {
 	const trimmed = text.trim();
 	if (!trimmed.endsWith("?")) return false;

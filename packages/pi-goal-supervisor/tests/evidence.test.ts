@@ -4,6 +4,7 @@ import {
 	assistantFingerprint,
 	detectDirectHumanQuestion,
 	extractAssistantText,
+	isAllowedGoalBlocker,
 	parseGoalMarkers,
 } from "../src/evidence.ts";
 
@@ -44,6 +45,44 @@ test("rejects marker-looking quoted text when marker is not line-leading claim",
 			blocked: undefined,
 		},
 	);
+});
+
+test("validates goal blocker reasons by documented blocker class", () => {
+	const allowed = [
+		"unapproved production/remote/external-account mutation",
+		"sudo is required for a privileged local action",
+		"destructive filesystem/data changes need confirmation",
+		"unapproved read-only external-account access to Slack",
+		"need approval for read-only cross-source discovery in Notion",
+		"unapproved Google Docs mutation",
+		"missing permission to access Google Docs document",
+		"git add is required before continuing",
+		"git checkout is required before continuing",
+		"cross-source search is not approved",
+		"Slack read is not approved",
+		"Google Drive access is not approved",
+		"remote production mutation is not approved",
+		"material product/API/scope decision not implied by the goal",
+		"missing required credential for the private API",
+	];
+	const disallowed = [
+		"waiting for internal plan approval",
+		"routine local work remains",
+		"tests still need to be run",
+		"docs need updating",
+		"formatting is pending",
+		"routine implementation choices remain",
+		"safe local/read-only/reversible next step is available",
+		"Slack thread is noisy",
+		"need AWS config review",
+		"need database inspection",
+		"material architecture decision not implied by the goal",
+		"workflow decision not implied by the goal",
+	];
+
+	for (const reason of allowed) assert.equal(isAllowedGoalBlocker(reason), true);
+	for (const reason of disallowed)
+		assert.equal(isAllowedGoalBlocker(reason), false);
 });
 
 test("detects direct human decision questions conservatively", () => {

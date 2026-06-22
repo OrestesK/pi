@@ -6,6 +6,83 @@ import { test } from "node:test";
 import piGoalSupervisor, { registerGoalSupervisor } from "../src/index.ts";
 import { STATE_CUSTOM_TYPE, type GoalSupervisorState } from "../src/types.ts";
 
+type TestHarness = {
+	entries: Array<{ type: "custom"; customType: string; data: unknown }>;
+	hooks: Map<string, (event: unknown, ctx: unknown) => Promise<void> | void | unknown>;
+	handler: (args: string, ctx: unknown) => Promise<void>;
+	ctx: {
+		sessionManager: {
+			getCwd: () => string;
+			getSessionId: () => string;
+			getBranch: () => Array<{ type: "custom"; customType: string; data: unknown }>;
+		};
+		isIdle: () => boolean;
+		hasPendingMessages: () => boolean;
+		ui: { notify(): void; setWidget(): void };
+	};
+	sendCount: () => number;
+	lastState: () => GoalSupervisorState | undefined;
+};
+
+function createGoalHarness(
+	deps: Parameters<typeof registerGoalSupervisor>[2] = {},
+): TestHarness {
+	const entries: Array<{ type: "custom"; customType: string; data: unknown }> =
+		[];
+	const hooks = new Map<
+		string,
+		(event: unknown, ctx: unknown) => Promise<void> | void | unknown
+	>();
+	let handler: ((args: string, ctx: unknown) => Promise<void>) | undefined;
+	let sends = 0;
+	const api = {
+		on(
+			event: string,
+			hook: (event: unknown, ctx: unknown) => Promise<void> | void | unknown,
+		) {
+			hooks.set(event, hook);
+		},
+		registerCommand(
+			_name: string,
+			options: { handler: (args: string, ctx: unknown) => Promise<void> },
+		) {
+			handler = options.handler;
+		},
+		appendEntry(customType: string, data: unknown) {
+			entries.push({ type: "custom", customType, data });
+		},
+		sendMessage() {
+			sends += 1;
+		},
+	};
+	registerGoalSupervisor(api, {}, deps);
+	assert.ok(handler);
+	const ctx = {
+		sessionManager: {
+			getCwd: () => "/tmp/project",
+			getSessionId: () => "session-1",
+			getBranch: () => entries,
+		},
+		isIdle: () => true,
+		hasPendingMessages: () => false,
+		ui: { notify() {}, setWidget() {} },
+	};
+	const lastState = () =>
+		entries
+			.filter((entry) => entry.customType === STATE_CUSTOM_TYPE)
+			.at(-1)?.data as GoalSupervisorState | undefined;
+	return { entries, hooks, handler, ctx, sendCount: () => sends, lastState };
+}
+
+async function deliverPendingContinuation(harness: TestHarness): Promise<void> {
+	const id = harness.lastState()?.pendingContinuation?.id;
+	assert.ok(id);
+	await harness.hooks.get("before_agent_start")?.(
+		{ systemPrompt: "base", prompt: id },
+		harness.ctx,
+	);
+}
+
 test("default export registers goal command and lifecycle hooks", async () => {
 	const hooks: string[] = [];
 	const commands: string[] = [];
@@ -24,7 +101,28 @@ test("default export registers goal command and lifecycle hooks", async () => {
 	assert.ok(hooks.includes("session_start"));
 	assert.ok(hooks.includes("before_agent_start"));
 	assert.ok(hooks.includes("turn_end"));
+	assert.ok(hooks.includes("session_before_compact"));
 	assert.ok(hooks.includes("session_compact"));
+	assert.ok(hooks.includes("session_shutdown"));
+});
+
+test("session_before_compact and session_shutdown persist active state", async () => {
+	const harness = createGoalHarness();
+
+	await harness.handler("finish objective", harness.ctx);
+	const countStateEntries = () =>
+		harness.entries.filter((entry) => entry.customType === STATE_CUSTOM_TYPE)
+			.length;
+	const beforeCompactCount = countStateEntries();
+
+	harness.hooks.get("session_before_compact")?.({}, harness.ctx);
+	assert.equal(countStateEntries(), beforeCompactCount + 1);
+	assert.equal(harness.lastState()?.objective, "finish objective");
+
+	const beforeShutdownCount = countStateEntries();
+	harness.hooks.get("session_shutdown")?.({}, harness.ctx);
+	assert.equal(countStateEntries(), beforeShutdownCount + 1);
+	assert.equal(harness.lastState()?.objective, "finish objective");
 });
 
 test("pause and stop commands abort an active turn when context supports abort", async () => {
@@ -120,11 +218,165 @@ test("widget and supervisor prompt show unbounded turn count", async () => {
 		ctx,
 	) as { systemPrompt: string } | undefined;
 
+	const prompt = promptResult?.systemPrompt ?? "";
 	assert.equal(widgetContent?.[0], "goal: running 0 turns");
 	assert.doesNotMatch(widgetContent?.[0] ?? "", /\d+\/\d+/);
-	assert.match(promptResult?.systemPrompt ?? "", /turns: 0/i);
-	assert.doesNotMatch(promptResult?.systemPrompt ?? "", /\d+\/\d+/);
-	assert.doesNotMatch(promptResult?.systemPrompt ?? "", /completed turns/i);
+	assert.match(prompt, /turns: 0/i);
+	assert.doesNotMatch(prompt, /\d+\/\d+/);
+	assert.doesNotMatch(prompt, /completed turns/i);
+	assert.match(prompt, /100% blocked/i);
+	assert.match(prompt, /internal plan approval/i);
+	assert.match(prompt, /routine local work/i);
+	assert.match(prompt, /minor\/reversible local edits/i);
+	assert.match(prompt, /tests, docs, formatting/i);
+	assert.match(prompt, /routine implementation choices/i);
+	assert.match(prompt, /safe local\/read-only\/reversible/i);
+	assert.match(prompt, /unapproved production\/remote\/external-account mutation/i);
+	assert.match(prompt, /sudo, mutating git, or destructive filesystem\/data changes/i);
+	assert.match(prompt, /private\/external-account reads or cross-source discovery/i);
+	assert.match(prompt, /material product\/API\/scope decision not implied by the goal/i);
+	assert.match(prompt, /missing required permission, tool, or credential/i);
+	assert.match(
+		prompt,
+		/GOAL_BLOCKED: <specific 100% blocker and smallest safe requested human decision>/i,
+	);
+	assert.doesNotMatch(prompt, /required approval/i);
+	assert.doesNotMatch(prompt, /ambiguous product\/API decision/i);
+});
+
+test("turn_end rejects disallowed goal blockers and continues", async () => {
+	const harness = createGoalHarness();
+
+	await harness.handler("finish objective", harness.ctx);
+	await deliverPendingContinuation(harness);
+	const sendsBefore = harness.sendCount();
+	await harness.hooks.get("turn_end")?.(
+		{
+			message: {
+				role: "assistant",
+				content: "GOAL_BLOCKED: waiting for internal plan approval",
+			},
+		},
+		harness.ctx,
+	);
+
+	assert.equal(harness.lastState()?.status, "running");
+	assert.equal(harness.lastState()?.lastBlocker, undefined);
+	assert.equal(harness.sendCount(), sendsBefore + 1);
+});
+
+test("turn_end accepts allowed goal blockers without queueing continuation", async () => {
+	const harness = createGoalHarness();
+
+	await harness.handler("finish objective", harness.ctx);
+	await deliverPendingContinuation(harness);
+	const sendsBefore = harness.sendCount();
+	await harness.hooks.get("turn_end")?.(
+		{
+			message: {
+				role: "assistant",
+				content:
+					"GOAL_BLOCKED: missing required credential for the private API",
+			},
+		},
+		harness.ctx,
+	);
+
+	assert.equal(harness.lastState()?.status, "blocked");
+	assert.equal(harness.lastState()?.lastBlocker?.source, "marker");
+	assert.equal(harness.sendCount(), sendsBefore);
+});
+
+test("blocked marker goals auto-resume on the next agent prompt", async () => {
+	const harness = createGoalHarness();
+
+	await harness.handler("finish objective", harness.ctx);
+	await deliverPendingContinuation(harness);
+	await harness.hooks.get("turn_end")?.(
+		{
+			message: {
+				role: "assistant",
+				content:
+					"GOAL_BLOCKED: unapproved production/remote/external-account mutation",
+			},
+		},
+		harness.ctx,
+	);
+	assert.equal(harness.lastState()?.status, "blocked");
+
+	const promptResult = harness.hooks.get("before_agent_start")?.(
+		{ systemPrompt: "base", prompt: "user supplied approval context" },
+		harness.ctx,
+	) as { systemPrompt: string } | undefined;
+
+	assert.equal(harness.lastState()?.status, "running");
+	assert.match(promptResult?.systemPrompt ?? "", /Goal Supervisor/);
+});
+
+test("status and judge-error blocks do not auto-resume", async () => {
+	const harness = createGoalHarness({
+		judge: () => ({
+			verdict: "inconclusive",
+			score: 0,
+			reason: "judge unavailable",
+			missingEvidence: ["working judge"],
+			at: "2026-06-03T00:02:00.000Z",
+		}),
+	});
+
+	await harness.handler("finish objective", harness.ctx);
+	await deliverPendingContinuation(harness);
+	await harness.hooks.get("turn_end")?.(
+		{ message: { role: "assistant", content: "Work is in progress." } },
+		harness.ctx,
+	);
+	await harness.handler("done tests passed", harness.ctx);
+	assert.equal(harness.lastState()?.status, "blocked");
+	assert.equal(harness.lastState()?.lastBlocker?.source, "judge_error");
+
+	await harness.handler("status", harness.ctx);
+	assert.equal(harness.lastState()?.status, "blocked");
+	const promptResult = harness.hooks.get("before_agent_start")?.(
+		{ systemPrompt: "base", prompt: "try again" },
+		harness.ctx,
+	);
+	assert.equal(promptResult, undefined);
+	assert.equal(harness.lastState()?.status, "blocked");
+
+	const sendsBeforeResume = harness.sendCount();
+	await harness.handler("resume", harness.ctx);
+	assert.equal(harness.lastState()?.status, "running");
+	assert.equal(harness.sendCount(), sendsBeforeResume + 1);
+	assert.equal(harness.lastState()?.pendingContinuation?.reason, "resume");
+});
+
+test("stop and clear remain terminal after blocked goals", async () => {
+	for (const command of ["stop manual", "clear"]) {
+		const harness = createGoalHarness();
+
+		await harness.handler("finish objective", harness.ctx);
+		await deliverPendingContinuation(harness);
+		await harness.hooks.get("turn_end")?.(
+			{
+				message: {
+					role: "assistant",
+					content:
+						"GOAL_BLOCKED: missing required permission for deployment",
+				},
+			},
+			harness.ctx,
+		);
+		assert.equal(harness.lastState()?.status, "blocked");
+
+		await harness.handler(command, harness.ctx);
+		const promptResult = harness.hooks.get("before_agent_start")?.(
+			{ systemPrompt: "base", prompt: "continue" },
+			harness.ctx,
+		);
+
+		assert.equal(promptResult, undefined);
+		assert.equal(harness.lastState()?.status, "stopped");
+	}
 });
 
 test("manual /goal done fails closed when no transcript evidence exists", async () => {

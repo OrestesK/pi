@@ -120,4 +120,23 @@ test("continuation content preserves normal tools and marker contracts", () => {
 	assert.match(content, /GOAL_BLOCKED:/);
 	assert.match(content, /finish safely/);
 	assert.match(content, /id=nonce-1/);
+	assert.match(content, /100% blocked/i);
+	assert.match(content, /internal plan approval/i);
+	assert.match(content, /routine local work/i);
+	assert.match(content, /minor\/reversible local edits/i);
+	assert.match(content, /tests, docs, formatting/i);
+	assert.match(content, /routine implementation choices/i);
+	assert.match(content, /safe local\/read-only\/reversible/i);
+	assert.match(content, /Take the next concrete step now when one exists/i);
+	assert.match(content, /unapproved production\/remote\/external-account mutation/i);
+	assert.match(content, /sudo, mutating git, or destructive filesystem\/data changes/i);
+	assert.match(content, /private\/external-account reads or cross-source discovery/i);
+	assert.match(content, /material product\/API\/scope decision not implied by the goal/i);
+	assert.match(content, /missing required permission, tool, or credential/i);
+	assert.match(
+		content,
+		/GOAL_BLOCKED: <specific 100% blocker and smallest safe requested human decision>/i,
+	);
+	assert.doesNotMatch(content, /required approval/i);
+	assert.doesNotMatch(content, /ambiguous product\/API decision/i);
 });

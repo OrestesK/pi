@@ -25,7 +25,12 @@ export type GoalEvent =
 	| { type: "paused"; reason?: string; now: string }
 	| { type: "resumed"; now: string }
 	| { type: "stopped"; reason?: string; now: string }
-	| { type: "blocked"; reason: string; now: string }
+	| {
+			type: "blocked";
+			reason: string;
+			now: string;
+			source?: "marker" | "question" | "judge_error";
+	  }
 	| {
 			type: "done_claimed";
 			evidence: string;
@@ -139,7 +144,11 @@ export function reduceState(
 				status: "blocked",
 				updatedAt: event.now,
 				pendingContinuation: undefined,
-				lastBlocker: { reason: event.reason, at: event.now, source: "marker" },
+				lastBlocker: {
+					reason: event.reason,
+					at: event.now,
+					source: event.source ?? "marker",
+				},
 			};
 		case "done_claimed":
 			return {
