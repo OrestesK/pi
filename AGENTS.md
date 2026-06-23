@@ -198,8 +198,9 @@ If uncertain, classify higher inside `manager-workflow`. If the user says “wai
 - If no canonical recipe matches, design a dynamic runtime chain/swarm before launch: objective, why parent-only is insufficient, distinct child roles, fan-in/reducer need, artifact policy, and stop condition
 - Use runtime `chain` when a later subagent step depends on earlier child output, especially generate/filter, research-decision, debate/attack/synthesis, context-build/handoff, review-matrix-reduce, and scout/context-builder-to-planner flows
 - Do not run scout-only or generator-only fanout for option generation; use generate/filter fan-in, and treat the route as incomplete until a reducer/filter sees the concrete generated outputs
-- 8-10 review agents are valid for broad reviews when roles are distinct or chained through validators/reducers; use `review-matrix-reduce` rather than duplicate vague reviewers
-- Prefer a single targeted advisory child over fake swarms when there is only one material evidence angle; reserve parallel swarms for 2+ distinct concerns
+- Explicit numeric subagent requests are user intent, not mere emphasis. Honor them when the user says they are literal, a goal, or a requirement, provided the work can be split into distinct scopes/angles, runs stay within tool concurrency limits, and the workflow includes fan-in/reducer synthesis. If the requested count cannot be made non-duplicative or safe, report the limiting reason and ask for a smaller or more explicitly sliced scope
+- 8-10 review agents are valid defaults for broad reviews when roles are distinct or chained through validators/reducers; use `review-matrix-reduce` rather than duplicate vague reviewers. Larger explicit counts, including up to 200, require shardable scopes, bounded waves, and reducer/fan-in stages
+- Prefer a single targeted advisory child over fake swarms when there is only one material evidence angle and no explicit numeric requirement; reserve parallel swarms for 2+ distinct concerns
 - Do not let stale background reviews drive decisions
 
 ## Memory
