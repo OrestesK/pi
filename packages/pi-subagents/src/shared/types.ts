@@ -116,6 +116,7 @@ export interface SubagentResultIntercomPayload {
 	requestId?: string;
 	runId: string;
 	mode: SubagentRunMode;
+	routeLabel?: string;
 	status: SubagentResultStatus;
 	summary: string;
 	source: "foreground" | "async";
@@ -382,6 +383,7 @@ export interface SingleResult {
 
 export interface Details {
 	mode: SubagentRunMode | "management";
+	routeLabel?: string;
 	runId?: string;
 	context?: "fresh" | "fork";
 	results: SingleResult[];

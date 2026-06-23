@@ -1,4 +1,5 @@
 import type { ControlConfig, MaxOutputConfig } from "../../shared/types.ts";
+import type { SubagentCapability } from "./capability-requirements.ts";
 
 type WorkflowContext = "fresh" | "fork";
 type WorkflowOutputMode = "inline" | "file-only";
@@ -11,6 +12,7 @@ type WorkflowTask = {
 	outputMode?: WorkflowOutputMode;
 	reads?: string[] | false;
 	progress?: boolean;
+	requiresCapabilities?: SubagentCapability[];
 	liveSteeringRole?: "worker" | "reviewer";
 	liveSteeringAgentName?: string;
 };
@@ -263,6 +265,7 @@ export function expandBuiltinWorkflowParams<T extends WorkflowParamsLike>(
 	params?: T | ExpandedWorkflowParams;
 	error?: string;
 	expanded?: boolean;
+	routeLabel?: string;
 } {
 	if (params.workflow === undefined) return { params, expanded: false };
 	if (
@@ -331,6 +334,7 @@ export function expandBuiltinWorkflowParams<T extends WorkflowParamsLike>(
 				chain: generateFilterChain(task),
 			},
 			expanded: true,
+			routeLabel: `builtin.${workflowId}`,
 		};
 	}
 
@@ -343,6 +347,7 @@ export function expandBuiltinWorkflowParams<T extends WorkflowParamsLike>(
 				concurrency: 3,
 			},
 			expanded: true,
+			routeLabel: `builtin.${workflowId}`,
 		};
 	}
 
@@ -357,5 +362,6 @@ export function expandBuiltinWorkflowParams<T extends WorkflowParamsLike>(
 			concurrency: 3,
 		},
 		expanded: true,
+		routeLabel: `builtin.${workflowId}`,
 	};
 }

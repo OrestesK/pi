@@ -1533,6 +1533,7 @@ type SubagentSingleResult = {
 
 type SubagentDetails = {
   mode: string;
+  routeLabel?: string;
   context?: string;
   results: SubagentSingleResult[];
   progress?: SubagentProgress[];
@@ -2498,6 +2499,7 @@ function parseSubagentDetails(details: unknown): SubagentDetails | undefined {
   if (results.length === 0) return undefined;
   return {
     mode,
+    routeLabel: detailString(details, "routeLabel"),
     context: detailString(details, "context"),
     results,
     progress: recordArray(details, "progress")
@@ -3022,7 +3024,7 @@ function subagentSummaryLine(details: SubagentDetails): string {
     },
   );
   return [
-    details.mode,
+    details.routeLabel ? `${details.routeLabel} (${details.mode})` : details.mode,
     details.context === "fork" ? "[fork]" : undefined,
     status,
     stats,
@@ -4433,6 +4435,7 @@ function compactSubagentResultMessage(text: string): string | undefined {
   if (!/^Run:/m.test(text) || !/^Status:/m.test(text)) return undefined;
   const run = text.match(/^Run:\s*(.+)$/m)?.[1]?.trim();
   const status = text.match(/^Status:\s*(.+)$/m)?.[1]?.trim();
+  const route = text.match(/^Route:\s*(.+)$/m)?.[1]?.trim();
   const children = text.match(/^Children:\s*(.+)$/m)?.[1]?.trim();
   const child = text.match(/^1\.\s+(.+)$/m)?.[1]?.trim();
   const summary = text
@@ -4441,6 +4444,7 @@ function compactSubagentResultMessage(text: string): string | undefined {
   return [
     `subagent result${status ? ` · ${status}` : ""}${children ? ` · ${children}` : ""}`,
     run ? `run: ${run}` : undefined,
+    route ? `route: ${route}` : undefined,
     child,
     summary
       ? `summary: ${compactOneLine(summary.split("\n", 1)[0] ?? "", 100)}`

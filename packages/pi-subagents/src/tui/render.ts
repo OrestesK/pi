@@ -26,7 +26,16 @@ function getTermWidth(): number {
 	return process.stdout.columns || 120;
 }
 
-const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+type GraphemeSegmenter = {
+	segment(input: string): Iterable<{ segment: string }>;
+};
+
+const segmenter = new (Intl as typeof Intl & {
+	Segmenter: new (
+		locales?: string | string[],
+		options?: { granularity: "grapheme" },
+	) => GraphemeSegmenter;
+}).Segmenter(undefined, { granularity: "grapheme" });
 
 /**
  * Truncate a line to maxWidth, preserving ANSI styling through the ellipsis.
@@ -188,6 +197,17 @@ function formatCurrentToolLine(progress: Pick<AgentProgress, "currentTool" | "cu
 
 function buildLiveStatusLine(progress: Pick<AgentProgress, "activityState" | "lastActivityAt">): string | undefined {
 	return formatActivityLabel(progress.lastActivityAt, progress.activityState);
+}
+
+function isAgentProgress(progress: unknown): progress is AgentProgress {
+	return Boolean(
+		progress &&
+			typeof progress === "object" &&
+			typeof (progress as { status?: unknown }).status === "string" &&
+			typeof (progress as { agent?: unknown }).agent === "string" &&
+			Array.isArray((progress as { recentTools?: unknown }).recentTools) &&
+			Array.isArray((progress as { recentOutput?: unknown }).recentOutput),
+	);
 }
 
 function themeBold(theme: Theme, text: string): string {
@@ -769,7 +789,7 @@ function refreshAnimatedWidget(): void {
 	try {
 		if (!latestWidgetCtx?.hasUI || latestWidgetJobs.length === 0) return;
 		latestWidgetCtx.ui.setWidget(WIDGET_KEY, buildWidgetComponent(latestWidgetJobs, latestWidgetCtx.ui.getToolsExpanded?.() ?? false));
-		latestWidgetCtx.ui.requestRender?.();
+		(latestWidgetCtx.ui as typeof latestWidgetCtx.ui & { requestRender?: () => void }).requestRender?.();
 	} catch (error) {
 		if (!isStaleExtensionContextError(error)) throw error;
 		stopWidgetAnimation();
@@ -893,7 +913,8 @@ function renderMultiCompact(d: Details, theme: Theme): Component {
 	const contextBadge = d.context === "fork" ? theme.fg("warning", " [fork]") : "";
 	const c = new Container();
 	const width = getTermWidth() - 4;
-	c.addChild(new Text(truncLine(`${glyph} ${theme.fg("toolTitle", theme.bold(d.mode))}${contextBadge}${stats ? ` ${theme.fg("dim", "·")} ${stats}` : ""}`, width), 0, 0));
+	const routeLabel = d.routeLabel ? `${d.routeLabel} (${d.mode})` : d.mode;
+	c.addChild(new Text(truncLine(`${glyph} ${theme.fg("toolTitle", theme.bold(routeLabel))}${contextBadge}${stats ? ` ${theme.fg("dim", "·")} ${stats}` : ""}`, width), 0, 0));
 
 	const useResultsDirectly = multiLabel.hasParallelInChain || !d.chainAgents?.length;
 	const displayStart = multiLabel.showActiveGroupOnly ? multiLabel.groupStartIndex : 0;
@@ -910,8 +931,9 @@ function renderMultiCompact(d: Details, theme: Theme): Component {
 		const output = getSingleResultOutput(r);
 		const progressFromArray = d.progress?.find((p) => p.index === i) || d.progress?.find((p) => p.agent === r.agent && p.status === "running");
 		const rProg = r.progress || progressFromArray || r.progressSummary;
-		const rRunning = rProg && "status" in rProg && rProg.status === "running";
-		const rPending = rProg && "status" in rProg && rProg.status === "pending";
+		const liveProgress = isAgentProgress(rProg) ? rProg : undefined;
+		const rRunning = liveProgress?.status === "running";
+		const rPending = liveProgress?.status === "pending";
 		const stepNumber = r.progress?.index !== undefined ? r.progress.index + 1 : progressFromArray?.index !== undefined ? progressFromArray.index + 1 : i + 1;
 		const stepStats = formatProgressStats(theme, rProg);
 		const glyph = rPending ? theme.fg("dim", "◦") : resultGlyph(r, output, theme, rRunning);
@@ -919,8 +941,8 @@ function renderMultiCompact(d: Details, theme: Theme): Component {
 		const stepLabel = resultRowLabel(d, multiLabel, i, stepNumber);
 		const line = `${glyph} ${stepLabel}: ${themeBold(theme, agentName)}${stepStats ? ` ${theme.fg("dim", "·")} ${stepStats}` : ""}${pendingLabel}`;
 		c.addChild(new Text(truncLine(`  ${line}`, width), 0, 0));
-		if (rRunning && rProg && "status" in rProg) {
-			const activity = compactCurrentActivity(rProg);
+		if (rRunning && liveProgress) {
+			const activity = compactCurrentActivity(liveProgress);
 			c.addChild(new Text(truncLine(theme.fg("dim", `    ⎿  ${activity}`), width), 0, 0));
 			c.addChild(new Text(truncLine(theme.fg("accent", "    Press Ctrl+O for live detail"), width), 0, 0));
 		} else if (!rPending && (r.exitCode !== 0 || r.interrupted || r.detached || hasEmptyTextOutputWithoutOutputTarget(r.task, output))) {
@@ -1089,7 +1111,7 @@ export function renderSubagentResult(
 			? ` | ${totalSummary.toolCount} tools, ${formatTokens(totalSummary.tokens)} tok, ${formatDuration(totalSummary.durationMs)}`
 			: "";
 
-	const modeLabel = d.mode;
+	const modeLabel = d.routeLabel ? `${d.routeLabel} (${d.mode})` : d.mode;
 	const contextBadge = d.context === "fork" ? theme.fg("warning", " [fork]") : "";
 	const multiLabel = buildMultiProgressLabel(d, hasRunning);
 	const itemTitle = multiLabel.itemTitle;
@@ -1155,8 +1177,9 @@ export function renderSubagentResult(
 		const progressFromArray = d.progress?.find((p) => p.index === i) 
 			|| d.progress?.find((p) => p.agent === r.agent && p.status === "running");
 		const rProg = r.progress || progressFromArray || r.progressSummary;
-		const rRunning = rProg?.status === "running";
-		const stepNumber = typeof rProg?.index === "number" ? rProg.index + 1 : i + 1;
+		const liveProgress = isAgentProgress(rProg) ? rProg : undefined;
+		const rRunning = liveProgress?.status === "running";
+		const stepNumber = typeof liveProgress?.index === "number" ? liveProgress.index + 1 : i + 1;
 
 		const resultOutput = getSingleResultOutput(r);
 		const statusIcon = rRunning
@@ -1196,15 +1219,15 @@ export function renderSubagentResult(
 			c.addChild(new Text(fit(theme.fg("dim", `    fallbacks: ${r.attemptedModels.join(" → ")}`)), 0, 0));
 		}
 
-		if (rRunning && rProg) {
-			if (rProg.skills?.length) {
-				c.addChild(new Text(fit(theme.fg("accent", `    skills: ${rProg.skills.join(", ")}`)), 0, 0));
+		if (rRunning && liveProgress) {
+			if (liveProgress.skills?.length) {
+				c.addChild(new Text(fit(theme.fg("accent", `    skills: ${liveProgress.skills.join(", ")}`)), 0, 0));
 			}
-			const toolLine = formatCurrentToolLine(rProg, w, expanded);
+			const toolLine = formatCurrentToolLine(liveProgress, w, expanded);
 			if (toolLine) {
 				c.addChild(new Text(fit(theme.fg("warning", `    > ${toolLine}`)), 0, 0));
 			}
-			const liveStatusLine = buildLiveStatusLine(rProg);
+			const liveStatusLine = buildLiveStatusLine(liveProgress);
 			if (liveStatusLine) {
 				c.addChild(new Text(fit(theme.fg("accent", `    ${liveStatusLine}`)), 0, 0));
 			}
@@ -1212,8 +1235,8 @@ export function renderSubagentResult(
 			if (r.artifactPaths) {
 				c.addChild(new Text(fit(theme.fg("dim", `    artifacts: ${shortenPath(r.artifactPaths.outputPath)}`)), 0, 0));
 			}
-			if (rProg.recentTools?.length) {
-				for (const t of rProg.recentTools.slice(-3)) {
+			if (liveProgress.recentTools?.length) {
+				for (const t of liveProgress.recentTools.slice(-3)) {
 					const maxArgsLen = Math.max(40, w - 30);
 					const argsPreview = expanded || t.args.length <= maxArgsLen
 						? t.args
@@ -1221,7 +1244,7 @@ export function renderSubagentResult(
 					c.addChild(new Text(fit(theme.fg("dim", `      ${t.tool}: ${argsPreview}`)), 0, 0));
 				}
 			}
-			const recentLines = (rProg.recentOutput ?? []).slice(-5);
+			const recentLines = (liveProgress.recentOutput ?? []).slice(-5);
 			for (const line of recentLines) {
 				c.addChild(new Text(fit(theme.fg("dim", `      ${line}`)), 0, 0));
 			}

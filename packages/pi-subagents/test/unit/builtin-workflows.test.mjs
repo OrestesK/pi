@@ -40,6 +40,7 @@ test("quality-gate workflow expands to foreground fresh reviewer fanout", () => 
 	assert.equal(result.params?.context, "fresh");
 	assert.equal(result.params?.async, false);
 	assert.equal(result.params?.concurrency, 3);
+	assert.equal(result.routeLabel, "builtin.quality-gate");
 	assert.deepEqual(
 		result.params?.tasks.map((task) => task.agent),
 		["reviewer", "reviewer", "reviewer"],
@@ -74,6 +75,7 @@ test("research-decision workflow expands to researcher scout reviewer fanout", (
 	assert.equal(result.params?.cwd, "/repo");
 	assert.equal(result.params?.context, "fresh");
 	assert.equal(result.params?.async, false);
+	assert.equal(result.routeLabel, "builtin.research-decision");
 	assert.deepEqual(
 		result.params?.tasks.map((task) => task.agent),
 		["researcher", "scout", "reviewer"],
@@ -91,6 +93,7 @@ test("generate-filter workflow expands to foreground fan-out/fan-in chain", () =
 	assert.equal(result.params?.context, "fresh");
 	assert.equal(result.params?.async, false);
 	assert.equal(result.params?.concurrency, undefined);
+	assert.equal(result.routeLabel, "builtin.generate-filter");
 	assert.equal(result.params?.tasks, undefined);
 	assert.equal(result.params?.chain?.length, 2);
 	assert.deepEqual(
@@ -111,6 +114,7 @@ test("live-steering-team workflow expands to one worker and two live reviewers",
 	assert.equal(result.params?.context, "fresh");
 	assert.equal(result.params?.async, false);
 	assert.equal(result.params?.concurrency, 3);
+	assert.equal(result.routeLabel, "builtin.live-steering-team");
 	assert.equal(result.params?.liveSteeringTeam, true);
 	assert.deepEqual(
 		result.params?.tasks?.map((task) => task.agent),

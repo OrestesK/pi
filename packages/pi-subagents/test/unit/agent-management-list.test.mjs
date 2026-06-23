@@ -34,6 +34,13 @@ test("list output is concise and routing-oriented", () => {
 	assert.match(text, /not the parent conversation history/);
 	assert.match(text, /fork = inherits the parent conversation context/);
 
+	assert.match(text, /Tool access:/);
+	assert.match(text, /Tools are agent-specific, not inherited from the parent/);
+	assert.match(text, /Protected advisory roles strip MCP, mutation, and extension tools/);
+	assert.match(text, /write-capable agent for writes/);
+	assert.match(text, /configured non-advisory agent for MCP\/custom tools/);
+	assert.doesNotMatch(text, /Retool/);
+
 	assert.match(text, /Builtin workflows \(foreground\/fresh\):/);
 	assert.match(text, /builtin\.quality-gate/);
 	assert.match(text, /builtin\.research-decision/);

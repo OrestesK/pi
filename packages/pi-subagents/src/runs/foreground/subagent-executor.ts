@@ -106,6 +106,7 @@ import {
 } from "../background/async-resume.ts";
 import { inspectSubagentStatus } from "../background/run-status.ts";
 import { applyForceTopLevelAsyncOverrideForExecution } from "../background/top-level-async.ts";
+import { validateCapabilityRequirements, type SubagentCapability } from "../shared/capability-requirements.ts";
 import { expandBuiltinWorkflowParams } from "../shared/workflows.ts";
 import {
 	cleanupWorktrees,
@@ -161,6 +162,7 @@ interface TaskParam {
 	outputMode?: "inline" | "file-only";
 	outputSchema?: JsonSchemaObject;
 	acceptance?: AcceptanceInput;
+	requiresCapabilities?: SubagentCapability[];
 	reads?: string[] | boolean;
 	progress?: boolean;
 	model?: string;
@@ -202,6 +204,7 @@ export interface SubagentParamsLike {
 	outputMode?: "inline" | "file-only";
 	outputSchema?: JsonSchemaObject;
 	acceptance?: AcceptanceInput;
+	requiresCapabilities?: SubagentCapability[];
 	agentScope?: string;
 	chainDir?: string;
 }
@@ -235,6 +238,7 @@ interface ExecutionContextData {
 	effectiveAsync: boolean;
 	controlConfig: ResolvedControlConfig;
 	intercomBridge: IntercomBridgeState;
+	routeLabel?: string;
 }
 
 function resolveRequestedCwd(
@@ -854,6 +858,7 @@ async function emitForegroundResultIntercom(input: {
 	intercomBridge: IntercomBridgeState;
 	runId: string;
 	mode: SubagentRunMode;
+	routeLabel?: string;
 	results: SingleResult[];
 	chainSteps?: number;
 }): Promise<ReturnType<typeof buildSubagentResultIntercomPayload> | null> {
@@ -887,6 +892,7 @@ async function emitForegroundResultIntercom(input: {
 		to: input.intercomBridge.orchestratorTarget,
 		runId: input.runId,
 		mode: input.mode,
+		...(input.routeLabel ? { routeLabel: input.routeLabel } : {}),
 		source: "foreground",
 		children,
 		...(typeof input.chainSteps === "number"
@@ -913,6 +919,7 @@ async function maybeBuildForegroundIntercomReceipt(input: {
 		intercomBridge: input.intercomBridge,
 		runId: input.runId,
 		mode: input.mode,
+		...(input.details.routeLabel ? { routeLabel: input.details.routeLabel } : {}),
 		results: input.details.results,
 		...(typeof input.details.totalSteps === "number"
 			? { chainSteps: input.details.totalSteps }
@@ -1658,7 +1665,7 @@ async function runChainPath(
 	}
 
 	const chainDetails = chainResult.details
-		? compactForegroundDetails({ ...chainResult.details, runId })
+		? compactForegroundDetails({ ...chainResult.details, runId, routeLabel: data.routeLabel })
 		: undefined;
 	if (chainDetails)
 		rememberForegroundRun(deps.state, {
@@ -2495,6 +2502,7 @@ async function runParallelPath(
 		const details = compactForegroundDetails({
 			mode: "parallel",
 			runId,
+			routeLabel: data.routeLabel,
 			results,
 			progress: params.includeProgress ? allProgress : undefined,
 			artifacts: allArtifactPaths.length
@@ -2872,6 +2880,7 @@ async function runSinglePath(
 	const details = compactForegroundDetails({
 		mode: "single",
 		runId,
+		routeLabel: data.routeLabel,
 		results: [r],
 		progress: params.includeProgress ? allProgress : undefined,
 		artifacts: allArtifactPaths.length
@@ -3187,6 +3196,15 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 		);
 		if (validationError) return validationError;
 
+		const capabilityError = validateCapabilityRequirements(effectiveParams, agents);
+		if (capabilityError) {
+			return {
+				content: [{ type: "text", text: capabilityError }],
+				isError: true,
+				details: { mode: getRequestedModeLabel(effectiveParams), results: [] },
+			};
+		}
+
 		let sessionFileForIndex: (idx?: number) => string | undefined = () =>
 			undefined;
 		try {
@@ -3267,6 +3285,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			effectiveAsync,
 			controlConfig,
 			intercomBridge,
+			routeLabel: workflowExpansion.routeLabel,
 		};
 
 		const foregroundMode: "single" | "parallel" | "chain" = hasChain

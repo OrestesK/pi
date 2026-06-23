@@ -201,6 +201,7 @@ test("subagent call-renderer original fallback is explicit for partial args", ()
 function richSubagentResult() {
   return textResult("Chain complete", {
     mode: "chain",
+    routeLabel: "builtin.generate-filter",
     context: "fresh",
     totalSteps: 2,
     chainAgents: ["scout", "reviewer"],
@@ -239,6 +240,7 @@ test("subagent result renderer covers chain, failure, file-only, and artifacts",
   );
   const collapsed = render(collapsedComponent);
   assert.match(collapsed, /Subagent/);
+  assert.match(collapsed, /builtin\.generate-filter/);
   assert.match(collapsed, /chain/);
   assert.match(collapsed, /2 steps/);
   assert.match(collapsed, /1 failed/);
@@ -442,7 +444,7 @@ test("intercom renderer covers normal senders, subagent result compaction, reply
     {
       details: {
         from: { name: "subagent-result", cwd: "/tmp/project" },
-        bodyText: "Run: abc123\nMode: chain\nStatus: completed\nChildren: 2 completed\n\n1. scout — completed\nSummary:\nAll good\n",
+        bodyText: "Run: abc123\nMode: chain\nRoute: builtin.quality-gate\nStatus: completed\nChildren: 2 completed\n\n1. scout — completed\nSummary:\nAll good\n",
         replyCommand: "/reply abc123",
       },
     },
@@ -452,6 +454,7 @@ test("intercom renderer covers normal senders, subagent result compaction, reply
   const rendered = render(subagentResult, 80);
   assert.match(rendered, /subagent result · completed · 2 completed/);
   assert.match(rendered, /run: abc123/);
+  assert.match(rendered, /route: builtin\.quality-gate/);
   assert.match(rendered, /scout/);
   assert.match(rendered, /To reply: \/reply abc123/);
   assertRenderedWithinWidth(subagentResult);

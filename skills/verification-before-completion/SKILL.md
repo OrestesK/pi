@@ -74,6 +74,13 @@ Risks: <remaining risks or none known>
 Next: <user-run git/PR steps if needed>
 ```
 
+For quantitative summaries, add a short evidence line before finalizing counts/totals/coverage:
+
+- denominator and scope/time window,
+- latest source artifact/table/check inspected,
+- whether each key number was directly verified or inferred,
+- any stale draft or unverified count explicitly excluded.
+
 For explicit claim verification, include the verdict:
 
 ```text

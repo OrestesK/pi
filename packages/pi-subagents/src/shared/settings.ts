@@ -7,6 +7,7 @@ import * as path from "node:path";
 import type { AgentConfig } from "../agents/agents.ts";
 import { normalizeSkillInput } from "../agents/skills.ts";
 import { CHAIN_RUNS_DIR, type AcceptanceInput, type JsonSchemaObject, type OutputMode } from "./types.ts";
+import type { SubagentCapability } from "../runs/shared/capability-requirements.ts";
 const CHAIN_DIR_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const INITIAL_PROGRESS_CONTENT = "# Progress\n\n## Status\nIn Progress\n\n## Tasks\n\n## Files Changed\n\n## Notes\n";
 
@@ -63,6 +64,7 @@ export interface SequentialStep extends NamedChainStepFields {
 	progress?: boolean;
 	skill?: string | string[] | false;
 	model?: string;
+	requiresCapabilities?: SubagentCapability[];
 }
 
 /** Parallel task item within a parallel step */
@@ -79,6 +81,7 @@ export interface ParallelTaskItem extends NamedChainStepFields {
 	progress?: boolean;
 	skill?: string | string[] | false;
 	model?: string;
+	requiresCapabilities?: SubagentCapability[];
 }
 
 /** Parallel step: multiple agents running concurrently */

@@ -51,7 +51,7 @@ function createPlaceholderResult(
 	agent: string,
 	task: string,
 	status: "pending" | "running",
-	index?: number,
+	index: number,
 ): SingleResult {
 	return {
 		agent,
@@ -60,7 +60,7 @@ function createPlaceholderResult(
 		messages: EMPTY_MESSAGES,
 		usage: cloneUsage(),
 		progress: {
-			...(index !== undefined ? { index } : {}),
+			index,
 			agent,
 			status,
 			task,
@@ -73,12 +73,19 @@ function createPlaceholderResult(
 	};
 }
 
+function routeLabelFromParams(params: SubagentParamsLike): string | undefined {
+	return typeof params.workflow === "string" && params.workflow.trim()
+		? params.workflow.trim()
+		: undefined;
+}
+
 function buildParallelInitialResult(params: SubagentParamsLike): AgentToolResult<Details> {
 	const tasks = params.tasks ?? [];
 	return {
 		content: [{ type: "text", text: tasks.map((task) => `${task.agent}: ${task.task}`).join("\n\n") }],
 		details: {
 			mode: "parallel",
+			...(routeLabelFromParams(params) ? { routeLabel: routeLabelFromParams(params) } : {}),
 			...(params.context ? { context: params.context } : {}),
 			results: tasks.map((task, index) => createPlaceholderResult(task.agent, task.task, "running", index)),
 			progress: tasks.map((task, index) => ({
@@ -134,6 +141,7 @@ function buildChainInitialResult(params: SubagentParamsLike): AgentToolResult<De
 		}],
 		details: {
 			mode: "chain",
+			...(routeLabelFromParams(params) ? { routeLabel: routeLabelFromParams(params) } : {}),
 			...(params.context ? { context: params.context } : {}),
 			results,
 			progress: results.map((result, index) => ({
@@ -161,9 +169,11 @@ function buildSingleInitialResult(params: SubagentParamsLike): AgentToolResult<D
 		content: [{ type: "text", text: task }],
 		details: {
 			mode: "single",
+			...(routeLabelFromParams(params) ? { routeLabel: routeLabelFromParams(params) } : {}),
 			...(params.context ? { context: params.context } : {}),
-			results: [createPlaceholderResult(agent, task, "running")],
+			results: [createPlaceholderResult(agent, task, "running", 0)],
 			progress: [{
+				index: 0,
 				agent,
 				status: "running",
 				task,

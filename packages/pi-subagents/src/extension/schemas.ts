@@ -4,6 +4,7 @@
 
 import { Type } from "typebox";
 import { SUBAGENT_ACTIONS } from "../shared/types.ts";
+import { SUBAGENT_CAPABILITY_IDS } from "../runs/shared/capability-requirements.ts";
 
 const SkillOverride = Type.Unsafe({
 	anyOf: [
@@ -89,6 +90,14 @@ const ReadsOverride = Type.Unsafe({
 		"Files to read before running (array of filenames), or false to disable",
 });
 
+const RequiredCapabilitiesOverride = Type.Array(
+	Type.String({ enum: [...SUBAGENT_CAPABILITY_IDS] }),
+	{
+		description:
+			"Declared tool capability classes this child must have before launch. Used for deterministic preflight only; no task-text inference is performed.",
+	},
+);
+
 const TaskItem = Type.Object({
 	agent: Type.String(),
 	task: Type.String(),
@@ -113,6 +122,7 @@ const TaskItem = Type.Object({
 	skill: Type.Optional(SkillOverride),
 	outputSchema: Type.Optional(JsonSchemaObject),
 	acceptance: Type.Optional(AcceptanceOverride),
+	requiresCapabilities: Type.Optional(RequiredCapabilitiesOverride),
 });
 
 // Parallel task item (within a parallel step)
@@ -146,6 +156,7 @@ const ParallelTaskSchema = Type.Object({
 	),
 	outputSchema: Type.Optional(JsonSchemaObject),
 	acceptance: Type.Optional(AcceptanceOverride),
+	requiresCapabilities: Type.Optional(RequiredCapabilitiesOverride),
 });
 
 // Flattened so chain steps do not need an object-shape anyOf/oneOf union.
@@ -192,6 +203,7 @@ const ChainItem = Type.Object(
 		),
 		outputSchema: Type.Optional(JsonSchemaObject),
 		acceptance: Type.Optional(AcceptanceOverride),
+		requiresCapabilities: Type.Optional(RequiredCapabilitiesOverride),
 		expand: Type.Optional(ChainExpandSchema),
 		collect: Type.Optional(ChainCollectSchema),
 		parallel: Type.Optional(
@@ -455,4 +467,5 @@ export const SubagentParams = Type.Object({
 	),
 	outputSchema: Type.Optional(JsonSchemaObject),
 	acceptance: Type.Optional(AcceptanceOverride),
+	requiresCapabilities: Type.Optional(RequiredCapabilitiesOverride),
 });

@@ -10,6 +10,9 @@ const {
 	mergeAgentsForScope,
 	sanitizeProtectedAdvisoryAgentTools,
 } = await loadTs("../../src/agents/agent-selection.ts");
+const { validateCapabilityRequirements } = await loadTs(
+	"../../src/runs/shared/capability-requirements.ts",
+);
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(testDir, "../..");
@@ -181,4 +184,93 @@ test("custom non-advisory agents keep explicit mutation tools", () => {
 		tools: ["read", "write", "./custom-writer.ts"],
 	};
 	assert.deepEqual(sanitizeProtectedAdvisoryAgentTools(custom), custom);
+});
+
+test("declared MCP capability requirements fail fast for sanitized advisory agents", () => {
+	const message = validateCapabilityRequirements(
+		{
+			tasks: [
+				{
+					agent: "scout",
+					task: "inspect the Retool MCP app",
+					requiresCapabilities: ["mcp"],
+				},
+			],
+		},
+		[{ name: "scout", source: "builtin", tools: ["read"] }],
+	);
+
+	assert.match(message ?? "", /scout/);
+	assert.match(message ?? "", /requires mcp/);
+	assert.match(message ?? "", /cannot satisfy/);
+});
+
+test("declared capability requirements pass when the selected agent exposes them", () => {
+	const message = validateCapabilityRequirements(
+		{
+			tasks: [
+				{
+					agent: "mcp-reader",
+					task: "inspect the Retool MCP app",
+					requiresCapabilities: ["mcp", "direct-mcp"],
+				},
+			],
+		},
+		[
+			{
+				name: "mcp-reader",
+				source: "project",
+				tools: ["read", "mcp"],
+				mcpDirectTools: ["retool_getApp"],
+			},
+		],
+	);
+
+	assert.equal(message, undefined);
+});
+
+test("declared capability requirements are rejected when not attached to a concrete agent", () => {
+	assert.match(
+		validateCapabilityRequirements(
+			{ tasks: [{ agent: "scout", task: "read" }], requiresCapabilities: ["mcp"] },
+			[{ name: "scout", source: "builtin", tools: ["read"] }],
+		) ?? "",
+		/concrete agent-bearing task/,
+	);
+	assert.match(
+		validateCapabilityRequirements(
+			{
+				chain: [
+					{
+						requiresCapabilities: ["mcp"],
+						parallel: [{ agent: "scout", task: "read" }],
+					},
+				],
+			},
+			[{ name: "scout", source: "builtin", tools: ["read"] }],
+		) ?? "",
+		/concrete agent-bearing task/,
+	);
+});
+
+test("custom-extension capability allows default extension loading but rejects explicit no-extension agents", () => {
+	assert.equal(
+		validateCapabilityRequirements(
+			{
+				tasks: [{ agent: "custom", task: "use default extensions", requiresCapabilities: ["custom-extension"] }],
+			},
+			[{ name: "custom", source: "project", tools: ["read"] }],
+		),
+		undefined,
+	);
+
+	assert.match(
+		validateCapabilityRequirements(
+			{
+				tasks: [{ agent: "scout", task: "use extensions", requiresCapabilities: ["custom-extension"] }],
+			},
+			[{ name: "scout", source: "builtin", tools: ["read"], extensions: [] }],
+		) ?? "",
+		/requires custom-extension/,
+	);
 });

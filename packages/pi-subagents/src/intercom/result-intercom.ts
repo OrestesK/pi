@@ -72,6 +72,7 @@ interface GroupedResultIntercomMessageInput {
 	to: string;
 	runId: string;
 	mode: SubagentRunMode;
+	routeLabel?: string;
 	source: "foreground" | "async";
 	children: SubagentResultIntercomChild[];
 	asyncId?: string;
@@ -112,6 +113,7 @@ function compactLine(text: string, maxChars: number): string {
 function formatSubagentResultIntercomMessage(input: {
 	runId: string;
 	mode: SubagentRunMode;
+	routeLabel?: string;
 	status: SubagentResultStatus;
 	source: "foreground" | "async";
 	children: SubagentResultIntercomChild[];
@@ -125,6 +127,7 @@ function formatSubagentResultIntercomMessage(input: {
 		"",
 		`Run: ${input.runId}`,
 		`Mode: ${input.mode}`,
+		...(input.routeLabel ? [`Route: ${input.routeLabel}`] : []),
 		`Status: ${input.status}`,
 		`Children: ${formatStatusCounts(counts)}`,
 	];
@@ -175,6 +178,7 @@ export function buildSubagentResultIntercomPayload(
 		to: input.to,
 		runId: input.runId,
 		mode: input.mode,
+		...(input.routeLabel ? { routeLabel: input.routeLabel } : {}),
 		status,
 		summary,
 		source: input.source,
@@ -206,7 +210,7 @@ export async function deliverSubagentResultIntercomEvent(
 		payload.to,
 		payload.message,
 		timeoutMs,
-		payload,
+		{ ...payload },
 	);
 }
 
@@ -285,6 +289,7 @@ export function formatSubagentResultReceipt(input: {
 	const lines = [
 		`Delivered ${modeLabel} via intercom.`,
 		`Run: ${input.runId}`,
+		...(input.payload.routeLabel ? [`Route: ${input.payload.routeLabel}`] : []),
 		`Children: ${formatStatusCounts(counts)}`,
 	];
 

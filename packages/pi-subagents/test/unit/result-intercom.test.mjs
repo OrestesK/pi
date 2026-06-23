@@ -15,6 +15,7 @@ test("builds compact subagent result intercom messages", () => {
 		to: "parent",
 		runId: "run-123",
 		mode: "parallel",
+		routeLabel: "builtin.quality-gate",
 		source: "async",
 		asyncId: "run-123",
 		asyncDir: "/tmp/run-123",
@@ -30,6 +31,7 @@ test("builds compact subagent result intercom messages", () => {
 	});
 
 	assert.match(payload.message, /Children: 6 completed/);
+	assert.match(payload.message, /Route: builtin\.quality-gate/);
 	assert.match(payload.message, /1\. agent-0 — completed/);
 	assert.match(payload.message, /5\. agent-4 — completed/);
 	assert.match(payload.message, /… 1 more children/);
