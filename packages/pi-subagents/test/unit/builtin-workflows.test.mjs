@@ -13,10 +13,10 @@ const {
 	expandBuiltinWorkflowParams,
 } = await loadTs("../../src/runs/shared/workflows.ts");
 
-test("lists the initial builtin workflow ids", () => {
+test("lists the builtin workflow ids", () => {
 	assert.deepEqual(
 		[...BUILTIN_WORKFLOW_IDS],
-		["quality-gate", "research-decision", "generate-filter"],
+		["quality-gate", "research-decision", "generate-filter", "live-steering-team"],
 	);
 });
 
@@ -101,6 +101,37 @@ test("generate-filter workflow expands to foreground fan-out/fan-in chain", () =
 	assert.match(result.params?.chain?.[1]?.task ?? "", /dedupe/i);
 });
 
+test("live-steering-team workflow expands to one worker and two live reviewers", () => {
+	const result = expandBuiltinWorkflowParams({
+		workflow: "builtin.live-steering-team",
+		task: "implement the target with live reviewer steering",
+	});
+
+	assert.equal(result.error, undefined);
+	assert.equal(result.params?.context, "fresh");
+	assert.equal(result.params?.async, false);
+	assert.equal(result.params?.concurrency, 3);
+	assert.equal(result.params?.liveSteeringTeam, true);
+	assert.deepEqual(
+		result.params?.tasks?.map((task) => task.agent),
+		["worker", "reviewer", "reviewer"],
+	);
+	assert.deepEqual(
+		result.params?.tasks?.map((task) => task.liveSteeringRole),
+		["worker", "reviewer", "reviewer"],
+	);
+	assert.match(result.params?.tasks?.[0]?.task ?? "", /team_read_messages/);
+	assert.match(result.params?.tasks?.[0]?.task ?? "", /team_ack_message/);
+	assert.match(result.params?.tasks?.[0]?.task ?? "", /Do not create summary, progress, or bookkeeping files/);
+	assert.match(result.params?.tasks?.[1]?.task ?? "", /team_decide/);
+	assert.match(result.params?.tasks?.[1]?.task ?? "", /nothing/);
+	assert.match(result.params?.tasks?.[1]?.task ?? "", /steer/);
+	assert.match(result.params?.tasks?.[1]?.task ?? "", /discuss/);
+	assert.match(result.params?.tasks?.[2]?.task ?? "", /team_decide/);
+	assert.doesNotMatch(result.params?.tasks?.[1]?.task ?? "", /save feedback for the end/i);
+	assert.doesNotMatch(result.params?.tasks?.[2]?.task ?? "", /save feedback for the end/i);
+});
+
 test("workflow rejects explicit execution, management, and ignored top-level execution fields", () => {
 	const cases = [
 		{ agent: "reviewer" },
@@ -140,6 +171,7 @@ test("workflow schema exposes only documented builtin ids", () => {
 		"builtin.quality-gate",
 		"builtin.research-decision",
 		"builtin.generate-filter",
+		"builtin.live-steering-team",
 	]);
 });
 

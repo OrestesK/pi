@@ -198,6 +198,7 @@ async function runSingleAttempt(
 		runId: options.runId,
 		childAgentName: agent.name,
 		childIndex: options.index ?? 0,
+		team: options.team,
 		structuredOutput: options.structuredOutput,
 	});
 

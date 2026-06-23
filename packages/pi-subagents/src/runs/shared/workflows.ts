@@ -9,7 +9,10 @@ type WorkflowTask = {
 	task: string;
 	output?: string | false;
 	outputMode?: WorkflowOutputMode;
+	reads?: string[] | false;
 	progress?: boolean;
+	liveSteeringRole?: "worker" | "reviewer";
+	liveSteeringAgentName?: string;
 };
 
 type WorkflowParallelStep = {
@@ -67,12 +70,14 @@ export type ExpandedWorkflowParams = Omit<
 	concurrency?: number;
 	context: "fresh";
 	async: false;
+	liveSteeringTeam?: boolean;
 };
 
 export const BUILTIN_WORKFLOW_IDS = [
 	"quality-gate",
 	"research-decision",
 	"generate-filter",
+	"live-steering-team",
 ] as const;
 
 type BuiltinWorkflowId = (typeof BUILTIN_WORKFLOW_IDS)[number];
@@ -145,6 +150,75 @@ function researchDecisionTasks(target: string): WorkflowTask[] {
 			task: `Research decision: adversarially critique the decision and compare the strongest alternatives. Do not edit. Return must-fix objections, tradeoffs, and a recommended verdict shape. Decision target:\n\n${target}`,
 			output: false,
 			progress: false,
+		},
+	];
+}
+
+function liveSteeringTeamTasks(target: string): WorkflowTask[] {
+	return [
+		{
+			agent: "worker",
+			liveSteeringRole: "worker",
+			liveSteeringAgentName: "worker-0",
+			reads: false,
+			progress: true,
+			task: `Live steering worker. You are the only implementation/writer agent. Two live reviewers run in parallel and can steer you through the team mailbox.
+
+Steering contract:
+- Use team_read_messages at the start, after each major phase, and immediately before final output.
+- For the final pre-completion read, allow reviewers a steering window by calling team_read_messages with waitMs: 10000.
+- For every steering message you receive, call team_ack_message with action accepted, rejected, or blocked and a concrete reason before continuing.
+- If you accept steering, visibly change course before completing and mention the message id in your final output.
+- If you reject steering, explain why in the acknowledgement and final output.
+- If you are blocked by steering, acknowledge with action blocked and stop with the blocker.
+- Do not create summary, progress, or bookkeeping files unless the target task explicitly asks for them; put final reporting in your response.
+- Do not complete while any reviewer steering message is unread or unacknowledged.
+
+Target task:
+
+${target}`,
+		},
+		{
+			agent: "reviewer",
+			liveSteeringRole: "reviewer",
+			liveSteeringAgentName: "reviewer-1",
+			reads: false,
+			output: false,
+			progress: false,
+			task: `Live steering reviewer A. Do not edit files. Your job is to actively steer the worker while it is running.
+
+Run a live pulse loop:
+- Inspect the current worker direction, files, output, and any team messages available to you.
+- Call team_decide repeatedly while the worker is active.
+- Use action nothing when no intervention is needed right now, with a concrete reason.
+- Use action steer addressed to worker-0 when you see a correctness, scope, or safety issue. Put the concrete instruction in message and use urgent:true for must-fix steering.
+- Use action discuss when you need another reviewer to weigh in before steering.
+- Pulse early and keep watching; active steering is the job.
+
+Target task:
+
+${target}`,
+		},
+		{
+			agent: "reviewer",
+			liveSteeringRole: "reviewer",
+			liveSteeringAgentName: "reviewer-2",
+			reads: false,
+			output: false,
+			progress: false,
+			task: `Live steering reviewer B. Do not edit files. Your job is to actively steer the worker while it is running, focusing on verification evidence and readiness risks.
+
+Run a live pulse loop:
+- Inspect the current worker direction, files, output, and any team messages available to you.
+- Call team_decide repeatedly while the worker is active.
+- Use action nothing when no intervention is needed right now, with a concrete reason.
+- Use action steer addressed to worker-0 for missing verification, weak evidence, or completion risks. Put the concrete instruction in message and use urgent:true for must-fix steering.
+- Use action discuss when you need another reviewer to weigh in before steering.
+- Pulse early and keep watching; active steering is the job.
+
+Target task:
+
+${target}`,
 		},
 	];
 }
@@ -255,6 +329,18 @@ export function expandBuiltinWorkflowParams<T extends WorkflowParamsLike>(
 			params: {
 				...base,
 				chain: generateFilterChain(task),
+			},
+			expanded: true,
+		};
+	}
+
+	if (workflowId === "live-steering-team") {
+		return {
+			params: {
+				...base,
+				liveSteeringTeam: true,
+				tasks: liveSteeringTeamTasks(task),
+				concurrency: 3,
 			},
 			expanded: true,
 		};

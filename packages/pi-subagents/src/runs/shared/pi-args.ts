@@ -6,6 +6,8 @@ import type { JsonSchemaObject } from "../../shared/types.ts";
 import { STRUCTURED_OUTPUT_CAPTURE_ENV, STRUCTURED_OUTPUT_SCHEMA_ENV, STRUCTURED_OUTPUT_TOOL_NAME } from "./structured-output.ts";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
+const TEAM_TOOL_NAMES = ["team_send_message", "team_read_messages", "team_ack_message"];
+const REVIEWER_TEAM_TOOL_NAMES = ["team_decide"];
 const TASK_ARG_LIMIT = 8000;
 const PROMPT_RUNTIME_EXTENSION_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "subagent-prompt-runtime.ts");
 export const SUBAGENT_CHILD_ENV = "PI_SUBAGENT_CHILD";
@@ -13,6 +15,9 @@ export const SUBAGENT_ORCHESTRATOR_TARGET_ENV = "PI_SUBAGENT_ORCHESTRATOR_TARGET
 export const SUBAGENT_RUN_ID_ENV = "PI_SUBAGENT_RUN_ID";
 export const SUBAGENT_CHILD_AGENT_ENV = "PI_SUBAGENT_CHILD_AGENT";
 export const SUBAGENT_CHILD_INDEX_ENV = "PI_SUBAGENT_CHILD_INDEX";
+export const SUBAGENT_TEAM_RUN_DIR_ENV = "PI_SUBAGENT_TEAM_RUN_DIR";
+export const SUBAGENT_TEAM_AGENT_NAME_ENV = "PI_SUBAGENT_TEAM_AGENT_NAME";
+export const SUBAGENT_TEAM_ROLE_ENV = "PI_SUBAGENT_TEAM_ROLE";
 
 interface BuildPiArgsInput {
 	baseArgs: string[];
@@ -35,6 +40,11 @@ interface BuildPiArgsInput {
 	runId?: string;
 	childAgentName?: string;
 	childIndex?: number;
+	team?: {
+		runDir: string;
+		agentName: string;
+		role: "worker" | "reviewer";
+	};
 	structuredOutput?: {
 		schema: JsonSchemaObject;
 		schemaPath: string;
@@ -77,8 +87,13 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 	}
 
 	const toolExtensionPaths: string[] = [];
-	const effectiveTools = input.structuredOutput && input.tools?.length
-		? [...input.tools, STRUCTURED_OUTPUT_TOOL_NAME]
+	const effectiveTools = input.tools?.length
+		? [
+				...input.tools,
+				...(input.structuredOutput ? [STRUCTURED_OUTPUT_TOOL_NAME] : []),
+				...(input.team ? TEAM_TOOL_NAMES : []),
+				...(input.team?.role === "reviewer" ? REVIEWER_TEAM_TOOL_NAMES : []),
+			]
 		: input.tools;
 	if (effectiveTools?.length) {
 		const builtinTools: string[] = [];
@@ -148,6 +163,11 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 	}
 	if (input.childIndex !== undefined) {
 		env[SUBAGENT_CHILD_INDEX_ENV] = String(input.childIndex);
+	}
+	if (input.team) {
+		env[SUBAGENT_TEAM_RUN_DIR_ENV] = input.team.runDir;
+		env[SUBAGENT_TEAM_AGENT_NAME_ENV] = input.team.agentName;
+		env[SUBAGENT_TEAM_ROLE_ENV] = input.team.role;
 	}
 	if (input.mcpDirectTools?.length) {
 		env.MCP_DIRECT_TOOLS = input.mcpDirectTools.join(",");

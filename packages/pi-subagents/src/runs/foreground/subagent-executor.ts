@@ -8,6 +8,12 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import type { AgentConfig, AgentScope } from "../../agents/agents.ts";
 import { getArtifactsDir } from "../../shared/artifacts.ts";
+import { listTeamDecisions } from "../../shared/team-decisions.ts";
+import {
+	findLiveSteeringCompletionFailure,
+	findLiveSteeringReviewerPulseFailures,
+} from "../../shared/live-steering.ts";
+import { listTeamMessages } from "../../shared/team-mailbox.ts";
 import {
 	ChainClarifyComponent,
 	type ChainClarifyResult,
@@ -137,6 +143,8 @@ type AgentToolResult<T> = CoreAgentToolResult<T> & { isError?: boolean };
 
 const ASYNC_INTERRUPT_SIGNAL: NodeJS.Signals =
 	process.platform === "win32" ? "SIGBREAK" : "SIGUSR2";
+const liveSteeringStartedAtByResult = new WeakMap<SingleResult, number>();
+const liveSteeringCompletedAtByResult = new WeakMap<SingleResult, number>();
 
 interface TaskParam {
 	agent: string;
@@ -151,6 +159,8 @@ interface TaskParam {
 	progress?: boolean;
 	model?: string;
 	skill?: string | string[] | boolean;
+	liveSteeringRole?: "worker" | "reviewer";
+	liveSteeringAgentName?: string;
 }
 
 export interface SubagentParamsLike {
@@ -168,6 +178,7 @@ export interface SubagentParamsLike {
 	chain?: ChainStep[];
 	tasks?: TaskParam[];
 	concurrency?: number;
+	liveSteeringTeam?: boolean;
 	worktree?: boolean;
 	context?: "fresh" | "fork";
 	async?: boolean;
@@ -304,7 +315,7 @@ function rememberForegroundRun(
 	state: SubagentState,
 	input: {
 		runId: string;
-		mode: "single" | "parallel" | "chain";
+		mode: SubagentRunMode;
 		cwd: string;
 		results: SingleResult[];
 	},
@@ -341,7 +352,7 @@ function resolveForegroundResumeTarget(
 ):
 	| {
 			runId: string;
-			mode: "single" | "parallel" | "chain";
+			mode: SubagentRunMode;
 			state: "complete";
 			agent: string;
 			index: number;
@@ -920,6 +931,14 @@ function validateExecutionInput(
 	hasSingle: boolean,
 	allowClarifyTaskPrompt: boolean,
 ): AgentToolResult<Details> | null {
+	if (Object.prototype.hasOwnProperty.call(params, "teamRun")) {
+		return {
+			content: [{ type: "text", text: "teamRun mode has been removed. Use single, chain, or parallel subagent execution modes." }],
+			isError: true,
+			details: { mode: "single" as const, results: [] },
+		};
+	}
+
 	if (Number(hasChain) + Number(hasTasks) + Number(hasSingle) !== 1) {
 		return {
 			content: [
@@ -1701,6 +1720,7 @@ interface ForegroundParallelRunInput {
 	liveProgress: (AgentProgress | undefined)[];
 	onUpdate?: (r: AgentToolResult<Details>) => void;
 	worktreeSetup?: WorktreeSetup;
+	liveSteeringTeamRunDir?: string;
 }
 
 function buildParallelModeError(message: string): AgentToolResult<Details> {
@@ -1709,6 +1729,48 @@ function buildParallelModeError(message: string): AgentToolResult<Details> {
 		isError: true,
 		details: { mode: "parallel" as const, results: [] },
 	};
+}
+
+function failLiveSteeringResult(result: SingleResult, reason: string): void {
+	result.exitCode = 1;
+	result.error = result.error ? `${result.error}\n${reason}` : reason;
+	if (result.progress) {
+		result.progress.status = "failed";
+		result.progress.error = result.error;
+	}
+}
+
+async function applyLiveSteeringProtocolChecks(
+	liveSteeringTeamRunDir: string | undefined,
+	tasks: TaskParam[],
+	results: SingleResult[],
+): Promise<void> {
+	if (!liveSteeringTeamRunDir) return;
+	const workerResult = results.find((result) => result.agent === "worker") ?? results[0];
+	if (!workerResult) return;
+	const workerStartedAtMs = liveSteeringStartedAtByResult.get(workerResult) ?? Date.now();
+	const workerCompletedAtMs = liveSteeringCompletedAtByResult.get(workerResult) ?? Date.now();
+
+	const reviewerNames = tasks
+		.filter((task) => task.liveSteeringRole === "reviewer")
+		.map((task, index) => task.liveSteeringAgentName ?? `reviewer-${index + 1}`);
+	const decisions = await listTeamDecisions(liveSteeringTeamRunDir);
+	const pulseFailures = findLiveSteeringReviewerPulseFailures({
+		decisions,
+		reviewerNames,
+		workerStartedAtMs,
+		workerCompletedAtMs,
+	});
+	for (const failure of pulseFailures) {
+		const taskIndex = tasks.findIndex((task) => (task.liveSteeringAgentName ?? task.agent) === failure.reviewer);
+		const reviewerResult = taskIndex >= 0 ? results[taskIndex] : undefined;
+		if (reviewerResult) failLiveSteeringResult(reviewerResult, failure.reason);
+	}
+
+	const messages = await listTeamMessages(liveSteeringTeamRunDir, "worker-0");
+	const failure = findLiveSteeringCompletionFailure(messages, workerCompletedAtMs);
+	if (!failure) return;
+	failLiveSteeringResult(workerResult, failure.reason);
 }
 
 function createParallelWorktreeSetup(
@@ -1874,6 +1936,7 @@ async function runForegroundParallelTasks(
 			const agentConfig = input.agents.find(
 				(agent) => agent.name === task.agent,
 			);
+			const liveSteeringStartedAtMs = Date.now();
 			return runSync(input.ctx.cwd, input.agents, task.agent, taskText, {
 				cwd: taskCwd,
 				signal: input.signal,
@@ -1901,6 +1964,13 @@ async function runForegroundParallelTasks(
 				onControlEvent: input.onControlEvent,
 				intercomSessionName: input.childIntercomTarget?.(task.agent, index),
 				orchestratorIntercomTarget: input.orchestratorIntercomTarget,
+				team: input.liveSteeringTeamRunDir && task.liveSteeringRole
+					? {
+							runDir: input.liveSteeringTeamRunDir,
+							agentName: task.liveSteeringAgentName ?? `${task.liveSteeringRole}-${index}`,
+							role: task.liveSteeringRole,
+						}
+					: undefined,
 				modelOverride: input.modelOverrides[index],
 				availableModels: input.availableModels,
 				preferredModelProvider: input.ctx.model?.provider,
@@ -1948,6 +2018,12 @@ async function runForegroundParallelTasks(
 							});
 						}
 					: undefined,
+			}).then((result) => {
+				if (input.liveSteeringTeamRunDir && task.liveSteeringRole === "worker") {
+					liveSteeringStartedAtByResult.set(result, liveSteeringStartedAtMs);
+					liveSteeringCompletedAtByResult.set(result, Date.now());
+				}
+				return result;
 			}).finally(() => {
 				if (input.foregroundControl?.currentIndex === index) {
 					input.foregroundControl.interrupt = undefined;
@@ -2238,6 +2314,10 @@ async function runParallelPath(
 	const liveProgress: (AgentProgress | undefined)[] = new Array(
 		tasks.length,
 	).fill(undefined);
+	const liveSteeringTeamRunDir = params.liveSteeringTeam
+		? path.join(sessionRoot, "live-steering-team")
+		: undefined;
+	if (liveSteeringTeamRunDir) fs.mkdirSync(liveSteeringTeamRunDir, { recursive: true });
 	const foregroundControl = deps.state.foregroundControls.get(runId);
 	const { setup: worktreeSetup, errorResult } = createParallelWorktreeSetup(
 		params.worktree,
@@ -2322,7 +2402,9 @@ async function runParallelPath(
 			liveProgress,
 			onUpdate,
 			worktreeSetup,
+			liveSteeringTeamRunDir,
 		});
+		await applyLiveSteeringProtocolChecks(liveSteeringTeamRunDir, tasks, results);
 		for (let i = 0; i < results.length; i++) {
 			const run = results[i]!;
 			recordRun(

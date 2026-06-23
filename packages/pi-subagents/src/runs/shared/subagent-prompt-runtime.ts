@@ -1,12 +1,17 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { recordTeamDecision } from "../../shared/team-decisions.ts";
+import { ackTeamMessage, appendTeamMessage, popUnreadTeamMessages } from "../../shared/team-mailbox.ts";
 import type { JsonSchemaObject } from "../../shared/types.ts";
 import { STRUCTURED_OUTPUT_CAPTURE_ENV, STRUCTURED_OUTPUT_SCHEMA_ENV, STRUCTURED_OUTPUT_TOOL_NAME, validateStructuredOutputValue } from "./structured-output.ts";
 
 const SUBAGENT_INHERIT_PROJECT_CONTEXT_ENV = "PI_SUBAGENT_INHERIT_PROJECT_CONTEXT";
 const SUBAGENT_INHERIT_SKILLS_ENV = "PI_SUBAGENT_INHERIT_SKILLS";
 export const SUBAGENT_INTERCOM_SESSION_NAME_ENV = "PI_SUBAGENT_INTERCOM_SESSION_NAME";
+const SUBAGENT_TEAM_RUN_DIR_ENV = "PI_SUBAGENT_TEAM_RUN_DIR";
+const SUBAGENT_TEAM_AGENT_NAME_ENV = "PI_SUBAGENT_TEAM_AGENT_NAME";
+const SUBAGENT_TEAM_ROLE_ENV = "PI_SUBAGENT_TEAM_ROLE";
 
 export const CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS = [
 	"You are a child subagent, not the parent orchestrator.",
@@ -33,6 +38,25 @@ function readBooleanEnv(name: string): boolean | undefined {
 	const value = process.env[name];
 	if (value === undefined) return undefined;
 	return value !== "0";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+function requireString(value: unknown, name: string): string {
+	if (typeof value !== "string" || !value.trim()) throw new Error(`${name} must not be empty`);
+	return value;
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function normalizeWaitMs(value: unknown): number {
+	if (value === undefined) return 0;
+	if (typeof value !== "number" || !Number.isFinite(value) || value < 0) throw new Error("waitMs must be a non-negative number");
+	return Math.min(30_000, Math.floor(value));
 }
 
 function findSectionEnd(prompt: string, startIndex: number, nextHeaders: string[]): number {
@@ -128,7 +152,151 @@ export function stripParentOnlySubagentMessages(messages: unknown[]): unknown[] 
 	return changed ? filtered : messages;
 }
 
+function registerLiveSteeringTeamTools(pi: ExtensionAPI): void {
+	const teamRunDir = process.env[SUBAGENT_TEAM_RUN_DIR_ENV]?.trim();
+	const agentName = process.env[SUBAGENT_TEAM_AGENT_NAME_ENV]?.trim();
+	const role = process.env[SUBAGENT_TEAM_ROLE_ENV]?.trim();
+	if (!teamRunDir || !agentName || !role) return;
+
+	const registerTool = pi.registerTool as unknown as (tool: {
+		name: string;
+		label: string;
+		description: string;
+		parameters: unknown;
+		execute: (_id: string, params: Record<string, unknown>) => Promise<unknown>;
+	}) => void;
+
+	registerTool({
+		name: "team_send_message",
+		label: "Team Send Message",
+		description: "Send a live steering message to another agent in this run-scoped team mailbox.",
+		parameters: {
+			type: "object",
+			properties: {
+				to: { type: "string" },
+				text: { type: "string" },
+				urgent: { type: "boolean" },
+			},
+			required: ["to", "text"],
+			additionalProperties: false,
+		},
+		async execute(_id, params) {
+			if (!isRecord(params)) throw new Error("team_send_message params must be an object");
+			const message = await appendTeamMessage(teamRunDir, {
+				from: agentName,
+				to: requireString(params.to, "to"),
+				text: requireString(params.text, "text"),
+				urgent: typeof params.urgent === "boolean" ? params.urgent : false,
+			});
+			return {
+				content: [{ type: "text", text: `Team message sent to ${message.to}: ${message.id}` }],
+				details: { message },
+			};
+		},
+	});
+
+	registerTool({
+		name: "team_read_messages",
+		label: "Team Read Messages",
+		description: "Read unread live steering messages addressed to this agent and mark them read. Optionally wait briefly for live steering before returning. Acknowledge each steering message before completing.",
+		parameters: {
+			type: "object",
+			properties: {
+				waitMs: { type: "number", description: "Optional milliseconds to wait for at least one unread message, capped at 30000." },
+			},
+			additionalProperties: false,
+		},
+		async execute(_id, params = {}) {
+			if (!isRecord(params)) throw new Error("team_read_messages params must be an object");
+			const waitMs = normalizeWaitMs(params.waitMs);
+			const deadline = Date.now() + waitMs;
+			let messages = await popUnreadTeamMessages(teamRunDir, agentName);
+			while (messages.length === 0 && Date.now() < deadline) {
+				await sleep(Math.min(250, Math.max(1, deadline - Date.now())));
+				messages = await popUnreadTeamMessages(teamRunDir, agentName);
+			}
+			const text = messages.length === 0
+				? "No unread team steering messages."
+				: messages.map((message) => `${message.id} from ${message.from}${message.urgent ? " [urgent]" : ""}: ${message.text}`).join("\n");
+			return {
+				content: [{ type: "text", text }],
+				details: { messages },
+			};
+		},
+	});
+
+	registerTool({
+		name: "team_ack_message",
+		label: "Team Acknowledge Message",
+		description: "Acknowledge a live steering message after deciding whether to accept, reject, or block on it.",
+		parameters: {
+			type: "object",
+			properties: {
+				messageId: { type: "string" },
+				action: { type: "string", enum: ["accepted", "rejected", "blocked"] },
+				reason: { type: "string" },
+			},
+			required: ["messageId", "action", "reason"],
+			additionalProperties: false,
+		},
+		async execute(_id, params) {
+			if (!isRecord(params)) throw new Error("team_ack_message params must be an object");
+			const action = params.action;
+			if (action !== "accepted" && action !== "rejected" && action !== "blocked") {
+				throw new Error("action must be accepted, rejected, or blocked");
+			}
+			const message = await ackTeamMessage(teamRunDir, agentName, requireString(params.messageId, "messageId"), {
+				by: agentName,
+				action,
+				reason: requireString(params.reason, "reason"),
+			});
+			return {
+				content: [{ type: "text", text: `Team message acknowledged: ${message.id} (${message.ackAction})` }],
+				details: { message },
+			};
+		},
+	});
+
+	if (role === "reviewer") {
+		registerTool({
+			name: "team_decide",
+			label: "Team Decide",
+			description: "Record an active live-steering pulse: choose nothing, steer, or discuss while the worker is running. steer/discuss also sends a team message.",
+			parameters: {
+				type: "object",
+				properties: {
+					action: { type: "string", enum: ["nothing", "steer", "discuss"] },
+					reason: { type: "string" },
+					to: { type: "string" },
+					message: { type: "string" },
+					urgent: { type: "boolean" },
+				},
+				required: ["action", "reason"],
+				additionalProperties: false,
+			},
+			async execute(_id, params) {
+				if (!isRecord(params)) throw new Error("team_decide params must be an object");
+				const action = params.action;
+				if (action !== "nothing" && action !== "steer" && action !== "discuss") throw new Error("action must be nothing, steer, or discuss");
+				const decision = await recordTeamDecision(teamRunDir, {
+					from: agentName,
+					action,
+					reason: requireString(params.reason, "reason"),
+					to: typeof params.to === "string" ? params.to : undefined,
+					message: typeof params.message === "string" ? params.message : undefined,
+					urgent: typeof params.urgent === "boolean" ? params.urgent : false,
+				});
+				return {
+					content: [{ type: "text", text: `Team decision recorded: ${decision.action}${decision.messageId ? ` (${decision.messageId})` : ""}` }],
+					details: { decision },
+				};
+			},
+		});
+	}
+}
+
 export default function registerSubagentPromptRuntime(pi: ExtensionAPI): void {
+	registerLiveSteeringTeamTools(pi);
 	const structuredOutputPath = process.env[STRUCTURED_OUTPUT_CAPTURE_ENV];
 	const structuredSchemaPath = process.env[STRUCTURED_OUTPUT_SCHEMA_ENV];
 	if (structuredOutputPath && structuredSchemaPath) {

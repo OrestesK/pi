@@ -14,7 +14,7 @@ export interface ParallelWriterGuardAgent {
 }
 
 export interface ParallelWriterGuardChainStep {
-	parallel?: ParallelWriterGuardTask[];
+	parallel?: unknown;
 	worktree?: boolean;
 	cwd?: string;
 }
@@ -41,9 +41,8 @@ const KNOWN_ADVISORY_TOOLS = new Set([
 	"fetch_content",
 	"get_search_content",
 ]);
-
 function isPiIntercomExtensionPath(value: string): boolean {
-	const normalized = value.trim().replaceAll("\\", "/").toLowerCase();
+	const normalized = value.trim().replace(/\\/g, "/").toLowerCase();
 	return normalized === "pi-intercom"
 		|| normalized.endsWith("/pi-intercom")
 		|| normalized.includes("/pi-intercom/");
@@ -115,9 +114,10 @@ export function findSharedCwdChainParallelWriterError(input: {
 	for (let stepIndex = 0; stepIndex < input.chain.length; stepIndex++) {
 		const step = input.chain[stepIndex]!;
 		if (!Array.isArray(step.parallel)) continue;
+		const parallelTasks = step.parallel as ParallelWriterGuardTask[];
 		const stepCwd = resolveGuardTaskCwd(input.baseCwd, step.cwd);
 		const error = findSharedCwdParallelWriterError({
-			tasks: step.parallel,
+			tasks: parallelTasks,
 			agents: input.agents,
 			baseCwd: stepCwd,
 			worktree: step.worktree,

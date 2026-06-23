@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { AgentToolResult } from "@mariozechner/pi-agent-core";
+import type { AgentToolResult as CoreAgentToolResult } from "@mariozechner/pi-agent-core";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import {
 	type AgentConfig,
@@ -11,6 +11,7 @@ import {
 	defaultInheritProjectContext,
 	defaultInheritSkills,
 	defaultSystemPromptMode,
+	discoverAgents,
 	discoverAgentsAll,
 	buildRuntimeName,
 	frontmatterNameForConfig,
@@ -23,6 +24,7 @@ import type { Details } from "../shared/types.ts";
 
 type ManagementAction = "list" | "get" | "create" | "update" | "delete";
 type ManagementScope = "user" | "project";
+type AgentToolResult<T> = CoreAgentToolResult<T> & { isError?: boolean };
 type ManagementContext = Pick<ExtensionContext, "cwd" | "modelRegistry">;
 
 interface ManagementParams {
@@ -84,8 +86,8 @@ function allAgents(d: { builtin: AgentConfig[]; user: AgentConfig[]; project: Ag
 
 function availableNames(cwd: string, kind: "agent" | "chain"): string[] {
 	const d = discoverAgentsAll(cwd);
-	const items = kind === "agent" ? allAgents(d) : d.chains;
-	return [...new Set(items.map((x) => x.name))].sort((a, b) => a.localeCompare(b));
+	const names = kind === "agent" ? allAgents(d).map((agent) => agent.name) : d.chains.map((chain) => chain.name);
+	return [...new Set(names)].sort((a, b) => a.localeCompare(b));
 }
 
 function findAgents(name: string, cwd: string, scope: AgentScope = "both"): AgentConfig[] {
@@ -394,20 +396,57 @@ function formatChainDetail(chain: ChainConfig): string {
 	return lines.join("\n");
 }
 
+const AGENT_LIST_GUIDANCE: Record<string, string> = {
+	"context-builder": "Use to assemble requirements + codebase context for planning or handoff.",
+	delegate: "Use for small advisory/no-edit tasks when no specialized role is needed.",
+	oracle: "Use to challenge direction, assumptions, and drift using inherited parent context.",
+	planner: "Use after context is gathered to turn requirements into an implementation plan.",
+	researcher: "Use for external evidence: docs, APIs, ecosystem behavior, or comparisons.",
+	reviewer: "Use for read-only review of code, diffs, plans, proposals, PRs, or readiness.",
+	scout: "Use for fast read-only codebase recon: files, symbols, risks, and likely change points.",
+	worker: "Use for straightforward, bounded, approved implementation. For approved complex/risky work needing mid-course review, use builtin.live-steering-team.",
+};
+
+function formatListAgent(agent: AgentConfig): string {
+	const context = agent.defaultContext ? ` (${agent.defaultContext})` : "";
+	const guidance = AGENT_LIST_GUIDANCE[agent.name] ?? `Use when this custom agent fits: ${agent.description}`;
+	return `- ${agent.name}${context} — ${guidance}`;
+}
+
 export function handleList(params: ManagementParams, ctx: ManagementContext): AgentToolResult<Details> {
 	const scope = normalizeListScope(params.agentScope) ?? "both";
 	const d = discoverAgentsAll(ctx.cwd);
-	const scopedAgents = allAgents(d).filter((a) => scope === "both" || a.source === "builtin" || a.source === scope).sort((a, b) => a.name.localeCompare(b.name));
-	const agents = scopedAgents.filter((a) => !a.disabled);
+	const agents = discoverAgents(ctx.cwd, scope).agents.sort((a, b) => a.name.localeCompare(b.name));
 	const chains = d.chains.filter((c) => scope === "both" || c.source === scope).sort((a, b) => a.name.localeCompare(b.name));
 	const lines = [
-		"Executable agents:",
-		...(agents.length
-			? agents.map((a) => `- ${a.name} (${a.source}${a.defaultContext ? `, context: ${a.defaultContext}` : ""}): ${a.description}`)
-			: ["- (none)"]),
+		"Agents (effective; default context: fresh):",
+		...(agents.length ? agents.map(formatListAgent) : ["- (none)"]),
 		"",
-		"Chains:",
-		...(chains.length ? chains.map((c) => `- ${c.name} (${c.source}): ${c.description}`) : ["- (none)"]),
+		"Context:",
+		"- fresh = independent child session; it gets the task plus normal project instructions/config/tools, not the parent conversation history.",
+		"- fork = inherits the parent conversation context; shown only when an agent defaults to it.",
+		"",
+		"Builtin workflows (foreground/fresh):",
+		"- builtin.quality-gate — Reviewer fan-out for PASS/FAIL/INCONCLUSIVE readiness before claiming done/ready.",
+		"- builtin.research-decision — Researcher + local scout + reviewer for evidence-backed recommendations and tradeoffs.",
+		"- builtin.generate-filter — Generate options in parallel, then reduce/filter to the strongest choices.",
+		"- builtin.live-steering-team — Approved complex implementation: one worker with live reviewer steering during execution. Prefer when early review is likely to change the approach or prevent rework.",
+		"",
+		"Route selection:",
+		"- Recon/planning: scout or context-builder -> planner.",
+		"- Straightforward approved implementation: worker, then reviewer/quality-gate before claiming done.",
+		"- Approved complex/risky implementation needing mid-course feedback: builtin.live-steering-team.",
+		"- Decisions/options: builtin.research-decision or builtin.generate-filter.",
+		"",
+		"Execution:",
+		"- SINGLE: { agent, task? }",
+		"- CHAIN: { chain: [...] }",
+		"- PARALLEL: { tasks: [...] }",
+		"- WORKFLOW: { workflow: \"builtin.<name>\", task }",
+		"- Details/provenance/tools: { action: \"get\", agent: \"name\" } or { action: \"get\", chainName: \"name\" }.",
+		"",
+		"Saved chains (.chain.md):",
+		...(chains.length ? chains.map((c) => `- ${c.name}: ${c.description}`) : ["- (none found in ~/.pi/agent/chains or .pi/chains; builtin workflows are listed above)"]),
 	];
 	return result(lines.join("\n"));
 }
@@ -549,7 +588,7 @@ export function handleUpdate(params: ManagementParams, ctx: ManagementContext): 
 			if (sw) warnings.push(sw);
 		}
 		if (updated.name !== oldName) {
-			const renamed = renamePath("agent", target.filePath, updated.name, target.source, ctx.cwd);
+			const renamed = renamePath("agent", target.filePath, updated.name, target.source as ManagementScope, ctx.cwd);
 			if (renamed.error) return result(renamed.error, true);
 			updated.filePath = renamed.filePath!;
 		}
@@ -599,7 +638,7 @@ export function handleUpdate(params: ManagementParams, ctx: ManagementContext): 
 		warnings.push(...chainStepWarnings(ctx, updated.steps));
 	}
 	if (updated.name !== oldName) {
-		const renamed = renamePath("chain", target.filePath, updated.name, target.source, ctx.cwd);
+		const renamed = renamePath("chain", target.filePath, updated.name, target.source as ManagementScope, ctx.cwd);
 		if (renamed.error) return result(renamed.error, true);
 		updated.filePath = renamed.filePath!;
 	}

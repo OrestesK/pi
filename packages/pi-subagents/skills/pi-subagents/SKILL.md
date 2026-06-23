@@ -137,6 +137,7 @@ Use the small catalog below as grammar, not as a large menu of rigid names. Do n
 | `quality-gate` | review swarm -> parent `PASS`/`FAIL`/`INCONCLUSIVE` | Before claiming ready/good enough |
 | `generate-filter` | parallel generators -> reviewer/filter -> parent shortlist | Ideas, options, tests, names, pruning, recommendations |
 | `research-decision` | researcher + local scout/context -> tradeoff critic -> recommendation | External/local evidence plus decision |
+| `live-steering-team` | one worker + two live reviewers using active `team_decide` pulses and run-scoped mailbox tools | Work where reviewers must actively steer a running worker |
 | `adversarial-debate` | positions -> attacks -> optional repair -> synthesis | Architecture, workflow, or taste-heavy decisions |
 | `context-build-synthesis` | context slices -> synthesis/meta-prompt | Planning large work or unfamiliar areas |
 | `handoff-plan` | external/local/strategy passes -> final handoff | Preparing worker-ready implementation briefs |
@@ -1009,6 +1010,7 @@ When the user approves launching a subagent to carry out a plan or workflow, tre
 - `/adversarial-debate` maps to: generate competing positions, attack the concrete proposals in a fan-in step, optionally repair the best candidate, then synthesize disagreement by rubric in the parent.
 - `/parallel-research` maps to: combine local `scout` context with external `researcher` evidence when current docs, ecosystem behavior, or API details matter.
 - `/research-decision` maps to: combine external evidence, local context, and adversarial tradeoff critique into a recommendation with confidence, risks, and user-decision points.
+- `workflow: "builtin.live-steering-team"` maps to: run one worker with two live reviewers that repeatedly call `team_decide` with `nothing`, `steer`, or `discuss`; `steer`/`discuss` send run-scoped mailbox messages, and the worker reads and acknowledges live steering while working.
 - `/generate-filter` maps to: spawn diverse option generators in a fan-out step, run a mandatory reviewer/filter fan-in pass over their concrete options, dedupe/filter by rubric, and return the strongest choices with tradeoffs.
 - `/parallel-context-build` maps to: run a chain-mode parallel group of `context-builder` agents with distinct temp output paths, then synthesize their context and meta-prompt sections.
 - `/parallel-handoff-plan` maps to: run external `researcher` plus local/strategy `context-builder` passes, then a synthesis `context-builder` that writes an implementation handoff plan and implementation-ready meta-prompt.

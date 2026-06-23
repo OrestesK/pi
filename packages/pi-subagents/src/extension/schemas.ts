@@ -282,10 +282,11 @@ const ControlOverrides = Type.Object({
 export const SubagentParams = Type.Object({
 	workflow: Type.Optional(
 		Type.String({
-			enum: [
+				enum: [
 				"builtin.quality-gate",
 				"builtin.research-decision",
 				"builtin.generate-filter",
+				"builtin.live-steering-team",
 			],
 			description:
 				"Named builtin workflow to expand into existing execution primitives. Requires task. Mutually exclusive with agent, tasks, chain, action, config, and chainName. Builtin workflows run foreground/fresh by default so the parent can synthesize the result before proceeding.",

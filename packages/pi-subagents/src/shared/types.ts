@@ -637,6 +637,11 @@ export interface RunSyncOptions {
 	controlConfig?: ResolvedControlConfig;
 	intercomSessionName?: string;
 	orchestratorIntercomTarget?: string;
+	team?: {
+		runDir: string;
+		agentName: string;
+		role: "worker" | "reviewer";
+	};
 	maxOutput?: MaxOutputConfig;
 	artifactsDir?: string;
 	artifactConfig?: ArtifactConfig;
