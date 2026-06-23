@@ -26,6 +26,11 @@ import { buildDoctorReport } from "../../extension/doctor.ts";
 import { clearPendingForegroundControlNotices } from "../../extension/control-notices.ts";
 import { runSync } from "./execution.ts";
 import { resolveModelCandidate } from "../shared/model-fallback.ts";
+import {
+	buildParallelStragglerNotice,
+	formatParallelStragglerNotice,
+	type ParallelStragglerTaskSnapshot,
+} from "../shared/parallel-straggler.ts";
 import { aggregateParallelOutputs } from "../shared/parallel-utils.ts";
 import { recordRun } from "../shared/run-history.ts";
 import {
@@ -131,6 +136,7 @@ import {
 	SUBAGENT_ACTIONS,
 	SUBAGENT_CONTROL_EVENT,
 	SUBAGENT_CONTROL_INTERCOM_EVENT,
+	SUBAGENT_ORCHESTRATOR_NOTICE_EVENT,
 	checkSubagentDepth,
 	resolveTopLevelParallelConcurrency,
 	resolveTopLevelParallelMaxTasks,
@@ -1707,6 +1713,7 @@ interface ForegroundParallelRunInput {
 	firstProgressIndex: number;
 	controlConfig: ResolvedControlConfig;
 	onControlEvent?: (event: ControlEvent) => void;
+	onOrchestratorNotice?: (notice: { key: string; runId: string; source: "foreground"; noticeText: string }) => void;
 	childIntercomTarget?: (agent: string, index: number) => string | undefined;
 	orchestratorIntercomTarget?: string;
 	foregroundControl?: SubagentState["foregroundControls"] extends Map<
@@ -1884,154 +1891,217 @@ function findDuplicateParallelOutputPath(input: {
 async function runForegroundParallelTasks(
 	input: ForegroundParallelRunInput,
 ): Promise<SingleResult[]> {
-	return mapConcurrent(
-		input.tasks,
-		input.concurrencyLimit,
-		async (task, index) => {
-			const behavior = input.behaviors[index];
-			const effectiveSkills = behavior?.skills;
-			const taskCwd = resolveParallelTaskCwd(
-				task,
-				input.paramsCwd,
-				input.worktreeSetup,
-				index,
-			);
-			const readInstructions = behavior
-				? buildChainInstructions(
-						{ ...behavior, output: false, progress: false },
-						taskCwd,
-						false,
-					)
-				: { prefix: "", suffix: "" };
-			const progressInstructions = behavior
-				? buildChainInstructions(
-						{ ...behavior, output: false, reads: false },
-						input.paramsCwd,
-						index === input.firstProgressIndex,
-					)
-				: { prefix: "", suffix: "" };
-			const outputPath = resolveSingleOutputPath(
-				behavior?.output,
-				input.ctx.cwd,
-				taskCwd,
-			);
-			const taskText = injectSingleOutputInstruction(
-				`${readInstructions.prefix}${input.taskTexts[index]!}${progressInstructions.suffix}`,
-				outputPath,
-			);
-			const interruptController = new AbortController();
-			if (input.foregroundControl) {
-				input.foregroundControl.currentAgent = task.agent;
-				input.foregroundControl.currentIndex = index;
-				input.foregroundControl.currentActivityState = undefined;
-				input.foregroundControl.updatedAt = Date.now();
-				input.foregroundControl.interrupt = () => {
-					if (interruptController.signal.aborted) return false;
-					interruptController.abort();
-					input.foregroundControl!.currentActivityState = undefined;
-					input.foregroundControl!.updatedAt = Date.now();
-					return true;
+	const taskSnapshots: ParallelStragglerTaskSnapshot[] = input.tasks.map((task, index) => ({
+		index,
+		agent: task.agent,
+		status: "pending",
+	}));
+	const emittedNoticeKeys = new Set<string>();
+	const maybeEmitStragglerNotice = () => {
+		if (!input.onOrchestratorNotice) return;
+		const notice = buildParallelStragglerNotice({
+			runId: input.runId,
+			mode: "parallel",
+			barrierLabel: "top-level parallel",
+			tasks: taskSnapshots,
+		});
+		if (!notice || emittedNoticeKeys.has(notice.key)) return;
+		emittedNoticeKeys.add(notice.key);
+		input.onOrchestratorNotice({
+			key: notice.key,
+			runId: input.runId,
+			source: "foreground",
+			noticeText: formatParallelStragglerNotice(notice),
+		});
+	};
+	const noticeTimer = input.onOrchestratorNotice
+		? setInterval(maybeEmitStragglerNotice, 2_000)
+		: undefined;
+	noticeTimer?.unref?.();
+	try {
+		return await mapConcurrent(
+			input.tasks,
+			input.concurrencyLimit,
+			async (task, index) => {
+				taskSnapshots[index] = {
+					...taskSnapshots[index]!,
+					status: "running",
+					startedAt: Date.now(),
 				};
-			}
-			const agentConfig = input.agents.find(
-				(agent) => agent.name === task.agent,
-			);
-			const liveSteeringStartedAtMs = Date.now();
-			return runSync(input.ctx.cwd, input.agents, task.agent, taskText, {
-				cwd: taskCwd,
-				signal: input.signal,
-				interruptSignal: interruptController.signal,
-				allowIntercomDetach:
-					agentConfig?.systemPrompt?.includes(INTERCOM_BRIDGE_MARKER) === true,
-				intercomEvents: input.intercomEvents,
-				runId: input.runId,
-				index,
-				sessionDir: input.sessionDirForIndex(index),
-				sessionFile: input.sessionFileForIndex(index),
-				share: input.shareEnabled,
-				artifactsDir: input.artifactConfig.enabled
-					? input.artifactsDir
-					: undefined,
-				artifactConfig: input.artifactConfig,
-				maxOutput: input.maxOutput,
-				outputPath,
-				outputMode: behavior?.outputMode,
-				...(behavior?.outputSchema ? { outputSchema: behavior.outputSchema } : {}),
-				...(behavior?.acceptance ? { acceptance: behavior.acceptance } : {}),
-				acceptanceContext: { mode: "parallel" },
-				maxSubagentDepth: input.maxSubagentDepths[index],
-				controlConfig: input.controlConfig,
-				onControlEvent: input.onControlEvent,
-				intercomSessionName: input.childIntercomTarget?.(task.agent, index),
-				orchestratorIntercomTarget: input.orchestratorIntercomTarget,
-				team: input.liveSteeringTeamRunDir && task.liveSteeringRole
-					? {
-							runDir: input.liveSteeringTeamRunDir,
-							agentName: task.liveSteeringAgentName ?? `${task.liveSteeringRole}-${index}`,
-							role: task.liveSteeringRole,
-						}
-					: undefined,
-				modelOverride: input.modelOverrides[index],
-				availableModels: input.availableModels,
-				preferredModelProvider: input.ctx.model?.provider,
-				skills: effectiveSkills === false ? [] : effectiveSkills,
-				onUpdate: input.onUpdate
-					? (progressUpdate) => {
-							const stepResults = progressUpdate.details?.results || [];
-							const stepProgress = progressUpdate.details?.progress || [];
-							if (input.foregroundControl && stepProgress.length > 0) {
-								const current = stepProgress[0];
-								input.foregroundControl.currentAgent = task.agent;
-								input.foregroundControl.currentIndex = index;
-								input.foregroundControl.currentActivityState =
-									current?.activityState;
-								input.foregroundControl.lastActivityAt =
-									current?.lastActivityAt;
-								input.foregroundControl.currentTool = current?.currentTool;
-								input.foregroundControl.currentToolStartedAt =
-									current?.currentToolStartedAt;
-								input.foregroundControl.currentPath = current?.currentPath;
-								input.foregroundControl.turnCount = current?.turnCount;
-								input.foregroundControl.tokens = current?.tokens;
-								input.foregroundControl.toolCount = current?.toolCount;
-								input.foregroundControl.updatedAt = Date.now();
-							}
-							if (stepResults.length > 0)
-								input.liveResults[index] = stepResults[0];
-							if (stepProgress.length > 0)
-								input.liveProgress[index] = stepProgress[0];
-							const mergedResults = input.liveResults.filter(
-								(result): result is SingleResult => result !== undefined,
-							);
-							const mergedProgress = input.liveProgress.filter(
-								(progress): progress is AgentProgress => progress !== undefined,
-							);
-							input.onUpdate?.({
-								content: progressUpdate.content,
-								details: {
-									mode: "parallel",
-									results: mergedResults,
-									progress: mergedProgress,
-									controlEvents: progressUpdate.details?.controlEvents,
-									totalSteps: input.tasks.length,
-								},
-							});
-						}
-					: undefined,
-			}).then((result) => {
-				if (input.liveSteeringTeamRunDir && task.liveSteeringRole === "worker") {
-					liveSteeringStartedAtByResult.set(result, liveSteeringStartedAtMs);
-					liveSteeringCompletedAtByResult.set(result, Date.now());
-				}
-				return result;
-			}).finally(() => {
-				if (input.foregroundControl?.currentIndex === index) {
-					input.foregroundControl.interrupt = undefined;
+				maybeEmitStragglerNotice();
+				const behavior = input.behaviors[index];
+				const effectiveSkills = behavior?.skills;
+				const taskCwd = resolveParallelTaskCwd(
+					task,
+					input.paramsCwd,
+					input.worktreeSetup,
+					index,
+				);
+				const readInstructions = behavior
+					? buildChainInstructions(
+							{ ...behavior, output: false, progress: false },
+							taskCwd,
+							false,
+						)
+					: { prefix: "", suffix: "" };
+				const progressInstructions = behavior
+					? buildChainInstructions(
+							{ ...behavior, output: false, reads: false },
+							input.paramsCwd,
+							index === input.firstProgressIndex,
+						)
+					: { prefix: "", suffix: "" };
+				const outputPath = resolveSingleOutputPath(
+					behavior?.output,
+					input.ctx.cwd,
+					taskCwd,
+				);
+				const taskText = injectSingleOutputInstruction(
+					`${readInstructions.prefix}${input.taskTexts[index]!}${progressInstructions.suffix}`,
+					outputPath,
+				);
+				const interruptController = new AbortController();
+				if (input.foregroundControl) {
+					input.foregroundControl.currentAgent = task.agent;
+					input.foregroundControl.currentIndex = index;
+					input.foregroundControl.currentActivityState = undefined;
 					input.foregroundControl.updatedAt = Date.now();
+					input.foregroundControl.interrupt = () => {
+						if (interruptController.signal.aborted) return false;
+						interruptController.abort();
+						input.foregroundControl!.currentActivityState = undefined;
+						input.foregroundControl!.updatedAt = Date.now();
+						return true;
+					};
 				}
-			});
-		},
-	);
+				const agentConfig = input.agents.find(
+					(agent) => agent.name === task.agent,
+				);
+				const liveSteeringStartedAtMs = Date.now();
+				return runSync(input.ctx.cwd, input.agents, task.agent, taskText, {
+					cwd: taskCwd,
+					signal: input.signal,
+					interruptSignal: interruptController.signal,
+					allowIntercomDetach:
+						agentConfig?.systemPrompt?.includes(INTERCOM_BRIDGE_MARKER) === true,
+					intercomEvents: input.intercomEvents,
+					runId: input.runId,
+					index,
+					sessionDir: input.sessionDirForIndex(index),
+					sessionFile: input.sessionFileForIndex(index),
+					share: input.shareEnabled,
+					artifactsDir: input.artifactConfig.enabled
+						? input.artifactsDir
+						: undefined,
+					artifactConfig: input.artifactConfig,
+					maxOutput: input.maxOutput,
+					outputPath,
+					outputMode: behavior?.outputMode,
+					...(behavior?.outputSchema ? { outputSchema: behavior.outputSchema } : {}),
+					...(behavior?.acceptance ? { acceptance: behavior.acceptance } : {}),
+					acceptanceContext: { mode: "parallel" },
+					maxSubagentDepth: input.maxSubagentDepths[index],
+					controlConfig: input.controlConfig,
+					onControlEvent: input.onControlEvent,
+					intercomSessionName: input.childIntercomTarget?.(task.agent, index),
+					orchestratorIntercomTarget: input.orchestratorIntercomTarget,
+					team: input.liveSteeringTeamRunDir && task.liveSteeringRole
+						? {
+								runDir: input.liveSteeringTeamRunDir,
+								agentName: task.liveSteeringAgentName ?? `${task.liveSteeringRole}-${index}`,
+								role: task.liveSteeringRole,
+							}
+						: undefined,
+					modelOverride: input.modelOverrides[index],
+					availableModels: input.availableModels,
+					preferredModelProvider: input.ctx.model?.provider,
+					skills: effectiveSkills === false ? [] : effectiveSkills,
+					onUpdate: input.onUpdate
+						? (progressUpdate) => {
+								const stepResults = progressUpdate.details?.results || [];
+								const stepProgress = progressUpdate.details?.progress || [];
+								if (stepProgress.length > 0) {
+									const current = stepProgress[0];
+									taskSnapshots[index] = {
+										...taskSnapshots[index]!,
+										lastActivityAt: current?.lastActivityAt,
+										currentTool: current?.currentTool,
+										toolCount: current?.toolCount,
+										tokens: current?.tokens,
+									};
+								}
+								if (input.foregroundControl && stepProgress.length > 0) {
+									const current = stepProgress[0];
+									input.foregroundControl.currentAgent = task.agent;
+									input.foregroundControl.currentIndex = index;
+									input.foregroundControl.currentActivityState =
+										current?.activityState;
+									input.foregroundControl.lastActivityAt =
+										current?.lastActivityAt;
+									input.foregroundControl.currentTool = current?.currentTool;
+									input.foregroundControl.currentToolStartedAt =
+										current?.currentToolStartedAt;
+									input.foregroundControl.currentPath = current?.currentPath;
+									input.foregroundControl.turnCount = current?.turnCount;
+									input.foregroundControl.tokens = current?.tokens;
+									input.foregroundControl.toolCount = current?.toolCount;
+									input.foregroundControl.updatedAt = Date.now();
+								}
+								if (stepResults.length > 0)
+									input.liveResults[index] = stepResults[0];
+								if (stepProgress.length > 0)
+									input.liveProgress[index] = stepProgress[0];
+								maybeEmitStragglerNotice();
+								const mergedResults = input.liveResults.filter(
+									(result): result is SingleResult => result !== undefined,
+								);
+								const mergedProgress = input.liveProgress.filter(
+									(progress): progress is AgentProgress => progress !== undefined,
+								);
+								input.onUpdate?.({
+									content: progressUpdate.content,
+									details: {
+										mode: "parallel",
+										results: mergedResults,
+										progress: mergedProgress,
+										controlEvents: progressUpdate.details?.controlEvents,
+										totalSteps: input.tasks.length,
+									},
+								});
+							}
+						: undefined,
+				}).then((result) => {
+					const completedAt = Date.now();
+					const startedAt = taskSnapshots[index]?.startedAt ?? completedAt;
+					taskSnapshots[index] = {
+						...taskSnapshots[index]!,
+						status: result.interrupted
+							? "interrupted"
+							: result.detached
+								? "detached"
+								: result.exitCode === 0
+									? "completed"
+									: "failed",
+						endedAt: completedAt,
+						durationMs: result.progressSummary?.durationMs ?? Math.max(0, completedAt - startedAt),
+					};
+					maybeEmitStragglerNotice();
+					if (input.liveSteeringTeamRunDir && task.liveSteeringRole === "worker") {
+						liveSteeringStartedAtByResult.set(result, liveSteeringStartedAtMs);
+						liveSteeringCompletedAtByResult.set(result, Date.now());
+					}
+					return result;
+				}).finally(() => {
+					if (input.foregroundControl?.currentIndex === index) {
+						input.foregroundControl.interrupt = undefined;
+						input.foregroundControl.updatedAt = Date.now();
+					}
+				});
+			},
+		);
+	} finally {
+		if (noticeTimer) clearInterval(noticeTimer);
+	}
 }
 
 async function runParallelPath(
@@ -2389,6 +2459,7 @@ async function runParallelPath(
 			firstProgressIndex: parallelProgressPrecreated ? -1 : firstProgressIndex,
 			controlConfig,
 			onControlEvent,
+			onOrchestratorNotice: (notice) => deps.pi.events.emit(SUBAGENT_ORCHESTRATOR_NOTICE_EVENT, notice),
 			childIntercomTarget: childIntercomTarget
 				? (agent, index) => childIntercomTarget(runId, agent, index)
 				: undefined,

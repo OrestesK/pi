@@ -81,14 +81,17 @@ import {
 	SUBAGENT_ASYNC_COMPLETE_EVENT,
 	SUBAGENT_ASYNC_STARTED_EVENT,
 	SUBAGENT_CONTROL_EVENT,
+	SUBAGENT_ORCHESTRATOR_NOTICE_EVENT,
 	WIDGET_KEY,
 } from "../shared/types.ts";
 import {
 	clearPendingForegroundControlNotices,
 	formatSubagentControlNotice,
 	handleSubagentControlNotice,
+	handleSubagentOrchestratorNotice,
 	SUBAGENT_CONTROL_MESSAGE_TYPE,
 	type SubagentControlMessageDetails,
+	type SubagentOrchestratorNoticeDetails,
 } from "./control-notices.ts";
 
 /**
@@ -635,10 +638,18 @@ DIAGNOSTICS:
 			details: payload as SubagentControlMessageDetails,
 		});
 	};
+	const orchestratorNoticeHandler = (payload: unknown) => {
+		handleSubagentOrchestratorNotice({
+			pi,
+			visibleControlNotices,
+			details: payload as SubagentOrchestratorNoticeDetails,
+		});
+	};
 	const eventUnsubscribes = [
 		pi.events.on(SUBAGENT_ASYNC_STARTED_EVENT, handleStarted),
 		pi.events.on(SUBAGENT_ASYNC_COMPLETE_EVENT, handleComplete),
 		pi.events.on(SUBAGENT_CONTROL_EVENT, controlEventHandler),
+		pi.events.on(SUBAGENT_ORCHESTRATOR_NOTICE_EVENT, orchestratorNoticeHandler),
 	];
 	globalStore[eventUnsubscribeStoreKey] = eventUnsubscribes;
 

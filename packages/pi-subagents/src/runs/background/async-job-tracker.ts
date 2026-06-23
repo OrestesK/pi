@@ -6,15 +6,21 @@ import { formatControlNoticeMessage } from "../shared/subagent-control.ts";
 import {
 	type AsyncJobState,
 	type AsyncStartedEvent,
+	type AsyncStatus,
 	type ControlEvent,
 	type SubagentState,
 	POLL_INTERVAL_MS,
 	RESULTS_DIR,
 	SUBAGENT_CONTROL_EVENT,
 	SUBAGENT_CONTROL_INTERCOM_EVENT,
+	SUBAGENT_ORCHESTRATOR_NOTICE_EVENT,
 } from "../../shared/types.ts";
 import { readStatus } from "../../shared/utils.ts";
 import { normalizeParallelGroups } from "./parallel-groups.ts";
+import {
+	buildParallelStragglerNotice,
+	formatParallelStragglerNotice,
+} from "../shared/parallel-straggler.ts";
 import { reconcileAsyncRun } from "./stale-run-reconciler.ts";
 
 interface AsyncJobTrackerOptions {
@@ -23,6 +29,53 @@ interface AsyncJobTrackerOptions {
 	resultsDir?: string;
 	kill?: (pid: number, signal?: NodeJS.Signals | 0) => boolean;
 	now?: () => number;
+}
+
+export function maybeEmitAsyncStragglerNotice(
+	pi: Pick<ExtensionAPI, "events">,
+	job: AsyncJobState,
+	status: AsyncStatus,
+): void {
+	if (status.state !== "running" || !status.steps?.length) return;
+	const groups = normalizeParallelGroups(status.parallelGroups, status.steps.length, status.chainStepCount ?? status.steps.length);
+	if (!groups.length) return;
+	const activeGroup = status.currentStep !== undefined
+		? groups.find((group) => status.currentStep! >= group.start && status.currentStep! < group.start + group.count)
+		: status.mode === "parallel"
+			? groups[0]
+			: undefined;
+	if (!activeGroup) return;
+	const barrierLabel = status.mode === "parallel"
+		? "top-level parallel"
+		: `step ${activeGroup.stepIndex + 1}/${status.chainStepCount ?? status.steps.length}: parallel group`;
+	const tasks = status.steps
+		.slice(activeGroup.start, activeGroup.start + activeGroup.count)
+		.map((step, offset) => ({
+			index: offset,
+			agent: step.agent,
+			status: step.status === "complete" ? "completed" as const : step.status,
+			startedAt: step.startedAt,
+			endedAt: step.endedAt,
+			durationMs: step.durationMs,
+			lastActivityAt: step.lastActivityAt,
+			currentTool: step.currentTool,
+			toolCount: step.toolCount,
+			tokens: step.tokens?.total,
+		}));
+	const notice = buildParallelStragglerNotice({
+		runId: status.runId || job.asyncId,
+		mode: status.mode === "parallel" ? "parallel" : "chain",
+		barrierLabel,
+		tasks,
+	});
+	if (!notice) return;
+	pi.events.emit(SUBAGENT_ORCHESTRATOR_NOTICE_EVENT, {
+		key: notice.key,
+		runId: notice.runId,
+		source: "async",
+		asyncDir: job.asyncDir,
+		noticeText: formatParallelStragglerNotice(notice),
+	});
 }
 
 export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: SubagentState, asyncDirRoot: string, options: AsyncJobTrackerOptions = {}): {
@@ -139,6 +192,7 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 					});
 					const status = reconciliation.status ?? readStatus(job.asyncDir);
 					if (status) {
+						maybeEmitAsyncStragglerNotice(pi, job, status);
 						const previousStatus = job.status;
 						job.status = status.state;
 						job.sessionId = status.sessionId ?? job.sessionId;

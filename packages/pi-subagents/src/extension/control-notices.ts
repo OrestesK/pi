@@ -12,6 +12,14 @@ export interface SubagentControlMessageDetails {
 	noticeText?: string;
 }
 
+export interface SubagentOrchestratorNoticeDetails {
+	key: string;
+	runId: string;
+	source?: "foreground" | "async";
+	asyncDir?: string;
+	noticeText: string;
+}
+
 export function controlNoticeTarget(details: SubagentControlMessageDetails): string | undefined {
 	return details.childIntercomTarget;
 }
@@ -89,4 +97,24 @@ export function handleSubagentControlNotice(input: {
 	}, input.foregroundDelayMs ?? 1000);
 	timer.unref?.();
 	pending.set(timerKey, timer);
+}
+
+export function handleSubagentOrchestratorNotice(input: {
+	pi: Pick<ExtensionAPI, "sendMessage">;
+	visibleControlNotices: Set<string>;
+	details: SubagentOrchestratorNoticeDetails;
+}): void {
+	if (!input.details?.key || !input.details.noticeText) return;
+	const key = `orchestrator:${input.details.key}`;
+	if (input.visibleControlNotices.has(key)) return;
+	input.visibleControlNotices.add(key);
+	input.pi.sendMessage(
+		{
+			customType: SUBAGENT_CONTROL_MESSAGE_TYPE,
+			content: input.details.noticeText,
+			display: true,
+			details: input.details,
+		},
+		{ triggerTurn: input.details.source !== "foreground" },
+	);
 }
