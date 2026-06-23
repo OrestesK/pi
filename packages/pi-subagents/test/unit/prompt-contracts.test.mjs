@@ -144,8 +144,8 @@ test("live-failure guardrails are explicit in pi-subagents skill", () => {
   assert.match(skill, /help me decide/i);
   assert.match(skill, /explain the options better[\s\S]*brainstorming/i);
   assert.match(skill, /research-decision/i);
-  assert.match(skill, /do not interpret requested numbers literally/i);
-  assert.match(skill, /spawn 20.*never launch 20/i);
+  assert.match(skill, /honor explicit numeric requests/i);
+  assert.match(skill, /spawn 20.*launch 20 distinct children/i);
   assert.match(skill, /compare everything between named targets/i);
   assert.match(skill, /do the checks again.*compare everything/i);
   assert.match(skill, /missing private.*target.*before.*subagents/i);

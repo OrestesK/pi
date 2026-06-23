@@ -322,11 +322,32 @@ async function runSingleAttempt(
 		};
 
 		const unsubscribeIntercomDetach = options.intercomEvents?.on?.(INTERCOM_DETACH_REQUEST_EVENT, (payload) => {
-			if (!options.allowIntercomDetach || detached || processClosed || !intercomStarted) return;
-			if (!payload || typeof payload !== "object") return;
-			const requestId = (payload as { requestId?: unknown }).requestId;
+			if (!options.allowIntercomDetach || detached || processClosed) return;
+			if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
+			const request = payload as {
+				requestId?: unknown;
+				runId?: unknown;
+				childIndex?: unknown;
+				childIntercomTarget?: unknown;
+				messageId?: unknown;
+			};
+			const requestId = request.requestId;
+			const childIndex = options.index !== undefined ? String(options.index) : undefined;
 			if (typeof requestId !== "string" || requestId.length === 0) return;
-			options.intercomEvents?.emit(INTERCOM_DETACH_RESPONSE_EVENT, { requestId, accepted: true });
+			if (request.runId !== options.runId) return;
+			if (childIndex !== undefined && request.childIndex !== childIndex) return;
+			if (
+				typeof request.childIntercomTarget === "string"
+				&& options.intercomSessionName
+				&& request.childIntercomTarget !== options.intercomSessionName
+			) return;
+			options.intercomEvents?.emit(INTERCOM_DETACH_RESPONSE_EVENT, {
+				requestId,
+				runId: options.runId,
+				...(childIndex !== undefined ? { childIndex } : {}),
+				...(options.intercomSessionName ? { childIntercomTarget: options.intercomSessionName } : {}),
+				accepted: true,
+			});
 			detachForIntercom();
 		});
 

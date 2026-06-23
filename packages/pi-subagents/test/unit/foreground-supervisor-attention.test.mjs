@@ -20,6 +20,37 @@ function makeFakePi(lines) {
 	return tmp;
 }
 
+function makeDelayedFakePi(lines, delayMs = 100) {
+	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-fake-pi-"));
+	const bin = path.join(tmp, "pi");
+	fs.writeFileSync(
+		bin,
+		`#!/usr/bin/env node\nsetTimeout(() => {\n${lines.map((line) => `console.log(${JSON.stringify(JSON.stringify(line))});`).join("\n")}\n}, ${delayMs});\n`,
+		{ mode: 0o700 },
+	);
+	return tmp;
+}
+
+class FakeIntercomEvents {
+	#handlers = new Map();
+
+	on(channel, handler) {
+		const handlers = this.#handlers.get(channel) ?? [];
+		handlers.push(handler);
+		this.#handlers.set(channel, handlers);
+		return () => {
+			const current = this.#handlers.get(channel) ?? [];
+			this.#handlers.set(channel, current.filter((candidate) => candidate !== handler));
+		};
+	}
+
+	emit(channel, data) {
+		for (const handler of this.#handlers.get(channel) ?? []) {
+			handler(data);
+		}
+	}
+}
+
 test("contact_supervisor need_decision emits immediate needs_attention", async () => {
 	const fakePiDir = makeFakePi([
 		{
@@ -126,6 +157,149 @@ test("detached contact_supervisor need_decision preserves needs_attention on res
 		assert.equal(result.detached, true);
 		assert.equal(result.exitCode, 0);
 		assert.equal(result.controlEvents?.[0]?.reason, "supervisor_decision");
+	} finally {
+		process.env.PATH = oldPath;
+	}
+});
+
+test("targeted intercom detach accepts only the matching child", async () => {
+	const fakePiDir = makeFakePi([
+		{
+			type: "tool_execution_start",
+			toolName: "contact_supervisor",
+			args: { reason: "need_decision", message: "Need supervisor decision." },
+		},
+		{
+			type: "message_end",
+			message: {
+				role: "assistant",
+				content: [{ type: "text", text: "done" }],
+				stopReason: "stop",
+			},
+		},
+	]);
+	const oldPath = process.env.PATH;
+	process.env.PATH = `${fakePiDir}${path.delimiter}${oldPath ?? ""}`;
+	const intercomEvents = new FakeIntercomEvents();
+	try {
+		const nonMatching = await runSync(
+			fakePiDir,
+			[
+				{
+					name: "delegate",
+					description: "Delegate",
+					source: "builtin",
+					filePath: "builtin/delegate.md",
+					systemPrompt: "Intercom orchestration channel: Delegate.",
+					systemPromptMode: "replace",
+					inheritProjectContext: true,
+					inheritSkills: false,
+					tools: ["contact_supervisor"],
+				},
+			],
+			"delegate",
+			"Ask for a decision",
+			{
+				runId: "run-targeted",
+				index: 0,
+				allowIntercomDetach: true,
+				intercomEvents,
+				artifactsDir: path.join(fakePiDir, "artifacts"),
+				onControlEvent: () => intercomEvents.emit("pi-intercom:detach-request", {
+					requestId: "request-nonmatching",
+					runId: "other-run",
+					childIndex: "0",
+					messageId: "message-1",
+				}),
+			},
+		);
+		assert.equal(nonMatching.detached, undefined);
+		assert.equal(nonMatching.exitCode, 0);
+
+		const matching = await runSync(
+			fakePiDir,
+			[
+				{
+					name: "delegate",
+					description: "Delegate",
+					source: "builtin",
+					filePath: "builtin/delegate.md",
+					systemPrompt: "Intercom orchestration channel: Delegate.",
+					systemPromptMode: "replace",
+					inheritProjectContext: true,
+					inheritSkills: false,
+					tools: ["contact_supervisor"],
+				},
+			],
+			"delegate",
+			"Ask for a decision",
+			{
+				runId: "run-targeted",
+				index: 0,
+				allowIntercomDetach: true,
+				intercomEvents,
+				artifactsDir: path.join(fakePiDir, "artifacts"),
+				onControlEvent: () => intercomEvents.emit("pi-intercom:detach-request", {
+					requestId: "request-matching",
+					runId: "run-targeted",
+					childIndex: "0",
+					messageId: "message-1",
+				}),
+			},
+		);
+		assert.equal(matching.detached, true);
+		assert.equal(matching.exitCode, 0);
+	} finally {
+		process.env.PATH = oldPath;
+	}
+});
+
+test("targeted intercom detach can arrive before contact_supervisor tool start is parsed", async () => {
+	const fakePiDir = makeDelayedFakePi([
+		{
+			type: "tool_execution_start",
+			toolName: "contact_supervisor",
+			args: { reason: "need_decision", message: "Need supervisor decision." },
+		},
+	], 100);
+	const oldPath = process.env.PATH;
+	process.env.PATH = `${fakePiDir}${path.delimiter}${oldPath ?? ""}`;
+	const intercomEvents = new FakeIntercomEvents();
+	try {
+		const run = runSync(
+			fakePiDir,
+			[
+				{
+					name: "delegate",
+					description: "Delegate",
+					source: "builtin",
+					filePath: "builtin/delegate.md",
+					systemPrompt: "Intercom orchestration channel: Delegate.",
+					systemPromptMode: "replace",
+					inheritProjectContext: true,
+					inheritSkills: false,
+					tools: ["contact_supervisor"],
+				},
+			],
+			"delegate",
+			"Ask for a decision",
+			{
+				runId: "run-race",
+				index: 0,
+				allowIntercomDetach: true,
+				intercomEvents,
+				artifactsDir: path.join(fakePiDir, "artifacts"),
+			},
+		);
+		setTimeout(() => intercomEvents.emit("pi-intercom:detach-request", {
+			requestId: "request-before-tool-start",
+			runId: "run-race",
+			childIndex: "0",
+			messageId: "message-before-tool-start",
+		}), 10);
+		const result = await run;
+		assert.equal(result.detached, true);
+		assert.equal(result.exitCode, 0);
 	} finally {
 		process.env.PATH = oldPath;
 	}
