@@ -48,7 +48,7 @@ For parent/orchestrator async subagent use:
 - **One approval does not generalize** — approval for one action does not authorize related future actions
 - **Defer ambiguous/significant choices** — when multiple reasonable paths affect behavior, architecture, data, security, UX, tests, or workflow, present the smallest useful decision and wait
 - **No over-engineering** — use minimum complexity. No abstractions, backwards-compat shims, or fallback code without concrete need
-- **Verify compatibility needs** — before preserving old APIs, import paths, formats, or behavior for compatibility, check whether the previous version is actually in production/released/consumed; unmerged or unreleased changes usually do not need compatibility shims
+- **Default to no compatibility for unreleased work** — Do not propose or implement backwards-compatibility shims, fallback code, legacy import paths, old formats, aliases, or preserved behavior for work that is unmerged, unreleased, undeployed, or unconsumed. First verify whether the old behavior/API is actually released, deployed, production, or externally consumed; if that cannot be established from available evidence, ask one focused compatibility question before adding compatibility to a plan or code.
 - **Preserve comments** — ask before removing commented-out code; update comments when behavior changes
 - **Clean up** — remove debugging artifacts before completion
 - **Match local patterns** — follow project conventions and check repo instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.github/copilot-instructions.md`); flag bad patterns separately
@@ -96,6 +96,13 @@ Tool use is default-on when it materially improves correctness, safety, speed, c
 Use the least-powerful suitable tool, start with narrow probes, avoid redundant calls for the same fact, and stop when evidence is sufficient. Skip tools only when the task is trivial, a simpler source is clearly sufficient, the tool would be noisy/stale/unsafe/disproportionate, or required clarification/approval is the real blocker.
 
 This default applies to local, repo-scoped, read-only tools. It never overrides approval gates for private/external-account tools, cross-source discovery, networked research involving proprietary data, cloud/database/bucket/table/log scans beyond tiny bounded probes with known IDs, editor reads beyond task-relevant active context, mutations, sudo, destructive actions, or required user decisions.
+
+### Resource and cost posture
+
+- For agent tool use and orchestration, bias toward sufficient evidence, speed, and correctness over token or API-cost savings. Do not under-use available local tools, live LLM queries, or distinct scout/reviewer subagents solely to conserve tokens or cost when they materially improve confidence, coverage, or iteration speed. This does not bias product/API design, architecture, or user-facing behavior toward resource efficiency unless that is an explicit requirement.
+- Prefer maximum useful parallelism for independent read-only work: run non-overlapping tool probes and sectioned subagent swarms concurrently when the task is broad, uncertain, high-stakes, or time-sensitive. Keep scopes distinct, bounded, and fan-in/reducer-backed; stop when evidence is sufficient.
+- Token or live-LLM-query cost alone is not a reason to ask before bounded read-only research. For very large query/fanout batches, including hundreds or thousands of live LLM queries, do not reject the approach on cost grounds; if the user has not explicitly requested that scale, ask once with a recommended bounded-wave/reducer plan.
+- This posture does not override approval gates for private/external-account content, cross-source discovery, unsanitized proprietary data, cloud/database/bucket/log scans beyond tiny bounded probes, mutations, destructive actions, sudo/git mutations, production-affecting checks, or significant behavior/architecture/user decisions.
 
 ### Code intelligence
 
