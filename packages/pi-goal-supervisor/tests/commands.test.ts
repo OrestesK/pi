@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { handleCommand, parseGoalCommand } from "../src/commands.ts";
+import {
+  getGoalArgumentCompletions,
+  handleCommand,
+  parseGoalCommand,
+} from "../src/commands.ts";
 import { createInitialState } from "../src/state.ts";
 
 test("parses status, implicit start, explicit start, and reserved commands", () => {
@@ -13,6 +17,10 @@ test("parses status, implicit start, explicit start, and reserved commands", () 
   assert.deepEqual(parseGoalCommand("ship it"), {
     action: "start",
     objective: "ship it",
+  });
+  assert.deepEqual(parseGoalCommand("stop now"), {
+    action: "start",
+    objective: "stop now",
   });
   assert.deepEqual(parseGoalCommand("pause waiting"), {
     action: "pause",
@@ -43,9 +51,17 @@ test("status and help with no active goal do not create placeholder state", () =
   assert.equal(help.state, undefined);
   assert.equal(help.shouldQueueContinuation, false);
   assert.match(help.message, /\| help/);
+  assert.match(help.message, /\| clear/);
+  assert.doesNotMatch(help.message, /\| stop/);
+  assert.deepEqual(
+    getGoalArgumentCompletions(""),
+    ["status", "start", "pause", "resume", "clear", "done", "help"].map(
+      (value) => ({ value, label: value }),
+    ),
+  );
 });
 
-test("command handler starts pauses resumes and stops", () => {
+test("command handler starts pauses resumes and clears", () => {
   const now = "2026-06-03T00:00:00.000Z";
   const start = handleCommand(undefined, "build package", {
     cwd: "/tmp/project",
@@ -62,7 +78,7 @@ test("command handler starts pauses resumes and stops", () => {
     sessionId: "s",
     now,
   });
-  const stopped = handleCommand(resumed.state, "stop done", {
+  const cleared = handleCommand(resumed.state, "clear", {
     cwd: "/tmp/project",
     sessionId: "s",
     now,
@@ -71,7 +87,7 @@ test("command handler starts pauses resumes and stops", () => {
   assert.ok(start.state);
   assert.ok(paused.state);
   assert.ok(resumed.state);
-  assert.ok(stopped.state);
+  assert.ok(cleared.state);
   const status = handleCommand(start.state, "status", {
     cwd: "/tmp/project",
     sessionId: "s",
@@ -81,9 +97,11 @@ test("command handler starts pauses resumes and stops", () => {
   assert.equal(start.state.status, "running");
   assert.equal(paused.state.status, "paused");
   assert.equal(resumed.state.status, "running");
-  assert.equal(stopped.state.status, "stopped");
+  assert.equal(cleared.state.status, "stopped");
   assert.equal(start.continuationReason, "start");
   assert.equal(resumed.continuationReason, "resume");
+  assert.equal(paused.abortTurn, true);
+  assert.equal(cleared.abortTurn, false);
   assert.match(start.message, /started/i);
   assert.match(status.message, /\(0 turns\)/);
   assert.doesNotMatch(status.message, /\d+\/\d+/);

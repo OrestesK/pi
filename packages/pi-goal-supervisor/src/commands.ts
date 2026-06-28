@@ -10,7 +10,6 @@ export type GoalCommand =
   | { action: "start"; objective: string }
   | { action: "pause"; reason?: string }
   | { action: "resume" }
-  | { action: "stop"; reason?: string }
   | { action: "clear" }
   | { action: "done"; evidence: string }
   | { action: "help" };
@@ -20,6 +19,7 @@ export type CommandResult = {
   message: string;
   shouldQueueContinuation: boolean;
   continuationReason?: ContinuationReason;
+  abortTurn?: boolean;
 };
 
 const RESERVED = new Set([
@@ -27,7 +27,6 @@ const RESERVED = new Set([
   "start",
   "pause",
   "resume",
-  "stop",
   "clear",
   "done",
   "help",
@@ -60,8 +59,6 @@ export function parseGoalCommand(args: string): GoalCommand {
       return { action: "pause", reason: restAfterFirst(args) || undefined };
     case "resume":
       return { action: "resume" };
-    case "stop":
-      return { action: "stop", reason: restAfterFirst(args) || undefined };
     case "clear":
       return { action: "clear" };
     case "done": {
@@ -105,7 +102,7 @@ export function handleCommand(
       return {
         state,
         message:
-          "Usage: /goal <objective> | start <objective> | status | pause | resume | stop | clear | done <evidence> | help",
+          "Usage: /goal <objective> | start <objective> | status | pause | resume | clear | done <evidence> | help",
         shouldQueueContinuation: false,
       };
     case "start": {
@@ -138,6 +135,7 @@ export function handleCommand(
         state: next,
         message: "Goal paused.",
         shouldQueueContinuation: false,
+        abortTurn: true,
       };
     }
     case "resume": {
@@ -152,18 +150,6 @@ export function handleCommand(
         continuationReason: "resume",
       };
     }
-    case "stop": {
-      const next = reduceState(requireState(state), {
-        type: "stopped",
-        reason: command.reason,
-        now: ctx.now,
-      });
-      return {
-        state: next,
-        message: "Goal stopped.",
-        shouldQueueContinuation: false,
-      };
-    }
     case "clear": {
       const next = reduceState(requireState(state), {
         type: "stopped",
@@ -174,6 +160,7 @@ export function handleCommand(
         state: next,
         message: "Goal cleared.",
         shouldQueueContinuation: false,
+        abortTurn: false,
       };
     }
     case "done": {
@@ -196,7 +183,7 @@ export function getGoalArgumentCompletions(
   argumentText: string,
 ): Array<{ value: string; label: string }> {
   const current = argumentText.trim().split(/\s+/).at(-1) ?? "";
-  return ["status", "start", "pause", "resume", "stop", "clear", "done", "help"]
+  return ["status", "start", "pause", "resume", "clear", "done", "help"]
     .filter((item) => item.startsWith(current))
     .map((item) => ({ value: item, label: item }));
 }

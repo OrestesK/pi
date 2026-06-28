@@ -152,6 +152,10 @@ function queueIfSafe(
   updateWidget(ctx, runtime.state);
 }
 
+function isSupervisorContinuationPrompt(prompt: string | undefined): boolean {
+  return prompt?.includes("[GOAL SUPERVISOR CONTINUATION") ?? false;
+}
+
 async function judgeCurrentClaim(
   runtime: Runtime,
   deps: GoalSupervisorDeps,
@@ -184,7 +188,7 @@ export function registerGoalSupervisor(
 ): void {
   pi.registerCommand?.("goal", {
     description:
-      "Run a session-scoped goal until evidence-backed completion. Usage: /goal <objective> | start <objective> | status | pause | resume | stop | clear | done <evidence> | help",
+      "Run a session-scoped goal until evidence-backed completion. Usage: /goal <objective> | start <objective> | status | pause | resume | clear | done <evidence> | help",
     getArgumentCompletions: getGoalArgumentCompletions,
     handler: async (args: string, rawCtx: unknown) => {
       const ctx = rawCtx as ContextLike;
@@ -212,10 +216,7 @@ export function registerGoalSupervisor(
           if (statusAfterJudge === "running")
             queueIfSafe(runtime, pi, ctx, "judge_rejected");
         }
-        if (
-          runtime.state?.status === "paused" ||
-          runtime.state?.status === "stopped"
-        ) {
+        if (result.abortTurn) {
           ctx.abort?.();
         }
         if (
@@ -252,7 +253,10 @@ export function registerGoalSupervisor(
       runtime.state = reduceState(runtime.state, { type: "resumed", now: now() });
       appendState(pi, runtime.state);
     }
-    if (!runtime.state || runtime.state.status !== "running") return undefined;
+    if (!runtime.state || runtime.state.status !== "running") {
+      if (isSupervisorContinuationPrompt(event.prompt)) ctx.abort?.();
+      return undefined;
+    }
     if (
       runtime.state.pendingContinuation &&
       event.prompt?.includes(runtime.state.pendingContinuation.id)

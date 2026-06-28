@@ -125,7 +125,7 @@ test("session_before_compact and session_shutdown persist active state", async (
 	assert.equal(harness.lastState()?.objective, "finish objective");
 });
 
-test("pause and stop commands abort an active turn when context supports abort", async () => {
+test("pause aborts an active turn but clear does not", async () => {
 	let handler: ((args: string, ctx: unknown) => Promise<void>) | undefined;
 	const entries: Array<{ type: "custom"; customType: string; data: unknown }> =
 		[];
@@ -162,9 +162,9 @@ test("pause and stop commands abort an active turn when context supports abort",
 	await handler("live smoke", ctx);
 	await handler("pause manual", ctx);
 	await handler("resume", ctx);
-	await handler("stop manual", ctx);
+	await handler("clear", ctx);
 
-	assert.equal(aborts, 2);
+	assert.equal(aborts, 1);
 });
 
 test("widget and supervisor prompt show unbounded turn count", async () => {
@@ -350,33 +350,61 @@ test("status and judge-error blocks do not auto-resume", async () => {
 	assert.equal(harness.lastState()?.pendingContinuation?.reason, "resume");
 });
 
-test("stop and clear remain terminal after blocked goals", async () => {
-	for (const command of ["stop manual", "clear"]) {
-		const harness = createGoalHarness();
+test("clear remains terminal after blocked goals", async () => {
+	const harness = createGoalHarness();
 
-		await harness.handler("finish objective", harness.ctx);
-		await deliverPendingContinuation(harness);
-		await harness.hooks.get("turn_end")?.(
-			{
-				message: {
-					role: "assistant",
-					content:
-						"GOAL_BLOCKED: missing required permission for deployment",
-				},
+	await harness.handler("finish objective", harness.ctx);
+	await deliverPendingContinuation(harness);
+	await harness.hooks.get("turn_end")?.(
+		{
+			message: {
+				role: "assistant",
+				content:
+					"GOAL_BLOCKED: missing required permission for deployment",
 			},
-			harness.ctx,
-		);
-		assert.equal(harness.lastState()?.status, "blocked");
+		},
+		harness.ctx,
+	);
+	assert.equal(harness.lastState()?.status, "blocked");
 
-		await harness.handler(command, harness.ctx);
-		const promptResult = harness.hooks.get("before_agent_start")?.(
-			{ systemPrompt: "base", prompt: "continue" },
-			harness.ctx,
-		);
+	await harness.handler("clear", harness.ctx);
+	const promptResult = harness.hooks.get("before_agent_start")?.(
+		{ systemPrompt: "base", prompt: "continue" },
+		harness.ctx,
+	);
 
-		assert.equal(promptResult, undefined);
-		assert.equal(harness.lastState()?.status, "stopped");
-	}
+	assert.equal(promptResult, undefined);
+	assert.equal(harness.lastState()?.status, "stopped");
+});
+
+test("clear aborts stale supervisor continuation prompts without aborting the command", async () => {
+	const harness = createGoalHarness();
+	let aborts = 0;
+	const ctx = {
+		...harness.ctx,
+		abort: () => {
+			aborts += 1;
+		},
+	};
+
+	await harness.handler("finish objective", ctx);
+	const pendingId = harness.lastState()?.pendingContinuation?.id;
+	assert.ok(pendingId);
+
+	await harness.handler("clear", ctx);
+	assert.equal(aborts, 0);
+	assert.equal(harness.lastState()?.status, "stopped");
+
+	const promptResult = harness.hooks.get("before_agent_start")?.(
+		{
+			systemPrompt: "base",
+			prompt: `[GOAL SUPERVISOR CONTINUATION id=${pendingId} reason=start]`,
+		},
+		ctx,
+	);
+
+	assert.equal(promptResult, undefined);
+	assert.equal(aborts, 1);
 });
 
 test("manual /goal done fails closed when no transcript evidence exists", async () => {
