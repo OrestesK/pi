@@ -60,6 +60,7 @@ const expectedAllowlist = [
   "get_search_content",
   "Agent",
   "mcp",
+  "intercom",
   "subagent",
   "subagent_list",
   "subagent_done",
@@ -100,6 +101,9 @@ const callMatrix = [
   ["mcp", { connect: "context7" }, "connect context7"],
   ["mcp", { describe: "tool_name" }, "describe tool_name"],
   ["mcp", { search: "docs" }, "search docs"],
+  ["intercom", { action: "pending" }, "pending"],
+  ["intercom", { action: "ask", to: "worker", message: "Need review" }, "worker"],
+  ["intercom", { action: "reply", message: "ack" }, "ack"],
   ["subagent", { agent: "scout", task: "look", async: true }, "scout"],
   ["subagent", { action: "status", id: "abc123" }, "status"],
   ["subagent", { workflow: "builtin.generate-filter", task: "ideas" }, "builtin.generate-filter"],
@@ -308,6 +312,13 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
     ["ast_grep_search", "AST Grep", textResult("matches", { matchCount: 4 }), /4 matchs/],
     ["ast_grep_replace", "AST Replace", textResult("dry", { matchCount: 2, applied: false }), /2 matchs · dry run/],
     ["ast_grep_replace", "AST Replace", textResult("applied", { matchCount: 1, applied: true }), /1 match · applied/],
+    ["intercom", "Intercom", textResult("No unresolved inbound asks."), /no pending asks/],
+    ["intercom", "Intercom", textResult("**Pending asks:**\n- worker · msg-1 · 5s ago · Need review\n- reviewer · msg-2 · 7s ago · Need reply"), /2 pending asks/],
+    ["intercom", "Intercom", textResult("**Intercom Status:**\nConnected: Yes\nSession ID: abc\nActive sessions: 9"), /connected · 9 sessions/],
+    ["intercom", "Intercom", textResult("**Current session:**\n• self\n\n**Other sessions:**\n• one\n• two"), /2 other sessions/],
+    ["intercom", "Intercom", textResult("Message sent to worker"), /sent to worker/],
+    ["intercom", "Intercom", textResult("Reply sent to reviewer"), /reply sent to reviewer/],
+    ["intercom", "Intercom", textResult("**Reply from worker:**\nack"), /reply from worker/],
   ];
   for (const [toolName, title, result, expected] of cases) {
     const component = ui.wrappedToolResult(
@@ -321,6 +332,56 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
     assert.match(render(component), expected, `${toolName} result summary mismatch`);
     assertRenderedWithinWidth(component);
   }
+
+  const noPendingIntercom = render(
+    ui.wrappedToolResult(
+      "intercom",
+      textResult("No unresolved inbound asks."),
+      options(),
+      theme,
+      context({}, { toolCallId: "intercom-no-pending" }),
+      "Intercom",
+    ),
+  );
+  assert.match(noPendingIntercom, /Intercom no pending asks/);
+  assert.doesNotMatch(noPendingIntercom, /No unresolved inbound asks/);
+
+  const pendingIntercom = render(
+    ui.wrappedToolResult(
+      "intercom",
+      textResult("**Pending asks:**\n- worker · msg-1 · 5s ago · Need review"),
+      options({ expanded: true }),
+      theme,
+      context({}, { toolCallId: "intercom-pending" }),
+      "Intercom",
+    ),
+  );
+  assert.match(pendingIntercom, /Intercom 1 pending ask/);
+  assert.match(pendingIntercom, /Pending asks:/);
+  assert.doesNotMatch(pendingIntercom, /\*\*Pending asks:\*\*/);
+
+  const statusIntercom = render(
+    ui.wrappedToolResult(
+      "intercom",
+      textResult("**Intercom Status:**\nConnected: Yes\nSession ID: abc\nActive sessions: 9"),
+      options({ expanded: true }),
+      theme,
+      context({}, { toolCallId: "intercom-status" }),
+      "Intercom",
+    ),
+  );
+  assert.match(statusIntercom, /Intercom Status:/);
+  assert.doesNotMatch(statusIntercom, /\*\*Intercom Status:\*\*/);
+
+  const partialIntercomAsk = ui.wrappedToolResult(
+    "intercom",
+    textResult("waiting"),
+    options({ isPartial: true }),
+    theme,
+    context({ action: "ask" }, { toolCallId: "intercom-partial-ask" }),
+    "Intercom",
+  );
+  assert.match(render(partialIntercomAsk), /Waiting for Reply/);
 
   const partial = ui.wrappedToolResult(
     "code_search",

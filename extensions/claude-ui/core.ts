@@ -1601,6 +1601,7 @@ const EXTENSION_TOOL_WRAPPER_ALLOWLIST = new Set([
   "get_search_content",
   "Agent",
   "mcp",
+  "intercom",
   "subagent",
   "subagent_list",
   "subagent_done",
@@ -2016,6 +2017,16 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
           : undefined,
         argValueLabel(args, "action"),
       ]);
+    case "intercom":
+      return joinBodyParts(theme, [
+        argValueLabel(args, "action"),
+        argValueLabel(args, "to")
+          ? pathText(theme, compactOneLine(argValueLabel(args, "to") ?? "…", 60))
+          : undefined,
+        argValueLabel(args, "message")
+          ? compactOneLine(argValueLabel(args, "message") ?? "…", 80)
+          : undefined,
+      ]);
     case "subagent": {
       if (!isRecord(args)) return muted(theme, "…");
       const action = argValueLabel(args, "action");
@@ -2211,6 +2222,8 @@ function webToolTitle(name: string): string {
       return "Get Content";
     case "mcp":
       return "MCP";
+    case "intercom":
+      return "Intercom";
     case "subagent":
       return "Subagent";
     case "todo":
@@ -2323,7 +2336,11 @@ function subagentListSummary(output: string): string | undefined {
   return agentCount > 0 ? plural(agentCount, "agent") : undefined;
 }
 
-function pendingToolLabel(toolName: string, title: string): string {
+function pendingToolLabel(
+  toolName: string,
+  title: string,
+  args?: unknown,
+): string {
   switch (toolName) {
     case "web_search":
     case "code_search":
@@ -2354,6 +2371,15 @@ function pendingToolLabel(toolName: string, title: string): string {
       return "Checking Memory";
     case "memory_sync":
       return "Syncing Memory";
+    case "intercom": {
+      const action = argValueLabel(args, "action");
+      if (action === "ask") return "Waiting for Reply";
+      if (action === "send") return "Sending Message";
+      if (action === "reply") return "Sending Reply";
+      if (action === "pending" || action === "status" || action === "list")
+        return "Checking Intercom";
+      return "Intercom";
+    }
     case "ask_user":
       return "Asking User";
     default:
@@ -2412,6 +2438,50 @@ function memoryListPreviewLines(output: string): string[] | undefined {
 
 function subagentListPreviewLines(output: string): string[] | undefined {
   const lines = contentLines(output).filter((line) => line.startsWith("- "));
+  return lines.length > 0 ? lines : undefined;
+}
+
+function intercomResultSummary(output: string): string | undefined {
+  const trimmed = output.trim();
+  if (/^No unresolved inbound asks\.?$/i.test(trimmed)) return "no pending asks";
+
+  const pendingAsks = trimmed.match(/^\*\*Pending asks:\*\*\n([\s\S]*)$/i)?.[1];
+  if (pendingAsks !== undefined) {
+    const count = (pendingAsks.match(/^-\s+/gm) ?? []).length;
+    return count > 0 ? plural(count, "pending ask") : "pending asks";
+  }
+
+  const sentTo = trimmed.match(/^Message sent to\s+(.+)$/i)?.[1]?.trim();
+  if (sentTo) return `sent to ${compactOneLine(sentTo, 80)}`;
+
+  const replySentTo = trimmed.match(/^Reply sent to\s+(.+)$/i)?.[1]?.trim();
+  if (replySentTo) return `reply sent to ${compactOneLine(replySentTo, 80)}`;
+
+  const replyFrom = trimmed.match(/^\*\*Reply from\s+(.+?):\*\*/i)?.[1]?.trim();
+  if (replyFrom) return `reply from ${compactOneLine(replyFrom, 80)}`;
+
+  const activeSessions = trimmed.match(/^Active sessions:\s*(\d+)$/im)?.[1];
+  if (/^Connected:\s*Yes$/im.test(trimmed)) {
+    return activeSessions
+      ? `connected · ${plural(Number(activeSessions), "session")}`
+      : "connected";
+  }
+  if (/^Connected:\s*No$/im.test(trimmed)) return "disconnected";
+
+  const otherSessions = trimmed.match(/\*\*Other sessions:\*\*([\s\S]*)/)?.[1];
+  if (otherSessions !== undefined) {
+    const count = (otherSessions.match(/^•\s+/gm) ?? []).length;
+    return count > 0 ? plural(count, "other session") : "no other sessions";
+  }
+
+  return undefined;
+}
+
+function intercomPreviewLines(output: string): string[] | undefined {
+  if (intercomResultSummary(output) === "no pending asks") return [];
+  const lines = contentLines(output)
+    .map((line) => line.trim().replace(/^\*\*(.+?)\*\*$/, "$1"))
+    .filter(Boolean);
   return lines.length > 0 ? lines : undefined;
 }
 
@@ -3334,6 +3404,13 @@ function toolPreviewBlock(
         expanded,
         EXPANDED_PREVIEW_LINES,
       );
+    case "intercom":
+      return previewLinesBlock(
+        intercomPreviewLines(output) ?? contentLines(output),
+        theme,
+        expanded,
+        EXPANDED_PREVIEW_LINES,
+      );
     default:
       return previewBlock(output, theme, expanded, EXPANDED_PREVIEW_LINES);
   }
@@ -3362,6 +3439,8 @@ function resultDetailSummary(
         subagentListSummary(output) ??
         (lines > 0 ? plural(lines, "line") : "done")
       );
+    case "intercom":
+      return intercomResultSummary(output) ?? (lines > 0 ? plural(lines, "line") : "done");
     case "lsp_navigation": {
       const operation = detailString(details, "operation");
       const resultCount = detailNumber(details, "resultCount");
@@ -3420,7 +3499,7 @@ function wrappedToolResult(
   if (options.isPartial) {
     return setText(
       context.lastComponent,
-      treeLine(theme, pendingToolLabel(toolName, title), "..."),
+      treeLine(theme, pendingToolLabel(toolName, title, context.args), "..."),
     );
   }
   if (context.isError) {
