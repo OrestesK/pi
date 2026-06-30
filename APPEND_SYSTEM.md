@@ -8,7 +8,7 @@
   - To copy an exact command: `printf '%s\n' '<command>' | wl-copy`
 - IDE: Neovim
 - Terminal: Foot
-- Package manager: `pacman` / `yay`; not apt/brew
+- Package manager: `pacman` / `yay`
 
 ## Stack
 
@@ -18,7 +18,7 @@
 - Containers: `docker`, `docker-compose`, `docker-buildx`
 - Database: local PostgreSQL is installed
 - Node: `nvm` + `pnpm`
-- User version-control workflow: stacked PRs are user-run
+- User version-control workflow: `git-spice`
 - Cloud: `aws-cli` for S3, ECS, Secrets Manager, CloudFormation, logs
 - Parsing: `tree-sitter-cli`
 

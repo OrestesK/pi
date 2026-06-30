@@ -102,6 +102,24 @@ Root-level memory files still appear in the base memory index under non-tape del
 
 **Important:** `core/project/` is a fixed subdirectory under `core/`. Always use `core/project/` for project-specific memory files, never create a `project/` folder at the root level.
 
+## Operational Memory Policy
+
+Use memory for durable reusable knowledge, not as a transcript dump.
+
+Read/search memory before nontrivial debugging, implementation, refactoring, architecture, CI/deploy/ops, benchmarking, workflow, or unfamiliar-repo work. Search again when uncertain, when prior context may be stale, when a familiar error appears, or before re-deriving a command, setup step, root cause, or runbook.
+
+Write memory only for information likely to save future work: repo runbooks, command flows, root causes, gotchas, environment setup, successful verification, failed approaches, and stable user preferences. Do not store secrets, raw logs, trivial one-off notes, or long transcripts. Keep files focused and searchable; split unrelated or growing topics into separate memories.
+
+Before writing, search/list existing memory and update an existing focused file when possible. If new facts supersede old ones, edit the current memory or mark stale duplicates with `status: superseded` and a replacement pointer. Do not duplicate authoritative rules from `AGENTS.md`; memory should store repo/debug/runbook knowledge and short pointers.
+
+After substantial debugging/running, write the 30-minute-saving memory before final response, or explicitly state why no durable memory was written.
+
+## Project vs Shared-Global Writes
+
+`memory_write` is project-scoped. Use it by default for project memory paths such as `core/USER.md`, `core/TASK.md`, `core/project/...`, `docs/...`, `archive/...`, `research/...`, or `notes/...`. Use direct file edits for project memory only when full frontmatter is required and safe, such as setting `status: superseded`.
+
+For shared-global memory, resolve the configured shared-global directory from `settings["pi-memory-md"].memoryDir` (`localPath` plus `globalMemory`) and edit files directly with the normal file tools. Standard shared-global files live under `{globalMemory}/core/` as optional `USER.md`, `MEMORY.md`, and `TASK.md`. User-maintained subfolders under that core directory, such as `core/project/`, may exist for cross-repo runbooks; preserve existing layout and update focused existing files instead of relocating content without explicit approval.
+
 ## Frontmatter Schema
 
 Every memory file MUST have frontmatter between `---` delimiters. `memory_write` writes JSON-compatible frontmatter because JSON is valid YAML and avoids ambiguous unquoted scalars. Prefer this form for manual rich metadata too:
@@ -128,6 +146,8 @@ Plain YAML frontmatter is still readable, but quote any string containing `: `, 
 - `tags` (array of strings) - For searching and categorization
 - `created` (date) - File creation date (auto-added on create)
 - `updated` (date) - Last modification date (auto-updated on update)
+
+For directly edited project or shared-global memory, include useful rich metadata when it materially improves search and maintenance: `description`, `category`, `status`, `load_priority`, `scope`, `repos`, `prs`, `last_verified`, `staleness_risk`, `evidence`, `tags`, `created`, and `updated`. Use honest status values such as `current`, `resolved`, `partial`, `abandoned`, `superseded`, `historical`, or `unknown`. Quote strings containing `: `, brackets, braces, backticks, or shell commands.
 
 ## Examples
 

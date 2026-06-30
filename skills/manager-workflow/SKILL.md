@@ -97,6 +97,7 @@ Load or apply these skills when their trigger fits:
 | Vague idea, new behavior, design/placement decision         | `brainstorming`                                                                                                   |
 | Approved requirements need task breakdown                   | `writing-plans`                                                                                                   |
 | New behavior or logic change                                | `test-driven-development`                                                                                         |
+| Adding/changing tests, test helpers, fixtures, mocks, or test-review feedback | `writing-tests`; use `test-driven-development` too when changing behavior or fixing bugs |
 | Bug, test failure, crash, flaky behavior, unexpected output | `systematic-debugging` first; use TDD for the fix after root cause is supported                                   |
 | Code/spec/plan review or review feedback evaluation         | `review`; escalate to `pi-subagents` review patterns when parallel/adversarial/fresh review would improve quality |
 | Before done/fixed/passing claims                            | `verification-before-completion`                                                                                  |
@@ -217,14 +218,15 @@ For approved plan execution with subagents:
 
 ## .scratch/ Workspace
 
-Ensure `.scratch/` exists and is gitignored. Do not make unrelated setup edits such as adding `.scratch/` to `.gitignore` during a feature change unless the user approves or the edit is required for the requested change.
+Use `.scratch/` for workflow artifacts when artifact creation is allowed and useful. Ensure it exists and is gitignored before workflows that require persistent plans, research, reviews, sessions, or run logs. Do not make unrelated setup edits such as adding `.scratch/` to `.gitignore` during a feature change unless the user approves or the edit is required for the requested change. If a required workflow needs persistent artifacts but the task forbids artifacts, stop and ask.
 
 Organized:
 
 - `research/` — scout findings
-- `plans/` — change plans with [ASSUMPTION] annotations
+- `plans/` — draft-for-approval and approved plans with [ASSUMPTION] annotations
 - `reviews/` — reviewer output
 - `sessions/` — session state for continuation
+- `runs/` — long-running command logs/status when artifacts are allowed
 
 Quick lookups stay in context. Deeper research goes to files.
 Check for existing .scratch/ files before re-researching.
