@@ -35,6 +35,8 @@ const RECOVERABLE_ERROR_PATTERNS = [
 	/socket hang up/i,
 	/timed? out/i,
 	/timeout/i,
+	/(fetch|network|socket|connection|websocket|stream|request).*terminated/i,
+	/terminated.*(fetch|network|socket|connection|websocket|stream|request)/i,
 	/\b502\b/,
 	/\b503\b/,
 	/\b504\b/,
@@ -54,6 +56,10 @@ export interface CodexRetryOptions {
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 	if (ms <= 0) return Promise.resolve();
 	return new Promise((resolve, reject) => {
+		if (signal?.aborted) {
+			reject(new Error("Request was aborted"));
+			return;
+		}
 		const timer = setTimeout(resolve, ms);
 		if (!signal) return;
 		const abort = () => {
@@ -71,12 +77,25 @@ function diagnosticText(message: AssistantMessage): string {
 	return `${message.errorMessage ?? ""}\n${diagnostics}`;
 }
 
+function isAbortError(error: unknown): boolean {
+	if (!(error instanceof Error)) return false;
+	return (
+		error.name === "AbortError" ||
+		/request was aborted|operation aborted/i.test(error.message)
+	);
+}
+
+function isAbortMessage(message: AssistantMessage | undefined): boolean {
+	if (!message) return false;
+	return message.stopReason === "aborted" || isAbortError(new Error(diagnosticText(message)));
+}
+
 export function isRecoverableCodexTransportFailure(
 	message: AssistantMessage | undefined,
 ): boolean {
-	if (!message || message.stopReason !== "error") return false;
+	if (!message || message.stopReason !== "error" || isAbortMessage(message))
+		return false;
 	const text = diagnosticText(message);
-	if (/request was aborted/i.test(text)) return false;
 	if (RECOVERABLE_ERROR_PATTERNS.some((pattern) => pattern.test(text)))
 		return true;
 
@@ -117,6 +136,24 @@ function isToolCallEvent(event: AssistantMessageEvent): boolean {
 		event.type === "toolcall_delta" ||
 		event.type === "toolcall_end"
 	);
+}
+
+function isVisibleProgressEvent(event: AssistantMessageEvent): boolean {
+	switch (event.type) {
+		case "start":
+		case "text_start":
+		case "text_delta":
+		case "text_end":
+		case "thinking_start":
+		case "thinking_delta":
+		case "thinking_end":
+		case "toolcall_start":
+		case "toolcall_delta":
+		case "toolcall_end":
+			return true;
+		default:
+			return false;
+	}
 }
 
 function retryDelay(baseDelayMs: number, attemptIndex: number): number {
@@ -172,7 +209,13 @@ function createRetryingStream(
 		let outputStarted = false;
 
 		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			if (options?.signal?.aborted) {
+				pushFinalError(output, makeErrorMessage(model, new Error("Request was aborted")));
+				return;
+			}
+
 			let sawToolCall = false;
+			let sawVisibleProgress = false;
 			let attemptError: AssistantMessage | undefined;
 			const attemptOptions: StreamOptions =
 				attempt === 1
@@ -182,6 +225,7 @@ function createRetryingStream(
 			try {
 				const attemptStream = streamCodex(model, context, attemptOptions);
 				for await (const event of attemptStream) {
+					if (isVisibleProgressEvent(event)) sawVisibleProgress = true;
 					if (isToolCallEvent(event)) sawToolCall = true;
 					if (event.type === "error") {
 						attemptError = event.error;
@@ -206,11 +250,13 @@ function createRetryingStream(
 				sawToolCall && recoverable && attemptError
 					? suppressUnsafeToolCallRetry(attemptError)
 					: attemptError;
-			const shouldRetry =
-				attempt < maxAttempts &&
-				!sawToolCall &&
-				recoverable &&
-				options?.signal?.aborted !== true;
+			const retryCandidate =
+				attempt < maxAttempts && !sawVisibleProgress && recoverable;
+			if (retryCandidate && options?.signal?.aborted) {
+				pushFinalError(output, makeErrorMessage(model, new Error("Request was aborted")));
+				return;
+			}
+			const shouldRetry = retryCandidate;
 
 			if (!shouldRetry) break;
 
@@ -251,9 +297,7 @@ function makeErrorMessage(
 	error: unknown,
 ): AssistantMessage {
 	const errorMessage = error instanceof Error ? error.message : String(error);
-	const stopReason = /request was aborted/i.test(errorMessage)
-		? "aborted"
-		: "error";
+	const stopReason = isAbortError(error) ? "aborted" : "error";
 	return {
 		role: "assistant",
 		content: [],

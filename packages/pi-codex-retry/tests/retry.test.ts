@@ -77,13 +77,20 @@ async function collect(
 	return collected;
 }
 
-test("classifies WebSocket 1006 and connection-ended transport failures as recoverable", () => {
+test("classifies recoverable transport failures without treating aborts as recoverable", () => {
 	assert.equal(
 		isRecoverableCodexTransportFailure(
 			message("WebSocket closed 1006 Connection ended"),
 		),
 		true,
 	);
+	assert.equal(isRecoverableCodexTransportFailure(message("fetch failed")), true);
+	assert.equal(isRecoverableCodexTransportFailure(message("network error")), true);
+	assert.equal(
+		isRecoverableCodexTransportFailure(message("network stream terminated")),
+		true,
+	);
+	assert.equal(isRecoverableCodexTransportFailure(message("terminated")), false);
 	assert.equal(
 		isRecoverableCodexTransportFailure(message("Request was aborted")),
 		false,
@@ -94,7 +101,7 @@ test("classifies WebSocket 1006 and connection-ended transport failures as recov
 	);
 });
 
-test("streams partial output, suppresses retryable error, and retries via SSE", async () => {
+test("retries pre-progress recoverable transport failures via SSE", async () => {
 	const calls: Array<StreamOptions | undefined> = [];
 	const firstError = message("WebSocket closed 1006 Connection ended");
 	const success = message();
@@ -110,12 +117,7 @@ test("streams partial output, suppresses retryable error, and retries via SSE", 
 			streamCodex: (_model, _context, options) => {
 				calls.push(options);
 				if (calls.length === 1) {
-					const partial = message();
-					partial.content.push({ type: "text", text: "partial" });
 					return fakeStream([
-						{ type: "start", partial },
-						{ type: "text_start", contentIndex: 0, partial },
-						{ type: "text_delta", contentIndex: 0, delta: "partial", partial },
 						{ type: "error", reason: "error", error: firstError },
 					]);
 				}
@@ -179,7 +181,7 @@ test("simple retry stream preserves reasoning option and retries via SSE", async
 	assert.equal(events.at(-1)?.type, "done");
 });
 
-test("emits an aborted terminal event when cancelled during retry backoff", async () => {
+test("stops retrying when cancelled during retry backoff", async () => {
 	const calls: Array<StreamOptions | undefined> = [];
 	const controller = new AbortController();
 	const stream = createCodexRetryStream(
@@ -215,6 +217,197 @@ test("emits an aborted terminal event when cancelled during retry backoff", asyn
 	assert.equal(
 		finalEvent?.type === "error" ? finalEvent.reason : undefined,
 		"aborted",
+	);
+});
+
+test("settles as aborted when cancelled after a recoverable attempt fails", async () => {
+	const calls: Array<StreamOptions | undefined> = [];
+	const controller = new AbortController();
+	const stream = createCodexRetryStream(
+		model,
+		context,
+		{ signal: controller.signal },
+		{
+			maxAttempts: 2,
+			baseDelayMs: 0,
+			streamCodex: (_model, _context, options) => {
+				calls.push(options);
+				const stream = createAssistantMessageEventStream();
+				queueMicrotask(() => {
+					controller.abort();
+					stream.push({
+						type: "error",
+						reason: "error",
+						error: message("WebSocket closed 1006 Connection ended"),
+					});
+					stream.end();
+				});
+				return stream;
+			},
+		},
+	);
+
+	const events = await collect(stream);
+	const finalEvent = events.at(-1);
+
+	assert.equal(calls.length, 1);
+	assert.equal(finalEvent?.type, "error");
+	assert.equal(
+		finalEvent?.type === "error" ? finalEvent.error.stopReason : undefined,
+		"aborted",
+	);
+});
+
+test("does not call provider when signal is already aborted", async () => {
+	let calls = 0;
+	const controller = new AbortController();
+	controller.abort();
+
+	const stream = createCodexRetryStream(
+		model,
+		context,
+		{ signal: controller.signal },
+		{
+			streamCodex: () => {
+				calls += 1;
+				return fakeStream([]);
+			},
+		},
+	);
+
+	const events = await collect(stream);
+	const finalEvent = events.at(-1);
+
+	assert.equal(calls, 0);
+	assert.equal(finalEvent?.type, "error");
+	assert.equal(
+		finalEvent?.type === "error" ? finalEvent.error.stopReason : undefined,
+		"aborted",
+	);
+});
+
+test("does not retry provider-side aborts", async () => {
+	const calls: Array<StreamOptions | undefined> = [];
+	const aborted = message("Request was aborted");
+	aborted.stopReason = "aborted";
+
+	const stream = createCodexRetryStream(model, context, undefined, {
+		maxAttempts: 2,
+		baseDelayMs: 0,
+		streamCodex: (_model, _context, options) => {
+			calls.push(options);
+			return fakeStream([
+				{ type: "error", reason: "aborted", error: aborted },
+			]);
+		},
+	});
+
+	const events = await collect(stream);
+	const finalEvent = events.at(-1);
+
+	assert.equal(calls.length, 1);
+	assert.equal(finalEvent?.type, "error");
+	assert.equal(
+		finalEvent?.type === "error" ? finalEvent.error.stopReason : undefined,
+		"aborted",
+	);
+});
+
+test("does not retry recoverable transport failures after start", async () => {
+	const calls: Array<StreamOptions | undefined> = [];
+	const partial = message();
+	const failure = message("fetch failed");
+
+	const stream = createCodexRetryStream(model, context, undefined, {
+		maxAttempts: 2,
+		baseDelayMs: 0,
+		streamCodex: (_model, _context, options) => {
+			calls.push(options);
+			return fakeStream([
+				{ type: "start", partial },
+				{ type: "error", reason: "error", error: failure },
+			]);
+		},
+	});
+
+	const events = await collect(stream);
+	const finalEvent = events.at(-1);
+
+	assert.equal(calls.length, 1);
+	assert.equal(events.filter((event) => event.type === "start").length, 1);
+	assert.equal(finalEvent?.type, "error");
+	assert.equal(
+		finalEvent?.type === "error" ? finalEvent.error.errorMessage : undefined,
+		"fetch failed",
+	);
+});
+
+test("does not retry recoverable transport failures after text output starts", async () => {
+	const calls: Array<StreamOptions | undefined> = [];
+	const partial = message();
+	partial.content.push({ type: "text", text: "partial" });
+	const failure = message("fetch failed");
+
+	const stream = createCodexRetryStream(model, context, undefined, {
+		maxAttempts: 2,
+		baseDelayMs: 0,
+		streamCodex: (_model, _context, options) => {
+			calls.push(options);
+			return fakeStream([
+				{ type: "start", partial },
+				{ type: "text_start", contentIndex: 0, partial },
+				{ type: "text_delta", contentIndex: 0, delta: "partial", partial },
+				{ type: "error", reason: "error", error: failure },
+			]);
+		},
+	});
+
+	const events = await collect(stream);
+	const finalEvent = events.at(-1);
+
+	assert.equal(calls.length, 1);
+	assert.equal(events.filter((event) => event.type === "start").length, 1);
+	assert.equal(finalEvent?.type, "error");
+	assert.equal(
+		finalEvent?.type === "error" ? finalEvent.error.errorMessage : undefined,
+		"fetch failed",
+	);
+});
+
+test("does not retry recoverable transport failures after thinking output starts", async () => {
+	const calls: Array<StreamOptions | undefined> = [];
+	const partial = message();
+	partial.content.push({ type: "thinking", thinking: "partial" });
+	const failure = message("fetch failed");
+
+	const stream = createCodexRetryStream(model, context, undefined, {
+		maxAttempts: 2,
+		baseDelayMs: 0,
+		streamCodex: (_model, _context, options) => {
+			calls.push(options);
+			return fakeStream([
+				{ type: "start", partial },
+				{ type: "thinking_start", contentIndex: 0, partial },
+				{
+					type: "thinking_delta",
+					contentIndex: 0,
+					delta: "partial",
+					partial,
+				},
+				{ type: "error", reason: "error", error: failure },
+			]);
+		},
+	});
+
+	const events = await collect(stream);
+	const finalEvent = events.at(-1);
+
+	assert.equal(calls.length, 1);
+	assert.equal(events.filter((event) => event.type === "start").length, 1);
+	assert.equal(finalEvent?.type, "error");
+	assert.equal(
+		finalEvent?.type === "error" ? finalEvent.error.errorMessage : undefined,
+		"fetch failed",
 	);
 });
 

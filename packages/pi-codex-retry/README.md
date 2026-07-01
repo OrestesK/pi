@@ -5,10 +5,10 @@ Local Pi extension that retries recoverable OpenAI Codex WebSocket transport fai
 ## Behavior
 
 - Overrides the `openai-codex-responses` API stream through `registerApiProvider()` with both raw and simple stream wrappers.
-- Streams each attempt live.
-- Retries recoverable transport failures such as `WebSocket closed 1006 Connection ended`, connection-ended failures, network errors, timeouts, and 502/503/504 responses.
+- Streams the successful attempt live.
+- Retries recoverable pre-progress transport failures such as `WebSocket closed 1006 Connection ended`, connection-ended failures, network errors, timeouts, and 502/503/504 responses.
 - Forces `transport: "sse"` on retry attempts so a failed WebSocket path does not repeat indefinitely.
-- Does **not** retry after a tool-call event starts, because replaying after tool side effects can duplicate actions.
+- Does **not** retry aborts or any failure after visible assistant progress starts, including `start`, text, thinking, or tool-call events.
 - Covers direct `complete()` callers that use the provider registry, including compaction extensions, better than AgentSession-only retry hooks.
 
 ## Configuration
