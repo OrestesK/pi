@@ -35,6 +35,32 @@ type TapeQueryBounds = {
 	endTime: string | null;
 };
 
+type LoadEntriesOptions = {
+	since?: string | null;
+};
+
+function latestTimestampString(
+	left: string | null | undefined,
+	right: string | null | undefined,
+): string | null {
+	if (!left) return right ?? null;
+	if (!right) return left;
+	return toTimestamp(left) >= toTimestamp(right) ? left : right;
+}
+
+function trimNewestEntries(
+	entries: SessionEntry[],
+	maxEntries: number,
+): SessionEntry[] {
+	if (entries.length <= maxEntries) return entries;
+	return entries
+		.sort(
+			(left, right) =>
+				toTimestamp(left.timestamp) - toTimestamp(right.timestamp),
+		)
+		.slice(-maxEntries);
+}
+
 function hasTextContent(content: unknown): boolean {
 	if (typeof content === "string") return content.trim().length > 0;
 	if (!Array.isArray(content)) return false;
@@ -240,7 +266,10 @@ export class TapeService {
 		return this.maxCachedEntries;
 	}
 
-	private loadEntries(scope: "session" | "project"): SessionEntry[] {
+	private loadEntries(
+		scope: "session" | "project",
+		options: LoadEntriesOptions = {},
+	): SessionEntry[] {
 		const filePaths =
 			scope === "session"
 				? (() => {
@@ -249,39 +278,40 @@ export class TapeService {
 					})()
 				: getSessionFilePaths(this.cwd);
 
-		const signature = this.buildEntryCacheSignature(filePaths);
+		const signature = [
+			this.buildEntryCacheSignature(filePaths),
+			`since=${options.since ?? ""}`,
+			`max=${this.maxCachedEntries}`,
+		].join("|");
 		const cached = this.entryCache.get(scope);
 		if (cached && cached.signature === signature) {
 			return cached.entries;
 		}
 
 		if (scope === "session") {
-			const parsed = filePaths[0] ? parseSessionFile(filePaths[0]) : null;
+			const parsed = filePaths[0]
+				? parseSessionFile(filePaths[0], {
+						maxEntries: this.maxCachedEntries,
+						since: options.since ?? undefined,
+					})
+				: null;
 			const entries = parsed?.entries ?? [];
-			const trimmedEntries =
-				entries.length > this.maxCachedEntries
-					? entries.slice(-this.maxCachedEntries)
-					: entries;
-			this.entryCache.set(scope, { signature, entries: trimmedEntries });
-			return trimmedEntries;
+			this.entryCache.set(scope, { signature, entries });
+			return entries;
 		}
 
-		const entries: SessionEntry[] = [];
+		let entries: SessionEntry[] = [];
 		for (const sessionFile of filePaths) {
-			const parsed = parseSessionFile(sessionFile);
+			const parsed = parseSessionFile(sessionFile, {
+				maxEntries: this.maxCachedEntries,
+				since: options.since ?? undefined,
+			});
 			if (!parsed) continue;
 			entries.push(...parsed.entries);
+			entries = trimNewestEntries(entries, this.maxCachedEntries);
 		}
 
-		const sortedEntries = entries.sort(
-			(left, right) =>
-				toTimestamp(left.timestamp) - toTimestamp(right.timestamp),
-		);
-		// Trim to max limit to prevent memory bloat
-		const trimmedEntries =
-			sortedEntries.length > this.maxCachedEntries
-				? sortedEntries.slice(-this.maxCachedEntries)
-				: sortedEntries;
+		const trimmedEntries = trimNewestEntries(entries, this.maxCachedEntries);
 		this.entryCache.set(scope, { signature, entries: trimmedEntries });
 		return trimmedEntries;
 	}
@@ -290,7 +320,8 @@ export class TapeService {
 		const { types, limit, query, since, scope = "project" } = options;
 		const { startTime, endTime } = this.resolveQueryBounds(options);
 
-		let entries = this.loadEntries(scope);
+		const loadSince = latestTimestampString(startTime, since);
+		let entries = this.loadEntries(scope, { since: loadSince });
 
 		if (startTime) {
 			entries = getEntriesAfterTimestamp(entries, startTime);

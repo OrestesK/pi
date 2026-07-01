@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import type {
 	SessionEntry,
 	SessionHeader,
@@ -94,6 +95,34 @@ function getDirectoryMtimeMs(dirPath: string): number | null {
 	}
 }
 
+function readFirstLine(filePath: string): string | null {
+	const fd = fs.openSync(filePath, "r");
+	const buffer = Buffer.allocUnsafe(4096);
+	const chunks: Buffer[] = [];
+	let totalLength = 0;
+
+	try {
+		while (true) {
+			const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, null);
+			if (bytesRead === 0) break;
+
+			const newlineIndex = buffer.subarray(0, bytesRead).indexOf(0x0a);
+			const end = newlineIndex === -1 ? bytesRead : newlineIndex;
+			if (end > 0) {
+				const chunk = Buffer.from(buffer.subarray(0, end));
+				chunks.push(chunk);
+				totalLength += chunk.length;
+			}
+			if (newlineIndex !== -1) break;
+		}
+	} finally {
+		fs.closeSync(fd);
+	}
+
+	if (totalLength === 0) return null;
+	return Buffer.concat(chunks, totalLength).toString("utf-8");
+}
+
 function readSessionHeader(filePath: string): SessionHeader | null {
 	try {
 		const stat = fs.statSync(filePath);
@@ -107,8 +136,7 @@ function readSessionHeader(filePath: string): SessionHeader | null {
 			return cached.value;
 		}
 
-		const content = fs.readFileSync(filePath, "utf-8");
-		const firstLine = content.split("\n", 1)[0];
+		const firstLine = readFirstLine(filePath);
 		if (!firstLine) {
 			sessionHeaderCache.set(filePath, {
 				mtimeMs: stat.mtimeMs,
@@ -208,12 +236,76 @@ export function getSessionFilePath(
 	return null;
 }
 
+export type ParseSessionFileOptions = {
+	maxEntries?: number;
+	since?: string;
+};
+
+function parseSessionLine(
+	line: string,
+	lineNumber: number,
+	state: {
+		header: SessionHeader | null;
+		entries: SessionEntry[];
+		maxEntries: number | null;
+		sinceTimestamp: number | null;
+		cursor: number;
+		wrapped: boolean;
+	},
+): void {
+	if (!line.trim()) return;
+
+	if (lineNumber === 0) {
+		const header = JSON.parse(line) as SessionHeader;
+		state.header = header.type === "session" ? header : null;
+		return;
+	}
+
+	if (!state.header) return;
+
+	try {
+		const entry = JSON.parse(line) as SessionEntry;
+		if (
+			state.sinceTimestamp !== null &&
+			toTimestamp(entry.timestamp) <= state.sinceTimestamp
+		) {
+			return;
+		}
+
+		if (state.maxEntries !== null && state.entries.length >= state.maxEntries) {
+			state.entries[state.cursor] = entry;
+			state.cursor = (state.cursor + 1) % state.maxEntries;
+			state.wrapped = true;
+			return;
+		}
+
+		state.entries.push(entry);
+	} catch {
+		// Skip malformed lines
+	}
+}
+
+function finalizeRollingEntries(state: {
+	entries: SessionEntry[];
+	cursor: number;
+	wrapped: boolean;
+}): SessionEntry[] {
+	if (!state.wrapped) return state.entries;
+	return [
+		...state.entries.slice(state.cursor),
+		...state.entries.slice(0, state.cursor),
+	];
+}
+
 export function parseSessionFile(
 	filePath: string,
+	options: ParseSessionFileOptions = {},
 ): { header: SessionHeader; entries: SessionEntry[] } | null {
+	const cacheKey = `${filePath}::${options.maxEntries ?? "all"}::${options.since ?? ""}`;
+
 	try {
 		const stat = fs.statSync(filePath);
-		const cached = sessionParseCache.get(filePath);
+		const cached = sessionParseCache.get(cacheKey);
 
 		if (
 			cached &&
@@ -223,42 +315,65 @@ export function parseSessionFile(
 			return cached.value;
 		}
 
-		const content = fs.readFileSync(filePath, "utf-8");
-		const lines = content.trim().split("\n");
-		if (lines.length === 0) {
-			sessionParseCache.set(filePath, {
-				mtimeMs: stat.mtimeMs,
-				size: stat.size,
-				value: null,
-			});
-			return null;
-		}
+		const maxEntries =
+			typeof options.maxEntries === "number" && options.maxEntries > 0
+				? Math.floor(options.maxEntries)
+				: null;
+		const sinceTimestamp = options.since ? toTimestamp(options.since) : null;
+		const state = {
+			header: null as SessionHeader | null,
+			entries: [] as SessionEntry[],
+			maxEntries,
+			sinceTimestamp,
+			cursor: 0,
+			wrapped: false,
+		};
 
-		const header: SessionHeader = JSON.parse(lines[0]);
-		if (header.type !== "session") {
-			sessionParseCache.set(filePath, {
-				mtimeMs: stat.mtimeMs,
-				size: stat.size,
-				value: null,
-			});
-			return null;
-		}
+		const fd = fs.openSync(filePath, "r");
+		const buffer = Buffer.allocUnsafe(1024 * 1024);
+		const decoder = new StringDecoder("utf-8");
+		let pending = "";
+		let lineNumber = 0;
 
-		const entries: SessionEntry[] = [];
+		try {
+			while (true) {
+				const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, null);
+				if (bytesRead === 0) break;
 
-		for (let index = 1; index < lines.length; index++) {
-			const line = lines[index];
-			if (!line.trim()) continue;
+				pending += decoder.write(buffer.subarray(0, bytesRead));
+				while (true) {
+					const newlineIndex = pending.indexOf("\n");
+					if (newlineIndex === -1) break;
 
-			try {
-				entries.push(JSON.parse(line) as SessionEntry);
-			} catch {
-				// Skip malformed lines
+					const line = pending.slice(0, newlineIndex);
+					pending = pending.slice(newlineIndex + 1);
+					parseSessionLine(line, lineNumber, state);
+					lineNumber++;
+				}
 			}
+
+			pending += decoder.end();
+			if (pending.length > 0) {
+				parseSessionLine(pending, lineNumber, state);
+			}
+		} finally {
+			fs.closeSync(fd);
 		}
 
-		const parsed = { header, entries };
-		sessionParseCache.set(filePath, {
+		if (!state.header) {
+			sessionParseCache.set(cacheKey, {
+				mtimeMs: stat.mtimeMs,
+				size: stat.size,
+				value: null,
+			});
+			return null;
+		}
+
+		const parsed = {
+			header: state.header,
+			entries: finalizeRollingEntries(state),
+		};
+		sessionParseCache.set(cacheKey, {
 			mtimeMs: stat.mtimeMs,
 			size: stat.size,
 			value: parsed,
@@ -266,7 +381,7 @@ export function parseSessionFile(
 		return parsed;
 	} catch {
 		sessionHeaderCache.delete(filePath);
-		sessionParseCache.delete(filePath);
+		sessionParseCache.delete(cacheKey);
 		return null;
 	}
 }
