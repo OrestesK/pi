@@ -61,6 +61,7 @@ const expectedAllowlist = [
   "Agent",
   "mcp",
   "intercom",
+  "contact_supervisor",
   "subagent",
   "subagent_list",
   "subagent_done",
@@ -111,6 +112,9 @@ const callMatrix = [
   ["intercom", { action: "pending" }, "pending"],
   ["intercom", { action: "ask", to: "worker", message: "Need review" }, "worker"],
   ["intercom", { action: "reply", message: "ack" }, "ack"],
+  ["contact_supervisor", { reason: "need_decision", message: "Should I optimize for readability or speed?" }, "Needs decision"],
+  ["contact_supervisor", { reason: "progress_update", message: "UPDATE: found the root cause" }, "Progress update"],
+  ["contact_supervisor", {}, "…"],
   ["subagent", { agent: "scout", task: "look", async: true }, "scout"],
   ["subagent", { action: "status", id: "abc123" }, "status"],
   ["subagent", { workflow: "builtin.generate-filter", task: "ideas" }, "builtin.generate-filter"],
@@ -333,6 +337,8 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
     ["intercom", "Intercom", textResult("Message sent to worker"), /sent to worker/],
     ["intercom", "Intercom", textResult("Reply sent to reviewer"), /reply sent to reviewer/],
     ["intercom", "Intercom", textResult("**Reply from worker:**\nack"), /reply from worker/],
+    ["contact_supervisor", "Contact Supervisor", textResult("**Reply from supervisor:**\nUse readability.", { reason: "need_decision", replied: true }), /decision received/],
+    ["contact_supervisor", "Contact Supervisor", textResult("Progress update sent.", { reason: "progress_update", sent: true }), /progress sent/],
     ["tape_info", "Tape Info", textResult("📊 Tape Information:\n  Total entries: 312\n  Anchors: 1\n  Last anchor: task/begin\n  Entries since last anchor: 42", { totalEntries: 312, anchorCount: 1, lastAnchorName: "task/begin", entriesSinceLastAnchor: 42 }), /312 entries · 1 anchor · last task\/begin · 42 since anchor/],
     ["tape_search", "Tape Search", textResult("Found 1 entries\n\n[10:00] User: renderer", { count: 1, entryCount: 1, anchorCount: 0 }), /1 entry/],
     ["tape_read", "Tape Read", textResult("Retrieved 2 entries:\n\n[10:00] User: hi\n[10:01] Assistant: ok", { count: 2 }), /2 entries/],
@@ -418,6 +424,80 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
     "Intercom",
   );
   assert.match(render(partialIntercomAsk), /Waiting for Reply/);
+
+  const partialSupervisorDecision = ui.wrappedToolResult(
+    "contact_supervisor",
+    textResult("waiting"),
+    options({ isPartial: true }),
+    theme,
+    context(
+      { reason: "need_decision", message: "Need scope decision before continuing." },
+      { toolCallId: "contact-supervisor-partial-decision" },
+    ),
+    "Contact Supervisor",
+  );
+  assert.match(render(partialSupervisorDecision), /Waiting for Decision/);
+  assert.equal(ui.webToolTitle("contact_supervisor"), "Contact Supervisor");
+  assert.match(
+    ui.webToolCallBody(
+      "contact_supervisor",
+      { reason: "need_decision", message: "Need scope decision before continuing." },
+      theme,
+    ),
+    /Need scope decision before continuing/,
+  );
+  assert.match(
+    ui.webToolCallBody(
+      "contact_supervisor",
+      { reason: "progress_update", message: "UPDATE: found the root cause." },
+      theme,
+    ),
+    /UPDATE: found the root cause/,
+  );
+
+  const partialSupervisorUpdate = ui.wrappedToolResult(
+    "contact_supervisor",
+    textResult("sending"),
+    options({ isPartial: true }),
+    theme,
+    context(
+      { reason: "progress_update", message: "UPDATE: found the root cause." },
+      { toolCallId: "contact-supervisor-partial-update" },
+    ),
+    "Contact Supervisor",
+  );
+  assert.match(render(partialSupervisorUpdate), /Sending Update/);
+
+  const supervisorReply = render(
+    ui.wrappedToolResult(
+      "contact_supervisor",
+      textResult("**Reply from supervisor:**\nUse the smaller change.\n\nThen rerun focused tests.", { reason: "need_decision", replied: true }),
+      options({ expanded: true }),
+      theme,
+      context({}, { toolCallId: "contact-supervisor-reply" }),
+      "Contact Supervisor",
+    ),
+  );
+  assert.match(supervisorReply, /decision received/);
+  assert.match(supervisorReply, /Reply from supervisor:/);
+  assert.match(supervisorReply, /Use the smaller change/);
+  assert.doesNotMatch(supervisorReply, /\*\*Reply from supervisor:/);
+
+  const supervisorUpdate = render(
+    ui.wrappedToolResult(
+      "contact_supervisor",
+      textResult("**Progress update:**\n**UPDATE:** found the root cause.", { reason: "progress_update", sent: true }),
+      options({ expanded: true }),
+      theme,
+      context({}, { toolCallId: "contact-supervisor-update" }),
+      "Contact Supervisor",
+    ),
+  );
+  assert.match(supervisorUpdate, /progress sent/);
+  assert.match(supervisorUpdate, /Progress update:/);
+  assert.match(supervisorUpdate, /UPDATE:/);
+  assert.doesNotMatch(supervisorUpdate, /\*\*Progress update:/);
+  assert.doesNotMatch(supervisorUpdate, /\*\*UPDATE:/);
 
   const partial = ui.wrappedToolResult(
     "code_search",

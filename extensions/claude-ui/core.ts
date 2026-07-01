@@ -1602,6 +1602,7 @@ const EXTENSION_TOOL_WRAPPER_ALLOWLIST = new Set([
   "Agent",
   "mcp",
   "intercom",
+  "contact_supervisor",
   "subagent",
   "subagent_list",
   "subagent_done",
@@ -2034,6 +2035,21 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
           ? compactOneLine(argValueLabel(args, "message") ?? "…", 80)
           : undefined,
       ]);
+    case "contact_supervisor": {
+      const reason = argValueLabel(args, "reason");
+      const reasonLabel =
+        reason === "need_decision"
+          ? "Needs decision"
+          : reason === "progress_update"
+            ? "Progress update"
+            : (reason ?? "…");
+      return joinBodyParts(theme, [
+        pathText(theme, reasonLabel),
+        argValueLabel(args, "message")
+          ? compactOneLine(argValueLabel(args, "message") ?? "…", 90)
+          : undefined,
+      ]);
+    }
     case "subagent": {
       if (!isRecord(args)) return muted(theme, "…");
       const action = argValueLabel(args, "action");
@@ -2285,6 +2301,8 @@ function webToolTitle(name: string): string {
       return "MCP";
     case "intercom":
       return "Intercom";
+    case "contact_supervisor":
+      return "Contact Supervisor";
     case "subagent":
       return "Subagent";
     case "todo":
@@ -2455,6 +2473,12 @@ function pendingToolLabel(
         return "Checking Intercom";
       return "Intercom";
     }
+    case "contact_supervisor": {
+      const reason = argValueLabel(args, "reason");
+      if (reason === "need_decision") return "Waiting for Decision";
+      if (reason === "progress_update") return "Sending Update";
+      return "Contacting Supervisor";
+    }
     case "ask_user":
       return "Asking User";
     default:
@@ -2556,6 +2580,13 @@ function intercomPreviewLines(output: string): string[] | undefined {
   if (intercomResultSummary(output) === "no pending asks") return [];
   const lines = contentLines(output)
     .map((line) => line.trim().replace(/^\*\*(.+?)\*\*$/, "$1"))
+    .filter(Boolean);
+  return lines.length > 0 ? lines : undefined;
+}
+
+function contactSupervisorPreviewLines(output: string): string[] | undefined {
+  const lines = contentLines(output)
+    .map((line) => line.trim().replace(/\*\*(.+?)\*\*/g, "$1"))
     .filter(Boolean);
   return lines.length > 0 ? lines : undefined;
 }
@@ -3502,6 +3533,13 @@ function toolPreviewBlock(
         expanded,
         EXPANDED_PREVIEW_LINES,
       );
+    case "contact_supervisor":
+      return previewLinesBlock(
+        contactSupervisorPreviewLines(output) ?? contentLines(output),
+        theme,
+        expanded,
+        EXPANDED_PREVIEW_LINES,
+      );
     case "tape_info":
       return previewLinesBlock(
         tapeInfoPreviewLines(output) ?? contentLines(output),
@@ -3558,6 +3596,20 @@ function resultDetailSummary(
       );
     case "intercom":
       return intercomResultSummary(output) ?? (lines > 0 ? plural(lines, "line") : "done");
+    case "contact_supervisor": {
+      const reason = detailString(details, "reason");
+      if (reason === "need_decision") {
+        return detailBoolean(details, "replied") || /Reply from supervisor/i.test(output)
+          ? "decision received"
+          : "waiting for decision";
+      }
+      if (reason === "progress_update") {
+        return detailBoolean(details, "sent") || /sent/i.test(output)
+          ? "progress sent"
+          : "progress update";
+      }
+      return lines > 0 ? plural(lines, "line") : "sent";
+    }
     case "tape_info": {
       const totalEntries = detailNumber(details, "totalEntries");
       const anchorCount = detailNumber(details, "anchorCount");
@@ -4785,6 +4837,7 @@ export const __claudeUiTestInternals = {
   renderWriteResult,
   shouldUseOriginalToolCallRenderer,
   webToolCallBody,
+  webToolTitle,
   wrappedToolResult,
 };
 
