@@ -65,6 +65,13 @@ const expectedAllowlist = [
   "subagent_list",
   "subagent_done",
   "todo",
+  "tape_handoff",
+  "tape_list",
+  "tape_delete",
+  "tape_info",
+  "tape_search",
+  "tape_read",
+  "tape_reset",
   "ask_user",
   "tree_sitter_search_symbols",
   "tree_sitter_document_symbols",
@@ -114,6 +121,13 @@ const callMatrix = [
   ["subagent_done", { agent: "worker", task: "finish", status: "done" }, "worker"],
   ["todo", { action: "create", id: "TODO-1", title: "Renderer coverage", status: "open" }, "Renderer coverage"],
   ["todo", {}, "…"],
+  ["tape_handoff", { name: "task/begin", summary: "start work", purpose: "handoff" }, "task/begin"],
+  ["tape_list", { limit: 5, contextLines: 2 }, "limit 5"],
+  ["tape_delete", { id: "anchor-1" }, "anchor-1"],
+  ["tape_info", {}, "summary"],
+  ["tape_search", { kinds: ["entry"], query: "renderer" }, "renderer"],
+  ["tape_read", { lastAnchor: true, query: "renderer", limit: 5 }, "@last"],
+  ["tape_reset", { archive: true }, "archive"],
   ["ask_user", { question: "Continue?", options: ["yes", "no"] }, "Continue?"],
   ["ask_user", { question: "Continue?", options: ["yes", "no"] }, "2 options"],
   ["tree_sitter_search_symbols", { query: "render", path: "extensions", language: "typescript" }, "render"],
@@ -319,7 +333,29 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
     ["intercom", "Intercom", textResult("Message sent to worker"), /sent to worker/],
     ["intercom", "Intercom", textResult("Reply sent to reviewer"), /reply sent to reviewer/],
     ["intercom", "Intercom", textResult("**Reply from worker:**\nack"), /reply from worker/],
+    ["tape_info", "Tape Info", textResult("📊 Tape Information:\n  Total entries: 312\n  Anchors: 1\n  Last anchor: task/begin\n  Entries since last anchor: 42", { totalEntries: 312, anchorCount: 1, lastAnchorName: "task/begin", entriesSinceLastAnchor: 42 }), /312 entries · 1 anchor · last task\/begin · 42 since anchor/],
+    ["tape_search", "Tape Search", textResult("Found 1 entries\n\n[10:00] User: renderer", { count: 1, entryCount: 1, anchorCount: 0 }), /1 entry/],
+    ["tape_read", "Tape Read", textResult("Retrieved 2 entries:\n\n[10:00] User: hi\n[10:01] Assistant: ok", { count: 2 }), /2 entries/],
+    ["tape_list", "Tape List", textResult("Found 1 anchor(s):\n\n  - task/begin [handoff] (today)", { count: 1 }), /1 anchor/],
+    ["tape_handoff", "Tape Handoff", textResult("{}", { name: "task/begin" }), /anchor task\/begin/],
+    ["tape_delete", "Tape Delete", textResult("{}", { id: "anchor-1", deleted: true, name: "task/begin" }), /deleted task\/begin/],
+    ["tape_reset", "Tape Reset", textResult("Anchor index cleared", { archived: false }), /reset/],
   ];
+
+  for (const toolName of ["tape_read", "tape_search"]) {
+    const renderedTapeTranscript = render(
+      ui.wrappedToolResult(
+        toolName,
+        textResult("Retrieved 1 entry:\n\n[10:00] User:\n  - bullet\n    code", { count: 1, entryCount: 1, anchorCount: 0 }),
+        options({ expanded: true }),
+        theme,
+        context({}, { toolCallId: `${toolName}-preserve-preview` }),
+        toolName === "tape_read" ? "Tape Read" : "Tape Search",
+      ),
+    );
+    assert.match(renderedTapeTranscript, /│   - bullet/);
+    assert.match(renderedTapeTranscript, /│     code/);
+  }
   for (const [toolName, title, result, expected] of cases) {
     const component = ui.wrappedToolResult(
       toolName,

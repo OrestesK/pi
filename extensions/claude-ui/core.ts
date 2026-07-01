@@ -1606,6 +1606,13 @@ const EXTENSION_TOOL_WRAPPER_ALLOWLIST = new Set([
   "subagent_list",
   "subagent_done",
   "todo",
+  "tape_handoff",
+  "tape_list",
+  "tape_delete",
+  "tape_info",
+  "tape_search",
+  "tape_read",
+  "tape_reset",
   "ask_user",
   "tree_sitter_search_symbols",
   "tree_sitter_document_symbols",
@@ -2072,6 +2079,60 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
           : undefined,
         argValueLabel(args, "status"),
       ]);
+    case "tape_handoff":
+      return joinBodyParts(theme, [
+        pathText(theme, compactOneLine(argValueLabel(args, "name") ?? "…", 70)),
+        argValueLabel(args, "purpose"),
+        argValueLabel(args, "summary")
+          ? compactOneLine(argValueLabel(args, "summary") ?? "", 70)
+          : undefined,
+      ]);
+    case "tape_list":
+      return joinBodyParts(theme, [
+        argValueLabel(args, "limit")
+          ? `limit ${argValueLabel(args, "limit")}`
+          : undefined,
+        argValueLabel(args, "contextLines")
+          ? `context ${argValueLabel(args, "contextLines")}`
+          : undefined,
+      ]);
+    case "tape_delete":
+      return pathText(theme, compactOneLine(argValueLabel(args, "id") ?? "…", 70));
+    case "tape_info":
+      return muted(theme, "summary");
+    case "tape_search":
+      return joinBodyParts(theme, [
+        argStringArray(args, "kinds").join(",") || undefined,
+        argValueLabel(args, "query")
+          ? pathText(theme, compactOneLine(argValueLabel(args, "query") ?? "", 70))
+          : undefined,
+        argValueLabel(args, "sinceAnchor")
+          ? `@${argValueLabel(args, "sinceAnchor")}`
+          : undefined,
+        argValueLabel(args, "lastAnchor") === "true" ? "@last" : undefined,
+        argValueLabel(args, "anchorName"),
+        argValueLabel(args, "anchorType"),
+        argValueLabel(args, "limit")
+          ? `limit ${argValueLabel(args, "limit")}`
+          : undefined,
+      ]);
+    case "tape_read":
+      return joinBodyParts(theme, [
+        argValueLabel(args, "afterAnchor")
+          ? `after ${argValueLabel(args, "afterAnchor")}`
+          : undefined,
+        argValueLabel(args, "lastAnchor") === "true" ? "@last" : undefined,
+        argValueLabel(args, "query")
+          ? pathText(theme, compactOneLine(argValueLabel(args, "query") ?? "", 70))
+          : undefined,
+        argValueLabel(args, "limit")
+          ? `limit ${argValueLabel(args, "limit")}`
+          : undefined,
+      ]);
+    case "tape_reset":
+      return argValueLabel(args, "archive") === "true"
+        ? muted(theme, "archive")
+        : muted(theme, "anchors");
     case "ask_user": {
       const optionCount = argArrayCount(args, "options");
       return joinBodyParts(theme, [
@@ -2228,6 +2289,20 @@ function webToolTitle(name: string): string {
       return "Subagent";
     case "todo":
       return "Todo";
+    case "tape_handoff":
+      return "Tape Handoff";
+    case "tape_list":
+      return "Tape List";
+    case "tape_delete":
+      return "Tape Delete";
+    case "tape_info":
+      return "Tape Info";
+    case "tape_search":
+      return "Tape Search";
+    case "tape_read":
+      return "Tape Read";
+    case "tape_reset":
+      return "Tape Reset";
     case "ask_user":
       return "Ask User";
     case "subagent_list":
@@ -2482,6 +2557,22 @@ function intercomPreviewLines(output: string): string[] | undefined {
   const lines = contentLines(output)
     .map((line) => line.trim().replace(/^\*\*(.+?)\*\*$/, "$1"))
     .filter(Boolean);
+  return lines.length > 0 ? lines : undefined;
+}
+
+function tapeInfoPreviewLines(output: string): string[] | undefined {
+  const lines = contentLines(output)
+    .map((line) => line.trim().replace(/^📊\s*/, ""))
+    .filter(Boolean)
+    .filter((line) => line !== "Tape Information:");
+  return lines.length > 0 ? lines : undefined;
+}
+
+function tapeListPreviewLines(output: string): string[] | undefined {
+  const lines = contentLines(output)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^\s*-\s*/, ""));
   return lines.length > 0 ? lines : undefined;
 }
 
@@ -3411,6 +3502,32 @@ function toolPreviewBlock(
         expanded,
         EXPANDED_PREVIEW_LINES,
       );
+    case "tape_info":
+      return previewLinesBlock(
+        tapeInfoPreviewLines(output) ?? contentLines(output),
+        theme,
+        expanded,
+        EXPANDED_PREVIEW_LINES,
+      );
+    case "tape_list":
+      return previewLinesBlock(
+        tapeListPreviewLines(output) ?? contentLines(output),
+        theme,
+        expanded,
+        EXPANDED_PREVIEW_LINES,
+      );
+    case "tape_search":
+    case "tape_read":
+      return previewLinesBlock(
+        contentLines(output),
+        theme,
+        expanded,
+        EXPANDED_PREVIEW_LINES,
+      );
+    case "tape_handoff":
+    case "tape_delete":
+    case "tape_reset":
+      return "";
     default:
       return previewBlock(output, theme, expanded, EXPANDED_PREVIEW_LINES);
   }
@@ -3441,6 +3558,68 @@ function resultDetailSummary(
       );
     case "intercom":
       return intercomResultSummary(output) ?? (lines > 0 ? plural(lines, "line") : "done");
+    case "tape_info": {
+      const totalEntries = detailNumber(details, "totalEntries");
+      const anchorCount = detailNumber(details, "anchorCount");
+      const lastAnchorName = detailString(details, "lastAnchorName");
+      const entriesSinceLastAnchor = detailNumber(
+        details,
+        "entriesSinceLastAnchor",
+      );
+      const parts = [
+        totalEntries !== undefined
+          ? plural(totalEntries, "entry", "entries")
+          : undefined,
+        anchorCount !== undefined ? plural(anchorCount, "anchor") : undefined,
+        lastAnchorName && lastAnchorName !== "none"
+          ? `last ${compactOneLine(lastAnchorName, 50)}`
+          : undefined,
+        entriesSinceLastAnchor !== undefined
+          ? `${entriesSinceLastAnchor} since anchor`
+          : undefined,
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(" · ") : "summary";
+    }
+    case "tape_search": {
+      const anchorCount = detailNumber(details, "anchorCount");
+      const entryCount = detailNumber(details, "entryCount");
+      const count = detailNumber(details, "count");
+      const parts = [
+        anchorCount !== undefined && anchorCount > 0
+          ? plural(anchorCount, "anchor")
+          : undefined,
+        entryCount !== undefined && entryCount > 0
+          ? plural(entryCount, "entry", "entries")
+          : undefined,
+      ].filter(Boolean);
+      if (parts.length > 0) return parts.join(" · ");
+      return count !== undefined ? plural(count, "result") : "search complete";
+    }
+    case "tape_read": {
+      const count = detailNumber(details, "count");
+      return count !== undefined
+        ? plural(count, "entry", "entries")
+        : "read complete";
+    }
+    case "tape_list": {
+      const count = detailNumber(details, "count");
+      return count !== undefined ? plural(count, "anchor") : "listed anchors";
+    }
+    case "tape_handoff": {
+      if (detailBoolean(details, "disabled")) return "disabled";
+      return detailString(details, "name")
+        ? `anchor ${detailString(details, "name")}`
+        : "anchor created";
+    }
+    case "tape_delete": {
+      const id = detailString(details, "id");
+      const name = detailString(details, "name") ?? id;
+      return detailBoolean(details, "deleted")
+        ? `deleted ${name ?? "anchor"}`
+        : `not found${id ? ` ${id}` : ""}`;
+    }
+    case "tape_reset":
+      return detailBoolean(details, "archived") ? "archived and reset" : "reset";
     case "lsp_navigation": {
       const operation = detailString(details, "operation");
       const resultCount = detailNumber(details, "resultCount");
