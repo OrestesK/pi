@@ -33,6 +33,8 @@ When the user asks for many reviewers, 8-10 review agents, different goals, or r
 
 Give every reviewer a specific task prompt naming its angle. Prefer `context: "fresh"`, `async: false`, `output: false`, `progress: false`, and deliberate `concurrency` in the runtime call because parent synthesis depends on reviewer output. If the user says `no repo artifacts`, `no project artifacts`, or `don't write .scratch files`, also set top-level `artifacts: false`. If the user says strict `do not write artifacts`, `no files`, or `inline only`, do not launch subagents; review parent-only or ask to relax that constraint. Ask reviewers to return concise, evidence-backed findings with file/line references and suggested fixes. The response should be review feedback, not a context summary. Reviewers must not edit files unless I explicitly ask for a writer pass.
 
+Every reviewer task should include this compact stop/block contract: Do not stop to save cost; continue while additional evidence could materially improve the deliverable. If blocked by missing tools, missing access, or missing context, return `BLOCKED` with the smallest missing next step. Do not broaden scope or make approval-required decisions.
+
 While reviewers run, do your own narrow inspection if useful. After they return, synthesize the feedback into:
 
 - fixes worth doing now

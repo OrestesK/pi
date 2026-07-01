@@ -22,6 +22,8 @@ Runtime policy:
 - If findings may be large, need persistence, or may be needed across turns and artifacts are allowed, set an explicit output path and `outputMode: "file-only"`.
 - For this top-level `tasks` shape, relative output paths resolve against `cwd`, not a temporary chain artifact directory; use absolute `.scratch/...` paths when the artifact must land in a specific repo.
 - For foreground tool-call chain steps, relative outputs are temp/chain-artifact-local; slash-command background `/chain` relative outputs resolve against cwd or the step cwd.
+- Every child task should include this compact stop/block contract: Do not stop to save cost; continue while additional evidence could materially improve the deliverable. If blocked by missing tools, missing access, or missing context, return `BLOCKED` with the smallest missing next step. Do not broaden scope or make approval-required decisions.
+- For researcher tasks, include a research depth contract: Do not cap searches or sources to save cost. Pursue primary sources, counterevidence, and follow-up searches while new evidence could materially change the conclusion; stop only when findings are saturated or blocked.
 
 Before parent synthesis:
 

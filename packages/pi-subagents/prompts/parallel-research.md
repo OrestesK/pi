@@ -11,6 +11,10 @@ Use a combination of `researcher` and `scout` subagents:
 - Use `researcher` for web, docs, standards, ecosystem, recent changes, benchmarks, and primary-source evidence.
 - Use `scout` for local codebase context, existing implementation patterns, repo constraints, and files that would be affected.
 
+For researcher tasks, include a research depth contract: Do not cap searches or sources to save cost. Pursue primary sources, counterevidence, and follow-up searches while new evidence could materially change the conclusion; stop only when findings are saturated or blocked.
+
+Every child task should include this compact stop/block contract: Do not stop to save cost; continue while additional evidence could materially improve the deliverable. If blocked by missing tools, missing access, or missing context, return `BLOCKED` with the smallest missing next step. Do not broaden scope or make approval-required decisions.
+
 Give each subagent a distinct angle. Unless I specify angles, use these three:
 
 1. External evidence

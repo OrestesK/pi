@@ -19,6 +19,7 @@ Runtime policy:
 - Prefer three strong reviewers for normal work and add a fourth or fifth when the target is large, security-sensitive, ops-heavy, architecture-heavy, or ambiguous.
 - Do not spawn duplicate vague reviewers.
 - For broader grouped gates or missing-evidence follow-ups, use the sectioned-swarm protocol in `packages/pi-subagents/skills/pi-subagents/SKILL.md`: name the new evidence angle before launching any second targeted read-only swarm.
+- Every child task should include this compact stop/block contract: Do not stop to save cost; continue while additional evidence could materially improve the deliverable. If blocked by missing tools, missing access, or missing context, return `BLOCKED` with the smallest missing next step. Do not broaden scope or make approval-required decisions.
 
 Before emitting the verdict:
 

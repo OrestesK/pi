@@ -110,23 +110,38 @@ function conflictingWorkflowFields(params: WorkflowParamsLike): string[] {
 	return conflicts;
 }
 
+const CHILD_TASK_CONTRACT = `Do not stop to save cost; continue while additional evidence could materially improve the deliverable.
+If blocked by missing tools, missing access, or missing context, return BLOCKED with the smallest missing next step.
+Do not broaden scope; escalate approval-required product, architecture, security, data, or scope decisions.
+When making factual claims, cite concrete evidence or state exactly what was not verified.`;
+
+const RESEARCH_DEPTH_CONTRACT = "Research depth: Do not cap searches or sources to save cost. Pursue primary sources, counterevidence, and follow-up searches while new evidence could materially change the conclusion; stop only when findings are saturated or blocked.";
+
+function withChildTaskContract(task: string): string {
+	return `${task}\n\n${CHILD_TASK_CONTRACT}`;
+}
+
+function withResearchDepth(task: string): string {
+	return `${task}\n${RESEARCH_DEPTH_CONTRACT}`;
+}
+
 function qualityGateTasks(target: string): WorkflowTask[] {
 	return [
 		{
 			agent: "reviewer",
-			task: `Quality gate: attack correctness, necessity, and regression risk for this target. Do not edit. Target:\n\n${target}`,
+			task: withChildTaskContract(`Quality gate: attack correctness, necessity, and regression risk for this target. Do not edit. Target:\n\n${target}`),
 			output: false,
 			progress: false,
 		},
 		{
 			agent: "reviewer",
-			task: `Quality gate: attack evidence, tests, verification, and approval boundaries for this target. Do not edit. Target:\n\n${target}`,
+			task: withChildTaskContract(`Quality gate: attack evidence, tests, verification, and approval boundaries for this target. Do not edit. Target:\n\n${target}`),
 			output: false,
 			progress: false,
 		},
 		{
 			agent: "reviewer",
-			task: `Quality gate: attack simplicity, scope, alternatives, and operational risk for this target. Do not edit. Target:\n\n${target}`,
+			task: withChildTaskContract(`Quality gate: attack simplicity, scope, alternatives, and operational risk for this target. Do not edit. Target:\n\n${target}`),
 			output: false,
 			progress: false,
 		},
@@ -137,19 +152,19 @@ function researchDecisionTasks(target: string): WorkflowTask[] {
 	return [
 		{
 			agent: "researcher",
-			task: `Research decision: gather external/current evidence relevant to this decision. Do not edit. Return sources, confidence, risks, and implications. Decision target:\n\n${target}`,
+			task: withChildTaskContract(withResearchDepth(`Research decision: gather external/current evidence relevant to this decision. Do not edit. Return sources, confidence, risks, and implications. Decision target:\n\n${target}`)),
 			output: false,
 			progress: false,
 		},
 		{
 			agent: "scout",
-			task: `Research decision: gather local repository/config context relevant to this decision. Do not edit or implement. Return files, constraints, risks, and likely verification surfaces. Decision target:\n\n${target}`,
+			task: withChildTaskContract(`Research decision: gather local repository/config context relevant to this decision. Do not edit or implement. Return files, constraints, risks, and likely verification surfaces. Decision target:\n\n${target}`),
 			output: false,
 			progress: false,
 		},
 		{
 			agent: "reviewer",
-			task: `Research decision: adversarially critique the decision and compare the strongest alternatives. Do not edit. Return must-fix objections, tradeoffs, and a recommended verdict shape. Decision target:\n\n${target}`,
+			task: withChildTaskContract(`Research decision: adversarially critique the decision and compare the strongest alternatives. Do not edit. Return must-fix objections, tradeoffs, and a recommended verdict shape. Decision target:\n\n${target}`),
 			output: false,
 			progress: false,
 		},
@@ -231,19 +246,19 @@ function generateFilterChain(target: string): WorkflowChainStep[] {
 			parallel: [
 				{
 					agent: "delegate",
-					task: `Generate practical, low-risk options for this request. Return concrete options only; do not filter yet. Request:\n\n${target}`,
+					task: withChildTaskContract(`Generate practical, low-risk options for this request. Return concrete options only; do not filter yet. Request:\n\n${target}`),
 					output: false,
 					progress: false,
 				},
 				{
 					agent: "delegate",
-					task: `Generate ambitious/high-upside options for this request. Return concrete options only; do not filter yet. Request:\n\n${target}`,
+					task: withChildTaskContract(`Generate ambitious/high-upside options for this request. Return concrete options only; do not filter yet. Request:\n\n${target}`),
 					output: false,
 					progress: false,
 				},
 				{
 					agent: "delegate",
-					task: `Generate minimal/simplifying options for this request. Return concrete options only; do not filter yet. Request:\n\n${target}`,
+					task: withChildTaskContract(`Generate minimal/simplifying options for this request. Return concrete options only; do not filter yet. Request:\n\n${target}`),
 					output: false,
 					progress: false,
 				},
@@ -252,7 +267,7 @@ function generateFilterChain(target: string): WorkflowChainStep[] {
 		},
 		{
 			agent: "reviewer",
-			task: "Filter the generated options from {previous}. Dedupe aggressively, reject weak or duplicate ideas, rank the strongest few, include tradeoffs and the next validation step. Do not edit.",
+			task: withChildTaskContract("Filter the generated options from {previous}. Dedupe aggressively, reject weak or duplicate ideas, rank the strongest few, include tradeoffs and the next validation step. Do not edit."),
 			output: false,
 			progress: false,
 		},

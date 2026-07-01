@@ -29,6 +29,22 @@ test("no-workflow params pass through without expanded workflow semantics", () =
 	assert.equal(result.params, params);
 });
 
+function assertWorkflowChildContract(taskText) {
+	assert.match(taskText, /Do not stop to save cost/i);
+	assert.match(taskText, /continue while additional evidence could materially improve/i);
+	assert.match(taskText, /BLOCKED/i);
+	assert.match(taskText, /missing tools|missing access|missing context/i);
+	assert.match(taskText, /Do not broaden scope/i);
+	assert.match(taskText, /evidence/i);
+}
+
+function assertResearchDepth(taskText) {
+	assert.match(taskText, /Research depth/i);
+	assert.match(taskText, /Do not cap searches or sources to save cost/i);
+	assert.match(taskText, /counterevidence/i);
+	assert.match(taskText, /materially change the conclusion/i);
+}
+
 test("quality-gate workflow expands to foreground fresh reviewer fanout", () => {
 	const result = expandBuiltinWorkflowParams({
 		workflow: "builtin.quality-gate",
@@ -62,6 +78,9 @@ test("quality-gate workflow expands to foreground fresh reviewer fanout", () => 
 		result.params?.tasks[0]?.task ?? "",
 		/verify proposal before implementing/,
 	);
+	for (const task of result.params?.tasks ?? []) {
+		assertWorkflowChildContract(task.task);
+	}
 });
 
 test("research-decision workflow expands to researcher scout reviewer fanout", () => {
@@ -80,6 +99,10 @@ test("research-decision workflow expands to researcher scout reviewer fanout", (
 		result.params?.tasks.map((task) => task.agent),
 		["researcher", "scout", "reviewer"],
 	);
+	for (const task of result.params?.tasks ?? []) {
+		assertWorkflowChildContract(task.task);
+	}
+	assertResearchDepth(result.params?.tasks[0]?.task ?? "");
 	assert.match(result.params?.tasks[2]?.task ?? "", /adversarially critique/);
 });
 
@@ -100,8 +123,12 @@ test("generate-filter workflow expands to foreground fan-out/fan-in chain", () =
 		result.params?.chain?.[0]?.parallel?.map((task) => task.agent),
 		["delegate", "delegate", "delegate"],
 	);
+	for (const task of result.params?.chain?.[0]?.parallel ?? []) {
+		assertWorkflowChildContract(task.task);
+	}
 	assert.equal(result.params?.chain?.[1]?.agent, "reviewer");
 	assert.match(result.params?.chain?.[1]?.task ?? "", /dedupe/i);
+	assertWorkflowChildContract(result.params?.chain?.[1]?.task ?? "");
 });
 
 test("live-steering-team workflow expands to one worker and two live reviewers", () => {

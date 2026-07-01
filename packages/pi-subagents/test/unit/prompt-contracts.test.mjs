@@ -59,11 +59,23 @@ test("pi-subagents skill owns sectioned swarm routing protocol", () => {
   assert.match(skill, /go through all edge cases/i);
 });
 
+function assertPromptStopBlockContract(prompt) {
+  assert.match(prompt, /Do not stop to save cost/i);
+  assert.match(
+    prompt,
+    /continue while additional evidence could materially improve/i,
+  );
+  assert.match(prompt, /BLOCKED/i);
+  assert.match(prompt, /missing tools|missing access|missing context/i);
+  assert.match(prompt, /Do not broaden scope/i);
+}
+
 test("recipe prompts point to sectioned swarm protocol without replacing their local contracts", () => {
   const parallelReview = readPackageFile("prompts/parallel-review.md");
   const qualityGate = readPackageFile("prompts/quality-gate.md");
   const generateFilter = readPackageFile("prompts/generate-filter.md");
   const researchDecision = readPackageFile("prompts/research-decision.md");
+  const parallelResearch = readPackageFile("prompts/parallel-research.md");
   const parallelContextBuild = readPackageFile(
     "prompts/parallel-context-build.md",
   );
@@ -100,6 +112,22 @@ test("recipe prompts point to sectioned swarm protocol without replacing their l
   assert.match(researchDecision, /async: false/);
   assert.match(researchDecision, /Never synthesize a recommendation from compact receipts/i);
   assert.match(researchDecision, /read each referenced saved artifact/i);
+  for (const researchPrompt of [parallelResearch, researchDecision, generateFilter]) {
+    assert.match(researchPrompt, /research depth/i);
+    assert.match(researchPrompt, /Do not cap searches or sources to save cost/i);
+    assert.match(researchPrompt, /counterevidence/i);
+    assert.match(researchPrompt, /materially change the conclusion/i);
+  }
+
+  for (const prompt of [
+    parallelReview,
+    qualityGate,
+    generateFilter,
+    researchDecision,
+    parallelResearch,
+  ]) {
+    assertPromptStopBlockContract(prompt);
+  }
 
   for (const prompt of [
     parallelReview,
