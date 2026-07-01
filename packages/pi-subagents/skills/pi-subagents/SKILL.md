@@ -421,12 +421,13 @@ Builtin agents load at the lowest priority. Project agents override user agents,
 and user/project agents override builtins with the same name. Protected advisory
 role names (`scout`, `reviewer`, `planner`, `researcher`, `context-builder`,
 `delegate`, `oracle`) are permission-sanitized after precedence is resolved:
-direct file mutation tools, generic `mcp`, direct MCP tools, `extensions`, and custom
-tool-extension paths are removed, and normal extensions are disabled except the
-subagent prompt runtime extension. Advisory `bash`, where present, is
-prompt-governed for read-only inspection because Pi has no read-only shell
-permission. Use `worker` or a custom non-advisory agent name for
-mutation-capable roles.
+direct file mutation tools, generic `mcp`, direct MCP tools, explicit `extensions`,
+custom-extension capability, and custom tool-extension paths are removed. Normal
+extensions remain enabled only when the role's default tool contract includes
+approved safe read-only extension-backed tools and the sanitized task tools still
+request them. Advisory `bash`, where present, is prompt-governed for read-only
+inspection because Pi has no read-only shell permission. Use `worker` or a custom
+non-advisory agent name for mutation-capable roles.
 
 | Agent             | Purpose                                     | Model            | Typical output / role                                                     |
 | ----------------- | ------------------------------------------- | ---------------- | ------------------------------------------------------------------------- |
@@ -494,10 +495,14 @@ Direct settings example:
 Useful override fields: `model`, `fallbackModels`, `thinking`,
 `systemPromptMode`, `inheritProjectContext`, `inheritSkills`, `defaultContext`,
 `disabled`, `skills`, `tools`, and `systemPrompt`. For protected advisory role
-names, `tools` is filtered to known advisory inspection/coordination tools,
-generic `mcp`, direct MCP tools, and `extensions` are stripped, and normal extensions are disabled.
-Use `worker` or a custom non-advisory agent name when direct file mutation,
-generic `mcp`, direct MCP tools, custom extensions, or custom tool-extension paths are required.
+names, `tools` is filtered to known advisory inspection/coordination tools;
+generic `mcp`, direct MCP tools, explicit `extensions`, custom-extension capability,
+and custom tool-extension paths are stripped. Normal extensions remain enabled only
+when the role's default tool contract includes approved safe read-only
+extension-backed tools and the sanitized task tools still request them. Use
+`worker` or a custom non-advisory agent name when direct file mutation, generic
+`mcp`, direct MCP tools, custom extensions, or custom tool-extension paths are
+required.
 Create a user or project agent with the same name only when you want a
 substantially different advisory prompt or model/context behavior.
 

@@ -151,12 +151,16 @@ export function syncResultAnimation(result: AgentToolResult<Details>, context: R
 	resultAnimationTimers.set(timer, context.state);
 }
 
-function extractOutputTarget(task: string): string | undefined {
+export function extractOutputTarget(task: string): string | undefined {
+	const savedToMatch = task.match(/\[Final response will be saved to:\s*([^\]\n]+)\]/i);
+	if (savedToMatch?.[1]?.trim()) return savedToMatch[1].trim();
+	const outputSavedMatch = task.match(/\*\*Output:\*\* Your final response will be saved to:\s*([^\n]+)/i);
+	if (outputSavedMatch?.[1]?.trim()) return outputSavedMatch[1].trim();
 	const writeToMatch = task.match(/\[Write to:\s*([^\]\n]+)\]/i);
 	if (writeToMatch?.[1]?.trim()) return writeToMatch[1].trim();
-	const findingsMatch = task.match(/Write your findings to:\s*(\S+)/i);
+	const findingsMatch = task.match(/Write your findings to:\s*([^\n]+)/i);
 	if (findingsMatch?.[1]?.trim()) return findingsMatch[1].trim();
-	const outputMatch = task.match(/[Oo]utput(?:\s+to)?\s*:\s*(\S+)/i);
+	const outputMatch = task.match(/[Oo]utput(?:\s+to)?\s*:\s*([^\n]+)/i);
 	if (outputMatch?.[1]?.trim()) return outputMatch[1].trim();
 	return undefined;
 }

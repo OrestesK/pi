@@ -70,6 +70,36 @@ test("buildPiArgs includes live steering team tools in explicit tool allowlist",
 	assert.equal(reviewer.args[reviewerToolsIndex + 1], "read,team_send_message,team_read_messages,team_ack_message,team_decide");
 });
 
+test("buildPiArgs keeps default extensions when extensions are omitted", () => {
+	const { args } = buildPiArgs({
+		baseArgs: ["--mode", "json", "-p"],
+		task: "research with web tools",
+		sessionEnabled: false,
+		inheritProjectContext: true,
+		inheritSkills: true,
+		tools: ["read", "web_search"],
+	});
+
+	const toolsIndex = args.indexOf("--tools");
+	assert.notEqual(toolsIndex, -1);
+	assert.equal(args[toolsIndex + 1], "read,web_search");
+	assert.equal(args.includes("--no-extensions"), false);
+});
+
+test("buildPiArgs disables normal extensions when extensions are explicitly empty", () => {
+	const { args } = buildPiArgs({
+		baseArgs: ["--mode", "json", "-p"],
+		task: "inspect locally",
+		sessionEnabled: false,
+		inheritProjectContext: true,
+		inheritSkills: true,
+		tools: ["read"],
+		extensions: [],
+	});
+
+	assert.equal(args.includes("--no-extensions"), true);
+});
+
 test("buildPiArgs forwards structured output capture paths to child env", () => {
 	const { env } = buildPiArgs({
 		baseArgs: ["--mode", "json", "-p"],

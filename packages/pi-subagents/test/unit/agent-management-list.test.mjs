@@ -36,10 +36,11 @@ test("list output is concise and routing-oriented", () => {
 
 	assert.match(text, /Tool access:/);
 	assert.match(text, /Tools are agent-specific, not inherited from the parent/);
-	assert.match(text, /Protected advisory roles strip MCP, mutation, and extension tools/);
+	assert.match(text, /Protected advisory roles strip MCP, mutation, direct custom-extension capability, and explicit extension tools/);
+	assert.match(text, /keep normal extensions only when their default tool contract includes approved safe read-only extension-backed tools/);
 	assert.match(text, /write-capable agent for writes/);
 	assert.match(text, /configured non-advisory agent for MCP\/custom tools/);
-	assert.doesNotMatch(text, /Retool/);
+	assert.doesNotMatch(text, /specific MCP target/);
 
 	assert.match(text, /Builtin workflows \(foreground\/fresh\):/);
 	assert.match(text, /builtin\.quality-gate/);

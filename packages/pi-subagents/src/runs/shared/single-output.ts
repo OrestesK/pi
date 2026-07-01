@@ -37,7 +37,7 @@ export function injectSingleOutputInstruction(
 	outputPath: string | undefined,
 ): string {
 	if (!outputPath) return task;
-	return `${task}\n\n---\n**Output:** Write your findings to: ${outputPath}`;
+	return `${task}\n\n---\n**Output:** Your final response will be saved to: ${outputPath}`;
 }
 
 function countLines(text: string): number {

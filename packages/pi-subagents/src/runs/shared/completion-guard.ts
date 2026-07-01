@@ -70,8 +70,8 @@ interface CompletionMutationGuardResult {
 function stripFrameworkInstructions(task: string): string {
 	return task
 		.split("\n")
-		.filter((line) => !/^\s*\[(?:Write to|Read from):/i.test(line))
-		.filter((line) => !/^\s*(?:Create and maintain progress at:|Update progress at:|Write your findings to:)/i.test(line))
+		.filter((line) => !/^\s*\[(?:Write to|Read from|Final response will be saved to):/i.test(line))
+		.filter((line) => !/^\s*(?:Create and maintain progress at:|Update progress at:|Write your findings to:|\*\*Output:\*\* Your final response will be saved to:)/i.test(line))
 		.join("\n");
 }
 

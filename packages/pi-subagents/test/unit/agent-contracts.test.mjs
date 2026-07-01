@@ -10,7 +10,7 @@ const {
 	mergeAgentsForScope,
 	sanitizeProtectedAdvisoryAgentTools,
 } = await loadTs("../../src/agents/agent-selection.ts");
-const { validateCapabilityRequirements } = await loadTs(
+const { agentSatisfiesCapability, validateCapabilityRequirements } = await loadTs(
 	"../../src/runs/shared/capability-requirements.ts",
 );
 
@@ -118,8 +118,44 @@ test("protected advisory overrides with omitted tools preserve role-specific def
 		source: "user",
 	});
 	assert.equal(reviewer.tools?.includes("web_search"), false);
+	assert.deepEqual(reviewer.extensions, []);
 	assert.equal(researcher.tools?.includes("web_search"), true);
+	assert.equal(researcher.extensions, undefined);
 });
+
+for (const name of ["researcher", "context-builder"]) {
+	test(`${name} keeps default extensions for safe extension-backed research tools`, () => {
+		const sanitized = sanitizeProtectedAdvisoryAgentTools({
+			name,
+			source: "user",
+		});
+
+		assert.equal(sanitized.tools?.includes("web_search"), true);
+		assert.equal(sanitized.extensions, undefined);
+	});
+}
+
+for (const name of ["scout", "reviewer", "planner", "delegate", "oracle"]) {
+	test(`${name} disables extensions when no safe extension-backed tools are allowed`, () => {
+		const sanitized = sanitizeProtectedAdvisoryAgentTools({
+			name,
+			source: "user",
+		});
+
+		assert.deepEqual(sanitized.extensions, []);
+	});
+
+	test(`${name} disables extensions even when overrides request safe extension-backed tools`, () => {
+		const sanitized = sanitizeProtectedAdvisoryAgentTools({
+			name,
+			source: "user",
+			tools: ["read", "web_search"],
+		});
+
+		assert.deepEqual(sanitized.tools, ["read", "web_search"]);
+		assert.deepEqual(sanitized.extensions, []);
+	});
+}
 
 test("packaged advisory runtime names are sanitized by local role name", () => {
 	const sanitized = sanitizeProtectedAdvisoryAgentTools({
@@ -186,13 +222,30 @@ test("custom non-advisory agents keep explicit mutation tools", () => {
 	assert.deepEqual(sanitizeProtectedAdvisoryAgentTools(custom), custom);
 });
 
+test("protected advisory agents cannot satisfy MCP capabilities before sanitization", () => {
+	assert.equal(
+		agentSatisfiesCapability(
+			{ name: "scout", source: "user", tools: ["read", "mcp"] },
+			"mcp",
+		),
+		false,
+	);
+	assert.equal(
+		agentSatisfiesCapability(
+			{ name: "scout", source: "user", mcpDirectTools: ["example_readOnlyTool"] },
+			"direct-mcp",
+		),
+		false,
+	);
+});
+
 test("declared MCP capability requirements fail fast for sanitized advisory agents", () => {
 	const message = validateCapabilityRequirements(
 		{
 			tasks: [
 				{
 					agent: "scout",
-					task: "inspect the Retool MCP app",
+					task: "inspect an MCP resource",
 					requiresCapabilities: ["mcp"],
 				},
 			],
@@ -211,7 +264,7 @@ test("declared capability requirements pass when the selected agent exposes them
 			tasks: [
 				{
 					agent: "mcp-reader",
-					task: "inspect the Retool MCP app",
+					task: "inspect an MCP resource",
 					requiresCapabilities: ["mcp", "direct-mcp"],
 				},
 			],
@@ -221,7 +274,7 @@ test("declared capability requirements pass when the selected agent exposes them
 				name: "mcp-reader",
 				source: "project",
 				tools: ["read", "mcp"],
-				mcpDirectTools: ["retool_getApp"],
+				mcpDirectTools: ["example_readResource"],
 			},
 		],
 	);
@@ -270,6 +323,16 @@ test("custom-extension capability allows default extension loading but rejects e
 				tasks: [{ agent: "scout", task: "use extensions", requiresCapabilities: ["custom-extension"] }],
 			},
 			[{ name: "scout", source: "builtin", tools: ["read"], extensions: [] }],
+		) ?? "",
+		/requires custom-extension/,
+	);
+
+	assert.match(
+		validateCapabilityRequirements(
+			{
+				tasks: [{ agent: "researcher", task: "use extensions", requiresCapabilities: ["custom-extension"] }],
+			},
+			[{ name: "researcher", source: "builtin", tools: ["read", "web_search"] }],
 		) ?? "",
 		/requires custom-extension/,
 	);

@@ -325,10 +325,10 @@ export function buildChainInstructions(
 		prefixParts.push(`[Read from: ${files.join(", ")}]`);
 	}
 
-	// OUTPUT - prepend so agent knows where to write
+	// OUTPUT - prepend so the save location stays visible even when task text is long
 	if (behavior.output) {
 		const outputPath = resolveChainPath(behavior.output, chainDir);
-		prefixParts.push(`[Write to: ${outputPath}]`);
+		prefixParts.push(`[Final response will be saved to: ${outputPath}]`);
 	}
 
 	// Progress instructions in suffix (less critical)

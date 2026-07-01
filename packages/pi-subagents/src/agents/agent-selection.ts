@@ -86,10 +86,21 @@ const ADVISORY_ALLOWED_TOOLS = new Set([
 	"get_search_content",
 ]);
 
+const SAFE_EXTENSION_BACKED_ADVISORY_TOOLS = new Set([
+	"code_search",
+	"web_search",
+	"fetch_content",
+	"get_search_content",
+]);
+
 function protectedAdvisoryRoleName(agent: AgentConfig): string {
 	const rawName = agent.localName ?? agent.name;
 	const normalized = rawName.trim().toLowerCase();
 	return normalized.split(".").pop() ?? normalized;
+}
+
+export function isProtectedAdvisoryAgentConfig(agent: AgentConfig): boolean {
+	return PROTECTED_ADVISORY_AGENT_NAMES.has(protectedAdvisoryRoleName(agent));
 }
 
 export function sanitizeProtectedAdvisoryAgentTools(
@@ -106,7 +117,12 @@ export function sanitizeProtectedAdvisoryAgentTools(
 		extensions: _extensions,
 		...rest
 	} = agent;
-	return { ...rest, tools, extensions: [] };
+	const defaultToolsNeedExtensions = defaultTools.some((tool) =>
+		SAFE_EXTENSION_BACKED_ADVISORY_TOOLS.has(tool),
+	);
+	const needsDefaultExtensions = defaultToolsNeedExtensions
+		&& tools.some((tool) => SAFE_EXTENSION_BACKED_ADVISORY_TOOLS.has(tool));
+	return needsDefaultExtensions ? { ...rest, tools } : { ...rest, tools, extensions: [] };
 }
 
 export function mergeAgentsForScope(
