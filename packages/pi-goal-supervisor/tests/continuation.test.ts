@@ -115,7 +115,15 @@ test("continuation content preserves normal tools and marker contracts", () => {
 
 	const content = buildContinuationContent(state, "nonce-1", "turn_end");
 
-	assert.match(content, /normal Pi tools\/extensions/i);
+	assert.match(
+		content,
+		/disables direct user asking, approval, confirmation, and HITL tools/i,
+	);
+	assert.match(content, /Automatic command\/tool blockers remain active/i);
+	assert.match(
+		content,
+		/Do not ask for approval, confirmation, clarification/i,
+	);
 	assert.match(content, /GOAL_DONE:/);
 	assert.match(content, /GOAL_BLOCKED:/);
 	assert.match(content, /finish safely/);
@@ -128,14 +136,14 @@ test("continuation content preserves normal tools and marker contracts", () => {
 	assert.match(content, /routine implementation choices/i);
 	assert.match(content, /safe local\/read-only\/reversible/i);
 	assert.match(content, /Take the next concrete step now when one exists/i);
-	assert.match(content, /unapproved production\/remote\/external-account mutation/i);
-	assert.match(content, /sudo, mutating git, or destructive filesystem\/data changes/i);
-	assert.match(content, /private\/external-account reads or cross-source discovery/i);
-	assert.match(content, /material product\/API\/scope decision not implied by the goal/i);
-	assert.match(content, /missing required permission, tool, or credential/i);
+	assert.match(content, /automatic command\/tool blocker/i);
 	assert.match(
 		content,
-		/GOAL_BLOCKED: <specific 100% blocker and smallest safe requested human decision>/i,
+		/missing required tool, credential, auth, access, or service/i,
+	);
+	assert.match(
+		content,
+		/GOAL_BLOCKED: <specific blocker and evidence that no safe non-asking next step exists>/i,
 	);
 	assert.doesNotMatch(content, /required approval/i);
 	assert.doesNotMatch(content, /ambiguous product\/API decision/i);

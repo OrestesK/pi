@@ -1,5 +1,6 @@
 export const STATE_CUSTOM_TYPE = "goal-supervisor-state";
 export const CONTINUATION_CUSTOM_TYPE = "goal-supervisor-continuation";
+export const TOOL_RESTRICTION_CUSTOM_TYPE = "goal-supervisor-tool-restriction";
 
 export type GoalStatus =
 	| "idle"
@@ -72,6 +73,13 @@ export type GoalSupervisorState = {
 	};
 };
 
+export type GoalToolRestrictionState = {
+	version: 1;
+	active: boolean;
+	updatedAt: string;
+	savedActiveTools?: string[];
+};
+
 export type CustomSessionEntry = {
 	type?: string;
 	customType?: string;
@@ -91,12 +99,19 @@ export type SendMessageCall = {
 	};
 };
 
+export type ToolInfo = {
+	name: string;
+};
+
 export type GoalSupervisorApi = {
 	sendMessage?(
 		message: SendMessageCall["message"],
 		options: SendMessageCall["options"],
 	): void;
 	appendEntry?(customType: string, data?: unknown): void;
+	getActiveTools?(): string[];
+	getAllTools?(): ToolInfo[];
+	setActiveTools?(names: string[]): void;
 	on?(
 		event: string,
 		handler: (event: unknown, ctx: unknown) => void | Promise<void> | unknown,

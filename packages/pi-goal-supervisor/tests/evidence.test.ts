@@ -49,6 +49,14 @@ test("rejects marker-looking quoted text when marker is not line-leading claim",
 
 test("validates goal blocker reasons by documented blocker class", () => {
 	const allowed = [
+		"automatic command blocker denied mutating git push",
+		"runtime tool guardrail blocked rm -rf",
+		"tool call was rejected by automatic blocker",
+		"missing required credential for the private API",
+		"auth unavailable for Google Docs document",
+		"required service is unavailable",
+	];
+	const disallowed = [
 		"unapproved production/remote/external-account mutation",
 		"sudo is required for a privileged local action",
 		"destructive filesystem/data changes need confirmation",
@@ -63,9 +71,6 @@ test("validates goal blocker reasons by documented blocker class", () => {
 		"Google Drive access is not approved",
 		"remote production mutation is not approved",
 		"material product/API/scope decision not implied by the goal",
-		"missing required credential for the private API",
-	];
-	const disallowed = [
 		"waiting for internal plan approval",
 		"routine local work remains",
 		"tests still need to be run",
@@ -80,7 +85,8 @@ test("validates goal blocker reasons by documented blocker class", () => {
 		"workflow decision not implied by the goal",
 	];
 
-	for (const reason of allowed) assert.equal(isAllowedGoalBlocker(reason), true);
+	for (const reason of allowed)
+		assert.equal(isAllowedGoalBlocker(reason), true);
 	for (const reason of disallowed)
 		assert.equal(isAllowedGoalBlocker(reason), false);
 });

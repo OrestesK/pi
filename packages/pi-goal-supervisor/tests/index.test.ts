@@ -8,13 +8,20 @@ import { STATE_CUSTOM_TYPE, type GoalSupervisorState } from "../src/types.ts";
 
 type TestHarness = {
 	entries: Array<{ type: "custom"; customType: string; data: unknown }>;
-	hooks: Map<string, (event: unknown, ctx: unknown) => Promise<void> | void | unknown>;
+	hooks: Map<
+		string,
+		(event: unknown, ctx: unknown) => Promise<void> | void | unknown
+	>;
 	handler: (args: string, ctx: unknown) => Promise<void>;
 	ctx: {
 		sessionManager: {
 			getCwd: () => string;
 			getSessionId: () => string;
-			getBranch: () => Array<{ type: "custom"; customType: string; data: unknown }>;
+			getBranch: () => Array<{
+				type: "custom";
+				customType: string;
+				data: unknown;
+			}>;
 		};
 		isIdle: () => boolean;
 		hasPendingMessages: () => boolean;
@@ -68,9 +75,8 @@ function createGoalHarness(
 		ui: { notify() {}, setWidget() {} },
 	};
 	const lastState = () =>
-		entries
-			.filter((entry) => entry.customType === STATE_CUSTOM_TYPE)
-			.at(-1)?.data as GoalSupervisorState | undefined;
+		entries.filter((entry) => entry.customType === STATE_CUSTOM_TYPE).at(-1)
+			?.data as GoalSupervisorState | undefined;
 	return { entries, hooks, handler, ctx, sendCount: () => sends, lastState };
 }
 
@@ -231,14 +237,20 @@ test("widget and supervisor prompt show unbounded turn count", async () => {
 	assert.match(prompt, /tests, docs, formatting/i);
 	assert.match(prompt, /routine implementation choices/i);
 	assert.match(prompt, /safe local\/read-only\/reversible/i);
-	assert.match(prompt, /unapproved production\/remote\/external-account mutation/i);
-	assert.match(prompt, /sudo, mutating git, or destructive filesystem\/data changes/i);
-	assert.match(prompt, /private\/external-account reads or cross-source discovery/i);
-	assert.match(prompt, /material product\/API\/scope decision not implied by the goal/i);
-	assert.match(prompt, /missing required permission, tool, or credential/i);
 	assert.match(
 		prompt,
-		/GOAL_BLOCKED: <specific 100% blocker and smallest safe requested human decision>/i,
+		/disables direct user asking, approval, confirmation, and HITL tools/i,
+	);
+	assert.match(prompt, /Automatic command\/tool blockers remain active/i);
+	assert.match(prompt, /Do not ask for approval, confirmation, clarification/i);
+	assert.match(prompt, /automatic command\/tool blocker/i);
+	assert.match(
+		prompt,
+		/missing required tool, credential, auth, access, or service/i,
+	);
+	assert.match(
+		prompt,
+		/GOAL_BLOCKED: <specific blocker and evidence that no safe non-asking next step exists>/i,
 	);
 	assert.doesNotMatch(prompt, /required approval/i);
 	assert.doesNotMatch(prompt, /ambiguous product\/API decision/i);
@@ -265,7 +277,7 @@ test("turn_end rejects disallowed goal blockers and continues", async () => {
 	assert.equal(harness.sendCount(), sendsBefore + 1);
 });
 
-test("turn_end accepts allowed goal blockers without queueing continuation", async () => {
+test("turn_end rejects user permission blockers and continues", async () => {
 	const harness = createGoalHarness();
 
 	await harness.handler("finish objective", harness.ctx);
@@ -276,7 +288,29 @@ test("turn_end accepts allowed goal blockers without queueing continuation", asy
 			message: {
 				role: "assistant",
 				content:
-					"GOAL_BLOCKED: missing required credential for the private API",
+					"GOAL_BLOCKED: unapproved production/remote/external-account mutation",
+			},
+		},
+		harness.ctx,
+	);
+
+	assert.equal(harness.lastState()?.status, "running");
+	assert.equal(harness.lastState()?.lastBlocker, undefined);
+	assert.equal(harness.sendCount(), sendsBefore + 1);
+});
+
+test("turn_end accepts automatic or missing-capability blockers without queueing continuation", async () => {
+	const harness = createGoalHarness();
+
+	await harness.handler("finish objective", harness.ctx);
+	await deliverPendingContinuation(harness);
+	const sendsBefore = harness.sendCount();
+	await harness.hooks.get("turn_end")?.(
+		{
+			message: {
+				role: "assistant",
+				content:
+					"GOAL_BLOCKED: automatic command blocker denied mutating git push",
 			},
 		},
 		harness.ctx,
@@ -297,7 +331,7 @@ test("blocked marker goals auto-resume on the next agent prompt", async () => {
 			message: {
 				role: "assistant",
 				content:
-					"GOAL_BLOCKED: unapproved production/remote/external-account mutation",
+					"GOAL_BLOCKED: automatic command blocker denied mutating git push",
 			},
 		},
 		harness.ctx,
@@ -359,8 +393,7 @@ test("clear remains terminal after blocked goals", async () => {
 		{
 			message: {
 				role: "assistant",
-				content:
-					"GOAL_BLOCKED: missing required permission for deployment",
+				content: "GOAL_BLOCKED: automatic command blocker denied deployment",
 			},
 		},
 		harness.ctx,
@@ -726,10 +759,105 @@ test("session_tree preserves a real pending continuation latch", async () => {
 	assert.ok(lastState?.pendingContinuation);
 });
 
-test("source does not use forbidden tool mutation APIs", () => {
+test("active goals disable user permission and asking tools", async () => {
+	const entries: Array<{ type: "custom"; customType: string; data: unknown }> =
+		[];
+	const hooks = new Map<
+		string,
+		(event: unknown, ctx: unknown) => Promise<void> | void | unknown
+	>();
+	let handler: ((args: string, ctx: unknown) => Promise<void>) | undefined;
+	const allTools = [
+		"read",
+		"bash",
+		"ask_user",
+		"intercom",
+		"interview",
+		"contact_supervisor",
+		"subagent",
+		"mcp",
+		"Agent",
+		"custom_permission_confirm",
+		"retool_retool_respond_to_react_app_thread_review",
+	];
+	let activeTools = [...allTools];
+	const api = {
+		on(
+			event: string,
+			hook: (event: unknown, ctx: unknown) => Promise<void> | void | unknown,
+		) {
+			hooks.set(event, hook);
+		},
+		registerCommand(
+			_name: string,
+			options: { handler: (args: string, ctx: unknown) => Promise<void> },
+		) {
+			handler = options.handler;
+		},
+		appendEntry(customType: string, data: unknown) {
+			entries.push({ type: "custom", customType, data });
+		},
+		sendMessage() {},
+		getActiveTools() {
+			return activeTools;
+		},
+		getAllTools() {
+			return allTools.map((name) => ({ name }));
+		},
+		setActiveTools(names: string[]) {
+			activeTools = names;
+		},
+	};
+	registerGoalSupervisor(api);
+	assert.ok(handler);
+	const ctx = {
+		sessionManager: {
+			getCwd: () => "/tmp/project",
+			getSessionId: () => "session-1",
+			getBranch: () => entries,
+		},
+		isIdle: () => true,
+		hasPendingMessages: () => false,
+		ui: { notify() {}, setWidget() {} },
+	};
+
+	await handler("finish without asking", ctx);
+
+	assert.deepEqual(activeTools, [
+		"read",
+		"bash",
+		"intercom",
+		"contact_supervisor",
+		"subagent",
+		"mcp",
+		"Agent",
+	]);
+	const blocked = hooks.get("tool_call")?.({ toolName: "ask_user" }, ctx) as
+		| { block: boolean; reason?: string }
+		| undefined;
+	assert.equal(blocked?.block, true);
+	assert.match(blocked?.reason ?? "", /goal mode disables/i);
+
+	await handler("clear", ctx);
+
+	assert.deepEqual(activeTools, [
+		"read",
+		"bash",
+		"ask_user",
+		"intercom",
+		"interview",
+		"contact_supervisor",
+		"subagent",
+		"mcp",
+		"Agent",
+		"custom_permission_confirm",
+		"retool_retool_respond_to_react_app_thread_review",
+	]);
+});
+
+test("source does not register tools", () => {
 	const srcDir = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
-	const forbidden =
-		/\b(getActiveTools|setActiveTools|getAllTools|registerTool)\b/;
+	const forbidden = /\bregisterTool\b/;
 	const offenders = readdirSync(srcDir)
 		.filter((name) => name.endsWith(".ts"))
 		.filter((name) => forbidden.test(readFileSync(join(srcDir, name), "utf8")));

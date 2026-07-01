@@ -16,13 +16,16 @@ import {
 } from "./state.ts";
 import {
   STATE_CUSTOM_TYPE,
+  TOOL_RESTRICTION_CUSTOM_TYPE,
   type GoalJudgeResult,
   type GoalSupervisorApi,
   type GoalSupervisorState,
+  type GoalToolRestrictionState,
 } from "./types.ts";
 
 type Runtime = {
   state?: GoalSupervisorState;
+  toolRestriction?: GoalToolRestrictionState;
 };
 
 type JudgeFn = (
@@ -74,6 +77,12 @@ type TurnEndEvent = {
   message?: unknown;
 };
 
+type ToolCallEvent = {
+  toolName?: string;
+};
+
+const GOAL_PERMISSION_TOOL_NAMES = new Set(["ask_user", "interview"]);
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -86,15 +95,122 @@ function contextSessionId(ctx: ContextLike): string | undefined {
   return ctx.sessionManager?.getSessionId?.();
 }
 
+function isGoalPermissionTool(toolName: string): boolean {
+  return (
+    GOAL_PERMISSION_TOOL_NAMES.has(toolName) ||
+    /(^|_)(ask|confirm|confirmation|permission|permissions|approve|approval|approvals|hitl)($|_)/i.test(
+      toolName,
+    ) ||
+    /^retool_retool_(list_pending_react_app_thread_reviews|view_pending_react_app_thread_hitl|respond_to_react_app_thread_review|list_pending_react_app_function_approvals)$/.test(
+      toolName,
+    )
+  );
+}
+
+function isActiveGoalState(state: GoalSupervisorState | undefined): boolean {
+  return (
+    state?.status === "running" ||
+    state?.status === "paused" ||
+    state?.status === "judging" ||
+    state?.status === "blocked"
+  );
+}
+
+function sameTools(left: string[], right: string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((tool, index) => tool === right[index])
+  );
+}
+
+function isGoalToolRestrictionState(
+  value: unknown,
+): value is GoalToolRestrictionState {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.version === 1 &&
+    typeof record.active === "boolean" &&
+    typeof record.updatedAt === "string" &&
+    (record.savedActiveTools === undefined ||
+      (Array.isArray(record.savedActiveTools) &&
+        record.savedActiveTools.every((tool) => typeof tool === "string")))
+  );
+}
+
+function restoreToolRestrictionFromEntries(
+  entries: Array<{ type?: string; customType?: string; data?: unknown }>,
+): GoalToolRestrictionState | undefined {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (
+      entry?.type === "custom" &&
+      entry.customType === TOOL_RESTRICTION_CUSTOM_TYPE &&
+      isGoalToolRestrictionState(entry.data)
+    ) {
+      return entry.data;
+    }
+  }
+  return undefined;
+}
+
+function appendToolRestriction(
+  pi: GoalSupervisorApi,
+  restriction: GoalToolRestrictionState,
+): void {
+  pi.appendEntry?.(TOOL_RESTRICTION_CUSTOM_TYPE, restriction);
+}
+
+function filterExistingTools(pi: GoalSupervisorApi, tools: string[]): string[] {
+  const allToolNames = pi.getAllTools?.().map((tool) => tool.name);
+  if (!allToolNames) return tools;
+  const available = new Set(allToolNames);
+  return tools.filter((tool) => available.has(tool));
+}
+
+function applyGoalToolRestrictions(
+  runtime: Runtime,
+  pi: GoalSupervisorApi,
+): void {
+  if (!pi.getActiveTools || !pi.setActiveTools) return;
+  const activeTools = pi.getActiveTools();
+  if (isActiveGoalState(runtime.state)) {
+    if (!runtime.toolRestriction?.active) {
+      runtime.toolRestriction = {
+        version: 1,
+        active: true,
+        updatedAt: now(),
+        savedActiveTools: activeTools,
+      };
+      appendToolRestriction(pi, runtime.toolRestriction);
+    }
+    const filtered = activeTools.filter((tool) => !isGoalPermissionTool(tool));
+    if (!sameTools(activeTools, filtered)) pi.setActiveTools(filtered);
+    return;
+  }
+  if (!runtime.toolRestriction?.active) return;
+  const restored = filterExistingTools(
+    pi,
+    runtime.toolRestriction.savedActiveTools ?? [],
+  );
+  if (!sameTools(activeTools, restored)) pi.setActiveTools(restored);
+  runtime.toolRestriction = {
+    version: 1,
+    active: false,
+    updatedAt: now(),
+    savedActiveTools: restored,
+  };
+  appendToolRestriction(pi, runtime.toolRestriction);
+}
+
 function restore(runtime: Runtime, ctx: ContextLike): void {
   const branch = ctx.sessionManager?.getBranch?.();
   if (!branch) return;
-  runtime.state = restoreStateFromEntries(
-    branch.map(
-      (entry) =>
-        entry as { type?: string; customType?: string; data?: unknown },
-    ),
+  const entries = branch.map(
+    (entry) => entry as { type?: string; customType?: string; data?: unknown },
   );
+  runtime.state = restoreStateFromEntries(entries);
+  runtime.toolRestriction = restoreToolRestrictionFromEntries(entries);
 }
 
 function safeNotify(
@@ -178,7 +294,7 @@ async function judgeCurrentClaim(
 }
 
 function supervisorPrompt(state: GoalSupervisorState): string {
-  return `\n\n## Goal Supervisor\nActive objective: ${state.objective}\nStatus: ${state.status}; turns: ${state.iteration}.\nUse the normal Pi tools/extensions already available. This supervisor does not change tools or permissions.\nAutonomy rule: keep going unless you have verified you are 100% blocked. Do not block for internal plan approval, routine local work, minor/reversible local edits, tests, docs, formatting, routine implementation choices, or any other safe local/read-only/reversible next step.\nUse GOAL_BLOCKED only for an unapproved production/remote/external-account mutation; an unapproved privileged/destructive local action such as sudo, mutating git, or destructive filesystem/data changes; unapproved private/external-account reads or cross-source discovery; a material product/API/scope decision not implied by the goal; or impossible because of a missing required permission, tool, or credential. If blocked, write exactly: GOAL_BLOCKED: <specific 100% blocker and smallest safe requested human decision>.\nWhen fully complete, write: GOAL_DONE: <specific evidence from transcript/artifacts/verifications>.`;
+  return `\n\n## Goal Supervisor\nActive objective: ${state.objective}\nStatus: ${state.status}; turns: ${state.iteration}.\nGoal mode disables direct user asking, approval, confirmation, and HITL tools. Automatic command/tool blockers remain active. Do not ask for approval, confirmation, clarification, or a product/workflow decision.\nAutonomy rule: keep going unless you have verified you are 100% blocked by an automatic command/tool blocker or a missing required tool, credential, auth, access, or service. Do not block for internal plan approval, routine local work, minor/reversible local edits, tests, docs, formatting, routine implementation choices, user permission policy, or any other safe local/read-only/reversible next step.\nUse GOAL_BLOCKED only for an actual automatic command/tool blocker or a missing required tool, credential, auth, access, or service. If blocked, write exactly: GOAL_BLOCKED: <specific blocker and evidence that no safe non-asking next step exists>.\nWhen fully complete, write: GOAL_DONE: <specific evidence from transcript/artifacts/verifications>.`;
 }
 
 export function registerGoalSupervisor(
@@ -203,6 +319,7 @@ export function registerGoalSupervisor(
         if (runtime.state) appendState(pi, runtime.state);
         safeNotify(ctx, result.message);
         updateWidget(ctx, runtime.state);
+        applyGoalToolRestrictions(runtime, pi);
         if (runtime.state?.status === "judging") {
           await judgeCurrentClaim(
             runtime,
@@ -212,6 +329,7 @@ export function registerGoalSupervisor(
           );
           if (runtime.state) appendState(pi, runtime.state);
           updateWidget(ctx, runtime.state);
+          applyGoalToolRestrictions(runtime, pi);
           const statusAfterJudge: string | undefined = runtime.state?.status;
           if (statusAfterJudge === "running")
             queueIfSafe(runtime, pi, ctx, "judge_rejected");
@@ -225,6 +343,7 @@ export function registerGoalSupervisor(
           result.continuationReason
         )
           queueIfSafe(runtime, pi, ctx, result.continuationReason);
+        applyGoalToolRestrictions(runtime, pi);
       } catch (error) {
         safeNotify(
           ctx,
@@ -239,7 +358,9 @@ export function registerGoalSupervisor(
     const ctx = rawCtx as ContextLike;
     restore(runtime, ctx);
     updateWidget(ctx, runtime.state);
+    applyGoalToolRestrictions(runtime, pi);
     queueIfSafe(runtime, pi, ctx, "session_start");
+    applyGoalToolRestrictions(runtime, pi);
   });
 
   pi.on?.("before_agent_start", (rawEvent: unknown, rawCtx: unknown) => {
@@ -250,9 +371,13 @@ export function registerGoalSupervisor(
       runtime.state?.status === "blocked" &&
       runtime.state.lastBlocker?.source === "marker"
     ) {
-      runtime.state = reduceState(runtime.state, { type: "resumed", now: now() });
+      runtime.state = reduceState(runtime.state, {
+        type: "resumed",
+        now: now(),
+      });
       appendState(pi, runtime.state);
     }
+    applyGoalToolRestrictions(runtime, pi);
     if (!runtime.state || runtime.state.status !== "running") {
       if (isSupervisorContinuationPrompt(event.prompt)) ctx.abort?.();
       return undefined;
@@ -267,8 +392,22 @@ export function registerGoalSupervisor(
       });
       appendState(pi, runtime.state);
     }
+    applyGoalToolRestrictions(runtime, pi);
     return {
       systemPrompt: `${event.systemPrompt ?? ""}${supervisorPrompt(runtime.state)}`,
+    };
+  });
+
+  pi.on?.("tool_call", (rawEvent: unknown, rawCtx: unknown) => {
+    const event = rawEvent as ToolCallEvent;
+    const ctx = rawCtx as ContextLike;
+    restore(runtime, ctx);
+    applyGoalToolRestrictions(runtime, pi);
+    if (!isActiveGoalState(runtime.state) || !event.toolName) return undefined;
+    if (!isGoalPermissionTool(event.toolName)) return undefined;
+    return {
+      block: true,
+      reason: `Goal mode disables user permission/asking tool '${event.toolName}'; automatic command/tool blockers remain active.`,
     };
   });
 
@@ -305,7 +444,9 @@ export function registerGoalSupervisor(
     }
     appendState(pi, runtime.state);
     updateWidget(ctx, runtime.state);
+    applyGoalToolRestrictions(runtime, pi);
     queueIfSafe(runtime, pi, ctx, "turn_end");
+    applyGoalToolRestrictions(runtime, pi);
   });
 
   pi.on?.("session_before_compact", (_event: unknown) => {
@@ -323,13 +464,16 @@ export function registerGoalSupervisor(
         now: now(),
       });
     if (runtime.state) appendState(pi, runtime.state);
+    applyGoalToolRestrictions(runtime, pi);
     queueIfSafe(runtime, pi, ctx, "compact");
+    applyGoalToolRestrictions(runtime, pi);
   });
 
   pi.on?.("session_tree", (_event: unknown, rawCtx: unknown) => {
     const ctx = rawCtx as ContextLike;
     restore(runtime, ctx);
     updateWidget(ctx, runtime.state);
+    applyGoalToolRestrictions(runtime, pi);
   });
 
   pi.on?.("session_shutdown", () => {
