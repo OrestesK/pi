@@ -18,6 +18,7 @@ pi/
 │   ├── scout.md               # Read-only recon
 │   ├── worker.md              # Single-task implementation
 │   ├── reviewer.md            # Review-only feedback
+│   ├── run-monitor.md         # Async long-running tmux/log status monitor
 │   └── general-purpose.md     # Fallback role
 │
 ├── skills/                    # On-demand workflows
@@ -31,6 +32,7 @@ pi/
 
 - Main model: configured in `settings.json`
 - Subagents: local role prompts in `agents/` plus packaged `pi-subagents` roles/prompts; local same-name agents override packaged builtins
+- Long-running tmux/log/evidence runs: parent starts the run in tmux and uses async `run-monitor` for status events instead of parent sleep-polling
 - Skills: progressive disclosure; descriptions are discoverable, full instructions load on demand
 - MCP: registered in `mcp.json`; most servers are lazy
 - Memory: `pi-memory-md` delivers selected memory into the system prompt

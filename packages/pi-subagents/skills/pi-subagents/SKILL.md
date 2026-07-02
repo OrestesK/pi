@@ -23,7 +23,7 @@ Use this skill when the parent orchestrator needs to launch a specialized subage
 - **Implementation handoff**: have `oracle` advise, then `worker` implement only after an approved direction
 - **Recon and planning**: use `scout` or `context-builder`, then `planner`
 - **Parallel exploration**: run multiple non-conflicting tasks concurrently
-- **Long-running work**: launch async/background runs and inspect them later
+- **Long-running work**: launch async/background runs and inspect them later; for already-started tmux/log/evidence runs, use async `run-monitor` as the read-only event/status sensor instead of parent sleep-polling
 - **Subagent control**: watch needs-attention signals and soft-interrupt only when a delegated run is genuinely blocked
 - **Agent authoring**: create, update, or override agents and chains for a project
 
@@ -33,6 +33,7 @@ For async subagents, prefer event-based progress over timer polling.
 
 Use this protocol for long-running async runs:
 
+- For long-running tmux/log/status runs that are not themselves subagent children, start a paired async `run-monitor` with the exact tmux target, log/status paths, expected phase/timeout, success/failure patterns, and optional runtime output/progress capture configured by the parent.
 - Give each long-running child an explicit progress file path under `.scratch/` whenever phase checkpoints materially improve parent visibility or recovery.
 - Ask children to update progress after meaningful phases, not every few seconds.
 - Ask children to interrupt/notify the parent only when blocked, when scope changes, when a must-fix/high-risk finding appears, or when complete.
