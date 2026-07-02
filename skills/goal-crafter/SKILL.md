@@ -41,17 +41,17 @@ Pi's local `/goal` is session-scoped and continuation-oriented:
 
 ## Resource posture
 
-Treat explicit `/goal` use as regular-first by default. The user does not want ordinary `/goal` commands to start team/subagent/reviewer/reducer workflows unless the objective explicitly asks for that shape.
+Treat explicit `/goal` use as regular-first by default. The user does not want `/goal` commands to start team-mode, reviewer-swarm, or reducer workflows.
 
 When crafting or supervising goals, keep the default resource posture simple and evidence-driven:
 
-- For ordinary `/goal` commands, encode a main-agent default. Do not encode a supervised-team, reviewer swarm, reducer, or child-agent workflow by default.
+- For `/goal` commands, encode a main-agent default. Do not encode a supervised-team, reviewer swarm, reducer, or child-agent workflow.
 - For nontrivial implementation, refactor, migration, PR-sized, schema/API, docs-surface, or cross-file goals, include a Contract Gate: a pre-edit contract card and owner map.
 - The contract card should name the public behavior/API/schema/config/env names, compatibility boundaries, required docs/tests surfaces, explicit non-goals, and forbidden alternate shapes or artifacts.
 - The owner map should identify likely source-of-truth files/layers before implementation and require final self-review to explain expected owner surfaces that were not touched.
 - Use memory search, session/tape readers, relevant `.scratch` artifacts, current repo files, and context-mode for large session/log outputs when they materially improve correctness.
 - Include web/code research only when the objective explicitly needs current external facts or when local evidence is insufficient to complete the goal safely.
-- Add subagent/team/reducer language only when the user explicitly asks for team mode, multiple agents, a review swarm, adversarial review, or reducer synthesis.
+- Do not add team-mode, reviewer-swarm, or reducer-synthesis language.
 
 ## Evidence priority
 
@@ -127,7 +127,7 @@ Scope: <files/subsystems/artifacts included; explicit non-goals if needed>.
 Constraints:
 - <project/user/tool safety rules that must remain true>
 - <forbidden actions or approval-required actions>
-- Default to the main agent; do not start team/subagent/reviewer/reducer workflows unless this goal explicitly asks for them.
+- Default to the main agent; do not start team-mode, reviewer-swarm, or reducer workflows.
 - For nontrivial cross-file work, use a pre-edit contract card and owner map, then final self-review against them.
 
 Done when:
@@ -137,7 +137,9 @@ Done when:
 
 Verification:
 - <exact checks/artifacts to inspect, or a first criterion to discover valid checks if unknown>
-- Include final self-review against the contract card, owner map, tests/docs evidence, scope hygiene, and forbidden artifacts.
+- Map each Done when item to fresh evidence from transcript, artifacts, diffs, checks, docs, or review.
+- Include final self-review against the contract card, owner map, tests/docs evidence, scope and artifact hygiene, and forbidden artifacts.
+- Account for generated/untracked artifacts, debug outputs, and changed files before GOAL_DONE.
 - GOAL_DONE only with fresh evidence proving every Done-when item.
 
 Blocked only if:
@@ -234,7 +236,7 @@ Constraints:
 - <preserve invariants>
 - <do not change or do without approval>
 - <follow AGENTS.md/project workflow/tool rules>
-- Default to the main agent; do not start team/subagent/reviewer/reducer workflows unless this goal explicitly asks for them.
+- Default to the main agent; do not start team-mode, reviewer-swarm, or reducer workflows.
 - For nontrivial cross-file work, use a pre-edit contract card and owner map, then final self-review against them.
 
 Done when:
@@ -245,7 +247,9 @@ Done when:
 Verification:
 - <commands, artifact checks, review checks, screenshots, logs, file:line refs, or other proof>
 - Match verification scope to requirement scope; narrow checks cannot prove broad claims.
-- Include final self-review against the contract card, owner map, tests/docs evidence, scope hygiene, and forbidden artifacts.
+- Map each Done when item to fresh evidence from transcript, artifacts, diffs, checks, docs, or review.
+- Include final self-review against the contract card, owner map, tests/docs evidence, scope and artifact hygiene, and forbidden artifacts.
+- Account for generated/untracked artifacts, debug outputs, and changed files before GOAL_DONE.
 - GOAL_DONE only when all criteria are proved or explicitly waived by the user.
 
 Iteration policy:
