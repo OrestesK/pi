@@ -80,6 +80,14 @@ function createGoalHarness(
 	return { entries, hooks, handler, ctx, sendCount: () => sends, lastState };
 }
 
+function sliceBetween(source: string, startMarker: string, endMarker: string): string {
+	const start = source.indexOf(startMarker);
+	assert.notEqual(start, -1, `missing start marker: ${startMarker}`);
+	const end = source.indexOf(endMarker, start + startMarker.length);
+	assert.notEqual(end, -1, `missing end marker: ${endMarker}`);
+	return source.slice(start, end);
+}
+
 async function deliverPendingContinuation(harness: TestHarness): Promise<void> {
 	const id = harness.lastState()?.pendingContinuation?.id;
 	assert.ok(id);
@@ -243,6 +251,19 @@ test("widget and supervisor prompt show unbounded turn count", async () => {
 	);
 	assert.match(prompt, /Automatic command\/tool blockers remain active/i);
 	assert.match(prompt, /Do not ask for approval, confirmation, clarification/i);
+	assert.match(prompt, /Default execution posture/i);
+	assert.match(prompt, /use the main agent by default/i);
+	assert.match(prompt, /do not start a supervised team/i);
+	assert.match(prompt, /Contract Gate/i);
+	assert.match(prompt, /contract card and owner map before editing/i);
+	assert.match(prompt, /source-of-truth files\/layers/i);
+	assert.match(prompt, /final self-review/i);
+	assert.match(prompt, /forbidden alternate shapes or artifacts/i);
+	assert.doesNotMatch(prompt, /use a supervised team by default/i);
+	assert.doesNotMatch(prompt, /two distinct reviewer\/monitor agents/i);
+	assert.doesNotMatch(prompt, /differentiated reviewer roles/i);
+	assert.doesNotMatch(prompt, /GOAL_DONE requires reducer PASS/i);
+	assert.doesNotMatch(prompt, /web\/code research/i);
 	assert.match(prompt, /automatic command\/tool blocker/i);
 	assert.match(
 		prompt,
@@ -254,6 +275,42 @@ test("widget and supervisor prompt show unbounded turn count", async () => {
 	);
 	assert.doesNotMatch(prompt, /required approval/i);
 	assert.doesNotMatch(prompt, /ambiguous product\/API decision/i);
+});
+
+test("goal-crafter templates default to main-agent goals", () => {
+	const skillPath = join(
+		dirname(fileURLToPath(import.meta.url)),
+		"../../../skills/goal-crafter/SKILL.md",
+	);
+	const skill = readFileSync(skillPath, "utf8");
+	const defaultTemplate = sliceBetween(
+		skill,
+		"Default format:",
+		"### 5. Adapt the goal to the task shape",
+	);
+	const expandedTemplate = sliceBetween(
+		skill,
+		"Use the expanded form",
+		"Iteration policy:",
+	);
+
+	for (const template of [defaultTemplate, expandedTemplate]) {
+		assert.match(template, /Default to the main agent/i);
+		assert.match(template, /pre-edit contract card and owner map/i);
+		assert.match(template, /final self-review against/i);
+		assert.doesNotMatch(
+			template,
+			/Default to a supervised team when available/i,
+		);
+		assert.doesNotMatch(
+			template,
+			/Use web\/code research when current external docs/i,
+		);
+		assert.doesNotMatch(
+			template,
+			/parent\/supervisor synthesis of worker and reviewer\/monitor findings/i,
+		);
+	}
 });
 
 test("turn_end rejects disallowed goal blockers and continues", async () => {

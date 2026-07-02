@@ -25,6 +25,8 @@ This package is deliberately autonomous while a goal is active:
 - It uses `pi.sendMessage(..., { deliverAs: "followUp", triggerTurn: true })` for supervisor continuations.
 - It does not stop automatically after a fixed number of turns, repeated no-progress turns, or elapsed wall-clock time; use `/goal pause` to hold it or `/goal clear` to end supervision for the active goal. `GOAL_BLOCKED` marks the goal as active-but-waiting until the next qualifying agent prompt or explicit `/goal resume`.
 - It instructs the agent not to ask for approval, confirmation, clarification, or product/workflow decisions, and not to block for internal plan approval, routine local work, minor/reversible local edits, tests, docs, formatting, routine implementation choices, user permission policy, or any safe local/read-only/reversible next step.
+- It uses the main agent by default and does not instruct the agent to start a supervised team, reviewer swarm, reducer workflow, or child-agent workflow from the `/goal` prompt.
+- For nontrivial implementation, refactor, migration, PR-sized, schema/API, docs-surface, or cross-file goals, it instructs the agent to use a Contract Gate: build a contract card and owner map before editing, then use final self-review to compare the result against the contract, owner map, tests/docs evidence, scope hygiene, and forbidden/generated artifacts.
 
 ## Completion policy
 
@@ -32,7 +34,7 @@ The worker must emit one of these markers:
 
 ```text
 GOAL_DONE: <specific evidence from transcript/artifacts/verifications>
-GOAL_BLOCKED: <specific 100% blocker and smallest safe requested human decision>
+GOAL_BLOCKED: <specific blocker and evidence that no safe non-asking next step exists>
 ```
 
 `GOAL_BLOCKED` should be used only after the agent verifies it is 100% blocked by an actual automatic command/tool blocker or a missing required tool, credential, auth, access, or service. User-permission, approval, confirmation, clarification, and product/workflow decision blockers are not accepted blocker classes. If any safe non-asking local/read-only/reversible next step remains, the agent should take it instead of blocking.
@@ -54,4 +56,4 @@ node -e "JSON.parse(require('fs').readFileSync('settings.json','utf8')); console
 pi list | grep -A3 -B3 'pi-goal-supervisor'
 ```
 
-A bounded live smoke was run with an isolated session dir under `.scratch/live-goal-supervisor/`.
+A bounded local live-comparison harness is available at `.scratch/runs/goal-live-team-comparison/run-live-comparison.sh`. The harness is diagnostic evidence only; it does not prove hard enforcement of child-session team behavior.

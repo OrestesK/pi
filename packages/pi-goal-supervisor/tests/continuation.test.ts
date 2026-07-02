@@ -136,6 +136,17 @@ test("continuation content preserves normal tools and marker contracts", () => {
 	assert.match(content, /routine implementation choices/i);
 	assert.match(content, /safe local\/read-only\/reversible/i);
 	assert.match(content, /Take the next concrete step now when one exists/i);
+	assert.match(content, /Default execution posture/i);
+	assert.match(content, /use the main agent by default/i);
+	assert.match(content, /do not start a supervised team/i);
+	assert.match(content, /Contract Gate/i);
+	assert.match(content, /contract card and owner map before editing/i);
+	assert.match(content, /final self-review/i);
+	assert.match(content, /forbidden alternate shapes or artifacts/i);
+	assert.doesNotMatch(content, /use a supervised team by default/i);
+	assert.doesNotMatch(content, /two distinct reviewer\/monitor agents/i);
+	assert.doesNotMatch(content, /web\/code research/i);
+	assert.doesNotMatch(content, /reducer\/parent synthesis/i);
 	assert.match(content, /automatic command\/tool blocker/i);
 	assert.match(
 		content,
