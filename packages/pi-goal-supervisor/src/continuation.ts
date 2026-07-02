@@ -52,6 +52,8 @@ Contract Gate: for nontrivial implementation, refactor, migration, PR-sized, sch
 
 Owner map review: during final self-review, explain any expected owner surface that was not touched.
 
+Completion evidence: before GOAL_DONE, map each done criterion to fresh evidence from transcript, artifacts, diffs, checks, docs, or review. Scope and artifact hygiene: account for generated or untracked artifacts, debug outputs, and changed files before completion.
+
 Use GOAL_BLOCKED only for an actual automatic command/tool blocker or a missing required tool, credential, auth, access, or service. If blocked, stop with:\nGOAL_BLOCKED: <specific blocker and evidence that no safe non-asking next step exists>\n\nIf the objective is fully complete, stop with:\nGOAL_DONE: <specific evidence from transcript/artifacts/verifications proving completion>\n\nOtherwise take the next concrete action now.${judgeNote}${blockerNote}`;
 }
 

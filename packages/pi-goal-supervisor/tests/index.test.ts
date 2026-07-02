@@ -259,6 +259,11 @@ test("widget and supervisor prompt show unbounded turn count", async () => {
 	assert.match(prompt, /source-of-truth files\/layers/i);
 	assert.match(prompt, /final self-review/i);
 	assert.match(prompt, /forbidden alternate shapes or artifacts/i);
+	assert.match(prompt, /map each done criterion to fresh evidence/i);
+	assert.match(prompt, /scope and artifact hygiene/i);
+	assert.match(prompt, /generated or untracked artifacts/i);
+	assert.match(prompt, /debug outputs/i);
+	assert.match(prompt, /changed files/i);
 	assert.doesNotMatch(prompt, /use a supervised team by default/i);
 	assert.doesNotMatch(prompt, /two distinct reviewer\/monitor agents/i);
 	assert.doesNotMatch(prompt, /differentiated reviewer roles/i);
@@ -298,6 +303,11 @@ test("goal-crafter templates default to main-agent goals", () => {
 		assert.match(template, /Default to the main agent/i);
 		assert.match(template, /pre-edit contract card and owner map/i);
 		assert.match(template, /final self-review against/i);
+		assert.match(template, /map each Done when item to fresh evidence/i);
+		assert.match(template, /scope and artifact hygiene/i);
+		assert.match(template, /generated\/untracked artifacts/i);
+		assert.match(template, /debug outputs/i);
+		assert.match(template, /changed files/i);
 		assert.doesNotMatch(
 			template,
 			/Default to a supervised team when available/i,
@@ -309,6 +319,10 @@ test("goal-crafter templates default to main-agent goals", () => {
 		assert.doesNotMatch(
 			template,
 			/parent\/supervisor synthesis of worker and reviewer\/monitor findings/i,
+		);
+		assert.doesNotMatch(
+			template,
+			/team\/subagent\/reviewer\/reducer workflows unless/i,
 		);
 	}
 });
@@ -761,6 +775,154 @@ test("branch restore clears stale in-memory goal when active branch has no state
 	await handler("status", emptyBranchCtx);
 
 	assert.equal(notifications.at(-1), "No active goal.");
+});
+
+test("aborted supervisor continuation pauses goal and clears stale pending latch", async () => {
+	const harness = createGoalHarness();
+
+	await harness.handler("finish objective", harness.ctx);
+	const stalePending = harness.lastState()?.pendingContinuation;
+	assert.ok(stalePending);
+	assert.equal(stalePending.reason, "start");
+	assert.equal(harness.sendCount(), 1);
+
+	await harness.hooks.get("turn_end")?.(
+		{
+			message: {
+				role: "assistant",
+				content: [],
+				stopReason: "aborted",
+				errorMessage: "Operation aborted",
+			},
+		},
+		harness.ctx,
+	);
+
+	const lastState = harness.lastState();
+	assert.equal(harness.sendCount(), 1);
+	assert.equal(lastState?.status, "paused");
+	assert.equal(lastState?.pendingContinuation, undefined);
+});
+
+test("aborted delivered supervisor continuation does not queue another continuation", async () => {
+	const harness = createGoalHarness();
+
+	await harness.handler("finish objective", harness.ctx);
+	await deliverPendingContinuation(harness);
+	assert.equal(harness.lastState()?.pendingContinuation, undefined);
+	const sendsBeforeAbort = harness.sendCount();
+
+	await harness.hooks.get("turn_end")?.(
+		{
+			message: {
+				role: "assistant",
+				content: [],
+				stopReason: "aborted",
+				errorMessage: "Operation aborted",
+			},
+		},
+		harness.ctx,
+	);
+
+	const lastState = harness.lastState();
+	assert.equal(harness.sendCount(), sendsBeforeAbort);
+	assert.equal(lastState?.status, "paused");
+	assert.equal(lastState?.pendingContinuation, undefined);
+});
+
+test("aborted supervisor continuation updates widget and reapplies tool restrictions", async () => {
+	const entries: Array<{ type: "custom"; customType: string; data: unknown }> =
+		[];
+	const hooks = new Map<
+		string,
+		(event: unknown, ctx: unknown) => Promise<void> | void | unknown
+	>();
+	let handler: ((args: string, ctx: unknown) => Promise<void>) | undefined;
+	const allTools = ["read", "ask_user", "interview", "bash"];
+	let activeTools = [...allTools];
+	let widgetContent: string[] | undefined;
+	const api = {
+		on(
+			event: string,
+			hook: (event: unknown, ctx: unknown) => Promise<void> | void | unknown,
+		) {
+			hooks.set(event, hook);
+		},
+		registerCommand(
+			_name: string,
+			options: { handler: (args: string, ctx: unknown) => Promise<void> },
+		) {
+			handler = options.handler;
+		},
+		appendEntry(customType: string, data: unknown) {
+			entries.push({ type: "custom", customType, data });
+		},
+		sendMessage() {},
+		getActiveTools() {
+			return activeTools;
+		},
+		getAllTools() {
+			return allTools.map((name) => ({ name }));
+		},
+		setActiveTools(names: string[]) {
+			activeTools = names;
+		},
+	};
+	registerGoalSupervisor(api);
+	assert.ok(handler);
+	const ctx = {
+		sessionManager: {
+			getCwd: () => "/tmp/project",
+			getSessionId: () => "session-1",
+			getBranch: () => entries,
+		},
+		isIdle: () => true,
+		hasPendingMessages: () => false,
+		ui: {
+			notify() {},
+			setWidget(_key: string, content: string[] | undefined) {
+				widgetContent = content;
+			},
+		},
+	};
+
+	await handler("finish objective", ctx);
+	assert.deepEqual(activeTools, ["read", "bash"]);
+	activeTools = [...allTools];
+
+	await hooks.get("turn_end")?.(
+		{
+			message: {
+				role: "assistant",
+				content: [],
+				stopReason: "aborted",
+				errorMessage: "Operation aborted",
+			},
+		},
+		ctx,
+	);
+
+	assert.equal(widgetContent?.[0], "goal: paused 0 turns");
+	assert.deepEqual(activeTools, ["read", "bash"]);
+});
+
+test("session_compact replaces a stale pending continuation latch", async () => {
+	const harness = createGoalHarness();
+
+	await harness.handler("finish objective", harness.ctx);
+	const stalePending = harness.lastState()?.pendingContinuation;
+	assert.ok(stalePending);
+	assert.equal(stalePending.reason, "start");
+	assert.equal(harness.sendCount(), 1);
+
+	await harness.hooks.get("session_compact")?.({}, harness.ctx);
+
+	const lastState = harness.lastState();
+	assert.equal(harness.sendCount(), 2);
+	assert.equal(lastState?.status, "running");
+	assert.equal(lastState?.counters.compactionsObserved, 1);
+	assert.equal(lastState?.pendingContinuation?.reason, "compact");
+	assert.notEqual(lastState?.pendingContinuation?.id, stalePending.id);
 });
 
 test("session_tree preserves a real pending continuation latch", async () => {

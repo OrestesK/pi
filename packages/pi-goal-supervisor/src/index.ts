@@ -81,6 +81,12 @@ type ToolCallEvent = {
   toolName?: string;
 };
 
+function isAbortedAssistantMessage(message: unknown): boolean {
+  if (typeof message !== "object" || message === null) return false;
+  const record = message as Record<string, unknown>;
+  return record.role === "assistant" && record.stopReason === "aborted";
+}
+
 const GOAL_PERMISSION_TOOL_NAMES = new Set(["ask_user", "interview"]);
 
 function now(): string {
@@ -304,6 +310,7 @@ Autonomy rule: keep going unless you have verified you are 100% blocked by an au
 Default execution posture: use the main agent by default. Do not start a supervised team, reviewer swarm, reducer workflow, or child-agent workflow from this goal prompt.
 Contract Gate: for nontrivial implementation, refactor, migration, PR-sized, schema/API, docs-surface, or cross-file goals, build a compact contract card and owner map before editing. The contract card must name the public behavior/API/schema/config/env names, compatibility boundaries, required docs/tests surfaces, explicit non-goals, and forbidden alternate shapes or artifacts. The owner map must identify the likely source-of-truth files/layers that should own the behavior.
 Owner map review: during final self-review, explain any expected owner surface that was not touched.
+Completion evidence: before GOAL_DONE, map each done criterion to fresh evidence from transcript, artifacts, diffs, checks, docs, or review. Scope and artifact hygiene: account for generated or untracked artifacts, debug outputs, and changed files before completion.
 Use GOAL_BLOCKED only for an actual automatic command/tool blocker or a missing required tool, credential, auth, access, or service. If blocked, write exactly: GOAL_BLOCKED: <specific blocker and evidence that no safe non-asking next step exists>.
 When fully complete, write: GOAL_DONE: <specific evidence from transcript/artifacts/verifications>.`;
 }
@@ -427,6 +434,16 @@ export function registerGoalSupervisor(
     restore(runtime, ctx);
     if (!runtime.state || runtime.state.status !== "running") return;
     const event = rawEvent as TurnEndEvent;
+    if (isAbortedAssistantMessage(event.message)) {
+      runtime.state = reduceState(runtime.state, {
+        type: "paused",
+        now: now(),
+      });
+      appendState(pi, runtime.state);
+      updateWidget(ctx, runtime.state);
+      applyGoalToolRestrictions(runtime, pi);
+      return;
+    }
     const assistantText = extractAssistantText(
       event.message as { content?: unknown },
     );

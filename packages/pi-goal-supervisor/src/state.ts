@@ -210,6 +210,7 @@ export function reduceState(
 			return {
 				...state,
 				updatedAt: event.now,
+				pendingContinuation: undefined,
 				counters: {
 					...state.counters,
 					compactionsObserved: state.counters.compactionsObserved + 1,

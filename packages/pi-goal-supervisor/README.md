@@ -27,6 +27,7 @@ This package is deliberately autonomous while a goal is active:
 - It instructs the agent not to ask for approval, confirmation, clarification, or product/workflow decisions, and not to block for internal plan approval, routine local work, minor/reversible local edits, tests, docs, formatting, routine implementation choices, user permission policy, or any safe local/read-only/reversible next step.
 - It uses the main agent by default and does not instruct the agent to start a supervised team, reviewer swarm, reducer workflow, or child-agent workflow from the `/goal` prompt.
 - For nontrivial implementation, refactor, migration, PR-sized, schema/API, docs-surface, or cross-file goals, it instructs the agent to use a Contract Gate: build a contract card and owner map before editing, then use final self-review to compare the result against the contract, owner map, tests/docs evidence, scope hygiene, and forbidden/generated artifacts.
+- Before `GOAL_DONE`, it instructs the agent to map each done criterion to fresh evidence and account for generated or untracked artifacts, debug outputs, and changed files.
 
 ## Completion policy
 

@@ -143,6 +143,11 @@ test("continuation content preserves normal tools and marker contracts", () => {
 	assert.match(content, /contract card and owner map before editing/i);
 	assert.match(content, /final self-review/i);
 	assert.match(content, /forbidden alternate shapes or artifacts/i);
+	assert.match(content, /map each done criterion to fresh evidence/i);
+	assert.match(content, /scope and artifact hygiene/i);
+	assert.match(content, /generated or untracked artifacts/i);
+	assert.match(content, /debug outputs/i);
+	assert.match(content, /changed files/i);
 	assert.doesNotMatch(content, /use a supervised team by default/i);
 	assert.doesNotMatch(content, /two distinct reviewer\/monitor agents/i);
 	assert.doesNotMatch(content, /web\/code research/i);
