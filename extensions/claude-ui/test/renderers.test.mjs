@@ -659,3 +659,65 @@ test("subagent control notice renderer covers orchestrator straggler notices and
   assert.doesNotMatch(rendered, /subagent_control_notice/);
   assertRenderedWithinWidth(component);
 });
+
+test("subagent control notice renderer hides stale straggler notices after run completion", () => {
+  const runId = "35981d53";
+  const notice = {
+    content: "Parallel barrier blocked by straggler: top-level parallel\n3/4 complete; 1 still running.\nRunning: reviewer 1/4, elapsed 5m14s, last activity 50.8s ago, 60 tools, 104158 tokens\nThreshold: slower than 5m13s (3m29s peer baseline).\nNo automatic action taken.\nActions: wait, inspect status/activity, nudge if available, interrupt, or detach/background when available.",
+    details: {
+      key: "35981d53:parallel:top-level parallel:3",
+      runId,
+      source: "foreground",
+      noticeText: "Parallel barrier blocked by straggler: top-level parallel\n3/4 complete; 1 still running.",
+    },
+  };
+  const assertHidden = (branch) => {
+    const component = ui.renderSubagentControlNotice(
+      notice,
+      { expanded: false, getBranch: () => branch },
+      theme,
+    );
+
+    const rendered = render(component, 80);
+    assert.match(rendered, /stale subagent notice hidden · run 35981d53 completed/);
+    assert.doesNotMatch(rendered, /3\/4 complete; 1 still running/);
+    assert.doesNotMatch(rendered, /Parallel barrier blocked by straggler/);
+    assert.doesNotMatch(rendered, /subagent_control_notice/);
+    assertRenderedWithinWidth(component);
+  };
+
+  assertHidden([
+    {
+      type: "message",
+      id: "tool-result",
+      parentId: null,
+      timestamp: "2026-07-03T09:37:01.713Z",
+      message: {
+        role: "toolResult",
+        toolName: "subagent",
+        content: [
+          {
+            type: "text",
+            text: "Delivered parallel subagent results via intercom.\nRun: 35981d53\nChildren: 4 completed\nRun intercom targets (may be inactive after completion):",
+          },
+        ],
+      },
+    },
+  ]);
+
+  assertHidden([
+    {
+      type: "custom_message",
+      customType: "intercom_message",
+      id: "intercom-result",
+      parentId: null,
+      timestamp: "2026-07-03T09:37:01.713Z",
+      display: true,
+      content: "**📨 From subagent-result** (/home/orestes/.config/pi)",
+      details: {
+        from: { name: "subagent-result" },
+        bodyText: "Run: 35981d53\nMode: parallel\nStatus: completed\nChildren: 4 completed",
+      },
+    },
+  ]);
+});

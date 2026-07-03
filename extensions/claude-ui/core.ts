@@ -4746,6 +4746,11 @@ type SubagentControlNoticeMessage = {
   details?: unknown;
 };
 
+type SubagentControlNoticeRenderOptions = {
+  expanded: boolean;
+  getBranch?: () => readonly SessionEntry[] | undefined;
+};
+
 const SUBAGENT_CONTROL_NOTICE_TYPES = [
   "subagent_control_notice",
   "subagent-control",
@@ -4842,9 +4847,107 @@ function subagentControlNoticeBody(message: SubagentControlNoticeMessage): strin
   return typeof message.content === "string" ? message.content : "";
 }
 
+function subagentControlNoticeRunId(
+  message: SubagentControlNoticeMessage,
+): string | undefined {
+  const details = message.details;
+  if (isRecord(details)) {
+    if (typeof details.runId === "string") return details.runId;
+    const event = isRecord(details.event) ? details.event : undefined;
+    if (typeof event?.runId === "string") return event.runId;
+  }
+
+  return subagentControlNoticeBody(message)
+    .match(/^Run:\s*(.+?)(?:\s+step\s+\d+)?$/m)?.[1]
+    ?.trim();
+}
+
+function textParts(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => (isRecord(part) && typeof part.text === "string" ? part.text : ""))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function intercomMessageText(entry: SessionEntry): string {
+  if (entry.type !== "custom_message") return "";
+  const details = isRecord(entry.details) ? entry.details : undefined;
+  const message = details && isRecord(details.message) ? details.message : undefined;
+  const content = message && isRecord(message.content) ? message.content : undefined;
+  if (typeof details?.bodyText === "string") return details.bodyText;
+  if (typeof content?.text === "string") return content.text;
+  return textParts(entry.content);
+}
+
+function hasRunLine(text: string, runId: string): boolean {
+  return contentLines(text).some((line) => line.trim() === `Run: ${runId}`);
+}
+
+function isCompletedSubagentRunText(text: string, runId: string): boolean {
+  if (!hasRunLine(text, runId)) return false;
+  return (
+    /^Status:\s*completed\s*$/im.test(text) ||
+    /^State:\s*complete\s*$/im.test(text) ||
+    /^Children:\s*\d+\s+completed\s*$/im.test(text) ||
+    /^Progress:\s*\d+\/\d+\s+done\s*$/im.test(text)
+  );
+}
+
+function isCompletedSubagentRunEntry(entry: SessionEntry, runId: string): boolean {
+  if (entry.type === "message") {
+    const message = entry.message as unknown;
+    if (!isRecord(message)) return false;
+    if (message.role !== "toolResult" || message.toolName !== "subagent") {
+      return false;
+    }
+    return isCompletedSubagentRunText(textParts(message.content), runId);
+  }
+
+  if (entry.type !== "custom_message" || entry.customType !== "intercom_message") {
+    return false;
+  }
+
+  const details = isRecord(entry.details) ? entry.details : undefined;
+  const from = details && isRecord(details.from) ? details.from : undefined;
+  const sender = typeof from?.name === "string" ? from.name : undefined;
+  const text = intercomMessageText(entry);
+  const contentText = textParts(entry.content);
+  if (sender !== "subagent-result" && !contentText.includes("From subagent-result")) {
+    return false;
+  }
+  return isCompletedSubagentRunText(text, runId);
+}
+
+function isStaleSubagentControlNotice(
+  message: SubagentControlNoticeMessage,
+  getBranch: SubagentControlNoticeRenderOptions["getBranch"],
+): boolean {
+  const body = subagentControlNoticeBody(message);
+  if (!body.startsWith("Parallel barrier blocked by straggler:")) return false;
+  const runId = subagentControlNoticeRunId(message);
+  if (!runId) return false;
+  const branch = getBranch?.();
+  if (!branch) return false;
+  return branch.some((entry) => isCompletedSubagentRunEntry(entry, runId));
+}
+
+function staleSubagentControlNoticeLine(
+  message: SubagentControlNoticeMessage,
+  width: number,
+  theme: Theme,
+): string {
+  const runId = subagentControlNoticeRunId(message);
+  const text = runId
+    ? `stale subagent notice hidden · run ${runId} completed`
+    : "stale subagent notice hidden";
+  return theme.fg("dim", truncateToWidth(text, Math.max(1, width), ""));
+}
+
 function renderSubagentControlNotice(
   message: SubagentControlNoticeMessage,
-  _options: { expanded: boolean },
+  options: SubagentControlNoticeRenderOptions,
   theme: Theme,
 ): Component | undefined {
   const body = subagentControlNoticeBody(message);
@@ -4854,6 +4957,9 @@ function renderSubagentControlNotice(
   return {
     invalidate() {},
     render(width: number): string[] {
+      if (isStaleSubagentControlNotice(message, options.getBranch)) {
+        return [staleSubagentControlNoticeLine(message, width, theme)];
+      }
       if (width < 3) return [truncateToWidth(title, width)];
       const bodyWidth = Math.max(1, width - 2);
       const header = ` ⚠ ${title} `;
@@ -4993,6 +5099,24 @@ export default function (pi: ExtensionAPI) {
     (idleReconcileTimer as { unref?: () => void }).unref?.();
   };
 
+  const getActiveBranch = (): readonly SessionEntry[] | undefined => {
+    const ctx = activeCtx;
+    if (!ctx) return undefined;
+    try {
+      return ctx.sessionManager.getBranch();
+    } catch (error) {
+      if (!isStaleContextError(error)) throw error;
+      clearStaleContext(ctx);
+      return undefined;
+    }
+  };
+  const renderSubagentControlNoticeForActiveSession = (
+    message: SubagentControlNoticeMessage,
+    options: { expanded: boolean },
+    theme: Theme,
+  ): Component | undefined =>
+    renderSubagentControlNotice(message, { ...options, getBranch: getActiveBranch }, theme);
+
   patchToolExecutionRenderers();
   patchAssistantMessageRender();
   patchUserMessageRender();
@@ -5002,7 +5126,7 @@ export default function (pi: ExtensionAPI) {
   registerContextCommand(pi);
   pi.registerMessageRenderer("intercom_message", renderIntercomMessage);
   for (const type of SUBAGENT_CONTROL_NOTICE_TYPES) {
-    pi.registerMessageRenderer(type, renderSubagentControlNotice);
+    pi.registerMessageRenderer(type, renderSubagentControlNoticeForActiveSession);
   }
 
   pi.on("session_start", (_event, ctx) => {
