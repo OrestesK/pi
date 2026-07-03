@@ -6,12 +6,9 @@ Local Pi extension that adds a session-scoped `/goal` command and continues work
 
 - `/goal` or `/goal status` — show current goal status.
 - `/goal <objective>` — start or replace the active goal.
-- `/goal start <objective>` — explicit start.
 - `/goal pause [reason]` — pause auto-continuation and abort the active turn when Pi exposes `ctx.abort()`.
 - `/goal resume` — resume and queue one continuation when idle.
 - `/goal clear` — stop auto-continuation for the active goal without aborting the active turn.
-- `/goal done <evidence>` — record completion evidence for judging.
-- `/goal help` — show command usage.
 
 ## Safety contract
 

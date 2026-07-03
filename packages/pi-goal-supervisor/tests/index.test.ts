@@ -282,7 +282,7 @@ test("widget and supervisor prompt show unbounded turn count", async () => {
 	assert.doesNotMatch(prompt, /ambiguous product\/API decision/i);
 });
 
-test("goal-crafter templates default to main-agent goals", () => {
+test("goal-crafter default template stays main-agent and evidence-gated", () => {
 	const skillPath = join(
 		dirname(fileURLToPath(import.meta.url)),
 		"../../../skills/goal-crafter/SKILL.md",
@@ -293,38 +293,31 @@ test("goal-crafter templates default to main-agent goals", () => {
 		"Default format:",
 		"### 5. Adapt the goal to the task shape",
 	);
-	const expandedTemplate = sliceBetween(
-		skill,
-		"Use the expanded form",
-		"Iteration policy:",
-	);
 
-	for (const template of [defaultTemplate, expandedTemplate]) {
-		assert.match(template, /Default to the main agent/i);
-		assert.match(template, /pre-edit contract card and owner map/i);
-		assert.match(template, /final self-review against/i);
-		assert.match(template, /map each Done when item to fresh evidence/i);
-		assert.match(template, /scope and artifact hygiene/i);
-		assert.match(template, /generated\/untracked artifacts/i);
-		assert.match(template, /debug outputs/i);
-		assert.match(template, /changed files/i);
-		assert.doesNotMatch(
-			template,
-			/Default to a supervised team when available/i,
-		);
-		assert.doesNotMatch(
-			template,
-			/Use web\/code research when current external docs/i,
-		);
-		assert.doesNotMatch(
-			template,
-			/parent\/supervisor synthesis of worker and reviewer\/monitor findings/i,
-		);
-		assert.doesNotMatch(
-			template,
-			/team\/subagent\/reviewer\/reducer workflows unless/i,
-		);
-	}
+	assert.match(defaultTemplate, /Default to the main agent/i);
+	assert.match(defaultTemplate, /pre-edit contract card and owner map/i);
+	assert.match(defaultTemplate, /final self-review against/i);
+	assert.match(defaultTemplate, /Map each Minimum acceptance item to fresh evidence/i);
+	assert.match(defaultTemplate, /scope and artifact hygiene/i);
+	assert.match(defaultTemplate, /generated\/untracked artifacts/i);
+	assert.match(defaultTemplate, /debug outputs/i);
+	assert.match(defaultTemplate, /changed files/i);
+	assert.doesNotMatch(
+		defaultTemplate,
+		/Default to a supervised team when available/i,
+	);
+	assert.doesNotMatch(
+		defaultTemplate,
+		/Use web\/code research when current external docs/i,
+	);
+	assert.doesNotMatch(
+		defaultTemplate,
+		/parent\/supervisor synthesis of worker and reviewer\/monitor findings/i,
+	);
+	assert.doesNotMatch(
+		defaultTemplate,
+		/team\/subagent\/reviewer\/reducer workflows unless/i,
+	);
 });
 
 test("turn_end rejects disallowed goal blockers and continues", async () => {
@@ -435,7 +428,10 @@ test("status and judge-error blocks do not auto-resume", async () => {
 		{ message: { role: "assistant", content: "Work is in progress." } },
 		harness.ctx,
 	);
-	await harness.handler("done tests passed", harness.ctx);
+	await harness.hooks.get("turn_end")?.(
+		{ message: { role: "assistant", content: "GOAL_DONE: tests passed" } },
+		harness.ctx,
+	);
 	assert.equal(harness.lastState()?.status, "blocked");
 	assert.equal(harness.lastState()?.lastBlocker?.source, "judge_error");
 
@@ -511,7 +507,7 @@ test("clear aborts stale supervisor continuation prompts without aborting the co
 	assert.equal(aborts, 1);
 });
 
-test("manual /goal done fails closed when no transcript evidence exists", async () => {
+test("manual done text replaces the active goal instead of judging completion", async () => {
 	const entries: Array<{ type: "custom"; customType: string; data: unknown }> =
 		[];
 	let handler: ((args: string, ctx: unknown) => Promise<void>) | undefined;
@@ -565,85 +561,8 @@ test("manual /goal done fails closed when no transcript evidence exists", async 
 		.at(-1)?.data as GoalSupervisorState | undefined;
 	assert.equal(judgeCalls, 0);
 	assert.equal(lastState?.status, "running");
-	assert.equal(
-		lastState?.lastJudge?.reason,
-		"no transcript evidence available for completion claim",
-	);
-});
-
-test("manual /goal done judges against actual prior assistant transcript", async () => {
-	const entries: Array<{ type: "custom"; customType: string; data: unknown }> =
-		[];
-	const hooks = new Map<
-		string,
-		(event: unknown, ctx: unknown) => Promise<void> | void | unknown
-	>();
-	let handler: ((args: string, ctx: unknown) => Promise<void>) | undefined;
-	let judgedTranscript = "";
-	const api = {
-		on(
-			event: string,
-			hook: (event: unknown, ctx: unknown) => Promise<void> | void | unknown,
-		) {
-			hooks.set(event, hook);
-		},
-		registerCommand(
-			_name: string,
-			options: { handler: (args: string, ctx: unknown) => Promise<void> },
-		) {
-			handler = options.handler;
-		},
-		appendEntry(customType: string, data: unknown) {
-			entries.push({ type: "custom", customType, data });
-		},
-		sendMessage() {},
-	};
-	registerGoalSupervisor(
-		api,
-		{},
-		{
-			judge: (_state, assistantText) => {
-				judgedTranscript = assistantText;
-				return {
-					verdict: "approved",
-					score: 9,
-					reason: "manual verified",
-					missingEvidence: [],
-					at: "2026-06-03T00:02:00.000Z",
-				};
-			},
-		},
-	);
-	assert.ok(handler);
-	const ctx = {
-		sessionManager: {
-			getCwd: () => "/tmp/project",
-			getSessionId: () => "session-1",
-			getBranch: () => entries,
-		},
-		isIdle: () => true,
-		hasPendingMessages: () => false,
-		ui: { notify() {}, setWidget() {} },
-	};
-
-	await handler("finish objective", ctx);
-	await hooks.get("turn_end")?.(
-		{
-			message: {
-				role: "assistant",
-				content: "Tests passed in the transcript.",
-			},
-		},
-		ctx,
-	);
-	await handler("done tests passed", ctx);
-
-	const lastState = entries
-		.filter((entry) => entry.customType === STATE_CUSTOM_TYPE)
-		.at(-1)?.data as GoalSupervisorState | undefined;
-	assert.equal(judgedTranscript, "Tests passed in the transcript.");
-	assert.equal(lastState?.status, "complete");
-	assert.equal(lastState?.lastJudge?.reason, "manual verified");
+	assert.equal(lastState?.objective, "done tests passed");
+	assert.equal(lastState?.lastDoneClaim, undefined);
 });
 
 test("turn_end GOAL_DONE uses injected judge and can complete the goal", async () => {

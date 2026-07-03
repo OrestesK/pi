@@ -1,6 +1,6 @@
 ---
 name: goal-crafter
-description: "Use when the user explicitly asks to write, review, refine, or turn current work into a /goal command. Crafts one paste-ready, evidence-grounded Pi /goal from current session context, compactions, memory, todos, artifacts, and relevant repo/docs without starting the goal or implementing the task."
+description: "Use when the user explicitly asks to write, review, refine, or turn current work into a /goal command. Crafts one paste-ready, evidence-grounded Pi /goal from current session context, compactions, memory, todos, artifacts, and relevant repo/docs as re-verifiable pointers, without hardcoding old context or starting/implementing the goal."
 ---
 
 # Goal Crafter
@@ -30,9 +30,10 @@ Do not auto-trigger merely because work is messy, long-running, or resumable. In
 Pi's local `/goal` is session-scoped and continuation-oriented:
 
 - `/goal <objective>` starts or replaces the active goal.
-- `/goal`, `/goal status`, `/goal pause`, `/goal resume`, `/goal clear`, and `/goal done <evidence>` manage it.
+- `/goal`, `/goal status`, `/goal pause`, `/goal resume`, and `/goal clear` manage it.
 - The supervisor queues one continuation at safe idle boundaries; it does not grant tools or permissions.
 - Completion requires `GOAL_DONE: <specific evidence from transcript/artifacts/verifications>`.
+- For crafted goals, default to a long-horizon continuation contract: first passing checks, first working output, first benchmark win, or a status summary is not completion unless the user explicitly asked for a small bounded goal or explicitly ends/ships the active goal.
 - Blocking requires `GOAL_BLOCKED: <specific blocker and evidence that no safe non-asking next step exists>`.
 - A blocked marker is accepted only after verifying the goal is 100% blocked by an automatic command/tool/runtime guardrail or by a missing required tool, credential, auth, access, or service. User-permission, approval, confirmation, clarification, and product/workflow decision blockers are not accepted blocker classes.
 - Starting a `/goal` is evidence that the user intends the task to be doable without asking; if one path needs approval, sudo, mutating git, external mutation, private reads, HITL, or a product decision, encode that as a constraint/non-goal and choose another safe path. Emit `GOAL_BLOCKED` only when no safe non-asking workaround exists.
@@ -42,6 +43,8 @@ Pi's local `/goal` is session-scoped and continuation-oriented:
 ## Resource posture
 
 Treat explicit `/goal` use as regular-first by default. The user does not want `/goal` commands to start team-mode, reviewer-swarm, or reducer workflows.
+
+Default goal shape for this user is adaptive and long-horizon: the goal should keep choosing safe useful evidence-producing work until the user explicitly ends it or the goal runner can show that no safe useful in-scope options remain. Use a short bounded goal only when the user explicitly asks for one.
 
 When crafting or supervising goals, keep the default resource posture simple and evidence-driven:
 
@@ -72,17 +75,21 @@ Rules:
 
 - Newer and primary evidence beats older summaries.
 - If the user pauses or redirects a hypothesis, mark that branch stale and make the new branch current.
-- Compactions, memory, and historical artifact paths are recovery indexes, not final authority.
+- Compactions, memory, todos, `.scratch` files, and historical artifact paths are recovery indexes, not final authority, fixed scope, or required execution order.
 - Existence-check and read historical artifact refs before treating their contents as evidence.
+- Prefer search terms, source-of-truth discovery, and evidence trails over hardcoded lists of old paths or old findings inside the final goal.
 - Separate current facts from historical continuity.
 - Mark stale, superseded, contradicted, or unverified facts explicitly.
 - Do not mine unbounded history. Stop once evidence is enough to identify objective, constraints, verification, and blockers.
+- When researching goal-making or task-spec practice, weight experienced practitioner reports, primary/creator sources, and frontier AI-agent/spec/eval sources above beginner acronym guides, SEO listicles, or generic framework summaries.
+- Do not let framework labels drive the goal shape. Use external frameworks only for ingredients that improve this specific goal's evidence, continuation, obstacle handling, or verifier.
 
 ## Procedure
 
 ### 1. Confirm mode and scope
 
-- Goal: produce exactly one `/goal ...` command.
+- Goal: produce exactly one fenced `text` block containing one `/goal ...` command.
+- The final response must have no intro, outro, caveat paragraph, or second code block. The first non-fence text inside the block must start with `/goal `.
 - Do not implement the underlying task.
 - Do not start the goal for the user unless the user explicitly asks after seeing it.
 - Do not make material product/API/scope/workflow decisions silently.
@@ -115,14 +122,23 @@ When the user asks to use "current session", "previous conversation", "compactio
 
 Extract only facts that affect the goal: current objective, latest status, constraints, verification evidence, blockers, stale branches, and next safe action.
 
-### 4. Build a compact goal by default
+### 4. Build an adaptive long-horizon goal by default
 
 Default format:
 
 ```text
 /goal <one measurable objective>.
 
-Scope: <files/subsystems/artifacts included; explicit non-goals if needed>.
+Context discovery:
+- Reconstruct the current task context from the latest user request, current repo/docs/config, relevant memory/todos/compactions/session history, and relevant `.scratch` artifacts.
+- Treat memory, todos, compactions, prior sessions, and `.scratch` artifacts as discovery pointers, not authority, mandatory execution order, fixed scope, or hardcoded goal content.
+- Re-verify important historical claims from current source, docs, config, transcript evidence, or fresh checks before relying on them.
+- Use search terms, source-of-truth discovery, and evidence trails instead of hardcoded lists of old paths or old findings.
+
+Scope:
+- In scope: <bounded objective area, source-of-truth discovery, verification surfaces, and safe quality ratchet work>.
+- Out of scope: <explicit non-goals, approval-required actions, unsafe/private/destructive routes>.
+- Scope may shift only when fresh evidence shows a better in-scope target; record the reason before continuing.
 
 Constraints:
 - <project/user/tool safety rules that must remain true>
@@ -130,24 +146,42 @@ Constraints:
 - Default to the main agent; do not start team-mode, reviewer-swarm, or reducer workflows.
 - For nontrivial cross-file work, use a pre-edit contract card and owner map, then final self-review against them.
 
-Done when:
+Minimum acceptance:
 1. <verifiable acceptance criterion + required evidence>
 2. <verifiable acceptance criterion + required evidence>
 3. <verifiable acceptance criterion + required evidence>
 
 Verification:
 - <exact checks/artifacts to inspect, or a first criterion to discover valid checks if unknown>
-- Map each Done when item to fresh evidence from transcript, artifacts, diffs, checks, docs, or review.
+- Map each Minimum acceptance item to fresh evidence from transcript, artifacts, diffs, checks, docs, or review.
 - Include final self-review against the contract card, owner map, tests/docs evidence, scope and artifact hygiene, and forbidden artifacts.
 - Account for generated/untracked artifacts, debug outputs, and changed files before GOAL_DONE.
-- GOAL_DONE only with fresh evidence proving every Done-when item.
+
+Continuation policy:
+- Work in smallest evidence-producing steps.
+- Do not treat first passing checks, first working output, first benchmark win, or status/morning summary as completion.
+- After each meaningful step, choose the next safest useful in-scope action: source inspection, benchmark refinement, implementation, simplification, compatibility check, regression test, docs update, cleanup, review, or progress handoff.
+- GOAL_DONE is valid only when the user explicitly asks to end/finish/ship the active goal, or when Minimum acceptance is proved and the runner can state with evidence that no safe useful in-scope option remains.
 
 Blocked only if:
 - <verified automatic command/tool/runtime guardrail blocks every viable safe path, or a required tool/credential/auth/access/service is missing>
 - Emit GOAL_BLOCKED with the specific blocker and evidence that no safe non-asking next step exists.
 ```
 
-Keep the command paste-ready. Include only details the goal runner needs.
+Keep the command paste-ready as exactly one fenced `text` block and no surrounding prose. Include only details the goal runner needs. Do not paste evidence inventories, old paths, old findings, or todos as hardcoded requirements. Include exact paths/names only when they are the current target, an authoritative current source of truth, or necessary for locating the work; otherwise encode discovery terms, source-of-truth search, and re-verification policy.
+
+Before rendering, apply these internal shape-fit checks. Do not emit framework names or extra sections by default; expose the underlying detail only when it materially helps the runner:
+
+- Separate the durable outcome, progress loop, and completion evidence.
+- For known-path work, make acceptance criteria specific, atomic, observable, bounded, and tied to verifiers.
+- For uncertain or frontier work, include the smallest bounded experiment or probe that can produce decision-grade evidence, then continue based on that evidence.
+- For repeated failure, risky quality ratchets, or likely friction, include obstacle/fallback thinking as safe next actions, not as new stop/block rules.
+- For bad-win risks, fold anti-goals into non-goals, constraints, or forbidden alternate shapes.
+- Distinguish progress actions from completion evidence; do not treat effort, a first pass, or the agent's own confidence as proof.
+- Prefer external evidence: commands, diffs, screenshots, logs, benchmarks, source citations, live checks, or accepted review findings. Self-review may supplement evidence but cannot replace it.
+- Calibrate scope as either minimal bounded completion or adaptive quality ratchet according to the user's request; do not silently choose one.
+- Do not let weak stop framing such as "probably stop once checks pass" collapse a quality-sensitive, integration-sensitive, or "actually good/use your judgment" request into checks/docs-only acceptance; keep live behavior, source-backed gaps, and options-exhaustion evidence when the task plausibly needs them.
+- For tool, extension, CLI, provider, integration, rendering, or prompt-behavior goals, checks/docs-only acceptance is invalid unless the user explicitly asks for only checks/docs. Include at least one representative live, replay, harness, screenshot, transcript, or behavior-smoke verifier, or state that live behavior remains unavailable/unverified.
 
 ### 5. Adapt the goal to the task shape
 
@@ -162,6 +196,10 @@ For bug or unexpected-behavior goals, include this spine in the acceptance crite
 - use fresh review for nontrivial fixes.
 
 When the user asks for "better", efficiency, cleanup, or stronger quality after a working first pass, add quality-ratchet criteria instead of stopping at correctness: inspect whether performance, simplicity, maintainability, concurrency/resource bounds, and reviewability are still weak; improve the smallest relevant surface; verify the improvement with fresh evidence.
+
+When live-testing goal-crafter behavior or prompt/skill changes, use natural under-specified probes that are plausible failure cases. Do not only test with prompts that name the exact target, constraints, and acceptance criteria; include vague requests, weak stop framing, and tempting overmanagement language so the test shows how the agent thinks by itself.
+
+Treat phrases such as "overnight", "keep going", "don't stop", "dont stop", "constant improvement", "hillclimb", "ratchet", "fully exhaust options", or "make it better" as cues for the adaptive long-horizon form. These cues strengthen continuation and evidence-refresh policy; they do not authorize unsafe actions, unbounded history mining, or hardcoded old context.
 
 For delegated subagent goals, state that inherited conversation is reference-only unless the task explicitly says to continue it, and give each child a concrete deliverable, scope boundary, validation target, and output contract. For subagent configuration work, verify discovery/registration with `subagent doctor/list/get`, fix frontmatter schema before assuming files are active, check duplicate builtin/user shadowing, disable only duplicated builtins instead of deleting packaged agents, and explicitly grant needed direct tools rather than relying on parent inheritance. Preserve exact output shape constraints such as bullet counts; when the task says to return exact text, the output contract must forbid extra explanation. For async or long-running delegated goals, include observability handles: run id when known, output/result/session paths, progress files, control thresholds, and when the parent must inspect them. For Pi subagent responsiveness/config goals, verify async support with doctor/status after reload, distinguish `asyncByDefault` from force-top-level async, and check required runtime pieces such as session dir, jiti resolution, intercom bridge, and lazily-created chain-run directories before declaring the setup broken. For async debugging, include foreground replay, artifact existence checks, and detached stderr/stdout capture when background runs vanish silently. For tool-demo goals, avoid mutating tools such as memory writes unless explicitly permitted and reversible or cleanup is available. If the task is read-only or no-edit/no-artifact, align prose with runtime/output policy: no writes means no output files unless an explicit artifact path is part of the task; do not create `.scratch/`, change `.gitignore`, or make convenience artifact setup edits. If the task says do not inspect files, do not include file-read requirements.
 
@@ -217,20 +255,22 @@ For cancellation, timeout, queue, retry, or long-running provider goals, include
 
 For schema or data-contract docs, include source/derivation annotations when relevant: which fields are copied from source artifacts, which are derived, which are optional/future, and which raw details are retained for downstream recalculation. Prefer a clear order such as current/top-level facts, then derived fields, then raw details.
 
-Use the expanded form for explicit resume/marathon/high-risk/cross-session requests:
+Use the expanded continuity form for explicit resume/high-risk/cross-session requests, or whenever the user uses long-horizon cues such as "overnight", "keep going", "don't stop", "constant improvement", "hillclimb", "ratchet", or "fully exhaust options":
 
 ```text
 /goal <one measurable objective>.
 
-Context:
+Context discovery:
 - Current task: <fresh current-session task>
 - Known current state: <confirmed facts with file/session/artifact refs>
 - Historical continuity: <prior session/compaction/memory facts, explicitly marked historical>
 - Stale branches to ignore: <superseded work, if any>
+- Discovery rule: treat memory, todos, compactions, prior sessions, and `.scratch` artifacts as pointers to re-verify, not as hardcoded required paths, stale findings, fixed scope, or mandatory execution order.
 
 Scope:
-- In scope: <bounded areas>
-- Out of scope: <non-goals>
+- In scope: <bounded areas plus safe source-of-truth discovery and quality ratchet work>
+- Out of scope: <non-goals and approval-required/unsafe/private/destructive routes>
+- Scope may shift only when fresh evidence proves a better in-scope target; record the reason before continuing.
 
 Constraints:
 - <preserve invariants>
@@ -239,7 +279,7 @@ Constraints:
 - Default to the main agent; do not start team-mode, reviewer-swarm, or reducer workflows.
 - For nontrivial cross-file work, use a pre-edit contract card and owner map, then final self-review against them.
 
-Done when:
+Minimum acceptance:
 1. <criterion with required proof>
 2. <criterion with required proof>
 3. <criterion with required proof>
@@ -247,16 +287,18 @@ Done when:
 Verification:
 - <commands, artifact checks, review checks, screenshots, logs, file:line refs, or other proof>
 - Match verification scope to requirement scope; narrow checks cannot prove broad claims.
-- Map each Done when item to fresh evidence from transcript, artifacts, diffs, checks, docs, or review.
+- Map each Minimum acceptance item to fresh evidence from transcript, artifacts, diffs, checks, docs, or review.
 - Include final self-review against the contract card, owner map, tests/docs evidence, scope and artifact hygiene, and forbidden artifacts.
 - Account for generated/untracked artifacts, debug outputs, and changed files before GOAL_DONE.
-- GOAL_DONE only when all criteria are proved or explicitly waived by the user.
 
-Iteration policy:
+Continuation policy:
 - Work in smallest evidence-producing steps.
 - After a failed check, inspect root cause before retrying.
 - Do not redefine success around partial progress or an easier subset.
+- Do not treat first passing checks, first working output, first benchmark win, or status/morning summary as completion.
 - Re-read current goal/continuity notes after compaction or long interruption.
+- After each meaningful step, choose the next safest useful in-scope action until the user explicitly ends the goal or no safe useful in-scope options remain.
+- GOAL_DONE only when Minimum acceptance is proved and either the user explicitly asks to end/finish/ship the active goal or the runner can state with evidence that no safe useful in-scope option remains.
 
 Blocked only if:
 - A verified automatic command/tool/runtime guardrail blocks every viable safe path.
@@ -281,10 +323,10 @@ Do not ask for information tools can verify. Do not ask broad multi-part questio
 
 Only make assumptions for mechanical, reversible defaults already implied by current instructions. Mark them as assumptions outside the `/goal` block if useful. Do not bake material unapproved assumptions into the command.
 
-If verification is unknown but discovering it is a safe and necessary first step, encode that as the first Done-when item or first action:
+If verification is unknown but discovering it is a safe and necessary first step, encode that as the first Minimum acceptance item or first action:
 
 ```text
-Done when:
+Minimum acceptance:
 1. Existing validation commands are identified from repo docs/config and summarized with exact paths.
 ```
 
@@ -292,9 +334,11 @@ Do not invent commands.
 
 ## Progress and review loops
 
-For long or tool-heavy goals, include a progress checkpoint requirement: periodically state current objective, what was inspected or changed, key finding/hypothesis/risk, and next action.
+For long or tool-heavy goals, include a progress checkpoint requirement: periodically state current objective, what was inspected or changed, key finding/hypothesis/risk, next action, and why the next action is the current highest-value safe option. Use meaningful-step or phase checkpoints by default; do not encode weekly, 12-week, wall-clock, token-budget, or fixed-cadence semantics unless the user asks for them and the local runtime can support them.
 
 For nontrivial implementation goals, include final review and must-fix loop criteria. `GOAL_DONE` is not valid while accepted must-fix review findings remain unless the user explicitly waives or defers them. Passing checks do not override a fresh accepted review blocker. When the user says "go on" inside an already-authorized safe local loop, continue with the next concrete action instead of asking again.
+
+For adaptive long-horizon goals, require a brief options-exhaustion check before `GOAL_DONE`: name the useful in-scope routes considered, which were completed, which are unsafe/approval-gated/out of scope, and why no safe useful route remains. Do not include this as a reason to stop early; it is a final gate only.
 
 ## Quality bar
 
@@ -306,12 +350,19 @@ Before output, check:
 - Placement/design decisions are either already implied, explicitly deferred, or handled by a reconnaissance/review criterion.
 - Any intentionally deferred edge case, race, or non-goal is named with a reason and final-report requirement.
 - Constraints include user/project/tool safety rules that matter.
-- Done-when items are observable and evidence-backed.
+- Minimum acceptance items are observable, atomic, bounded, and evidence-backed.
+- Relevant failure, edge, permission, compatibility, or boundary behavior is covered when the task risk justifies it.
 - Verification evidence would appear in transcript/artifacts so the supervisor/judge can evaluate it.
+- Completion relies on external evidence, not the agent's own confidence or summary.
+- Progress actions and completion evidence are not confused.
 - Stop/block rules match Pi's accepted `GOAL_BLOCKED` classes.
 - Current facts are separated from historical continuity.
 - Stale/contradicted context is not treated as active work.
-- No unsupported budgets, no-progress stops, or vague terminal rules are presented as enforced.
+- Memories, todos, compactions, prior sessions, and `.scratch` artifacts are used as pointers, not hardcoded requirements or execution order.
+- The goal has a continuation policy that keeps working past first-pass success until the user ends it or safe useful in-scope options are exhausted.
+- No unsupported budgets, no-progress stops, calendar cadence, or vague terminal rules are presented as enforced.
+- If goal-making research influenced the shape, experienced/practitioner/frontier/primary sources carried more weight than beginner/framework listicles.
+- Framework jargon and visible extra sections are omitted unless they directly help the runner.
 - No material decision is silently made.
 
 Reject or revise goals with these anti-patterns:
@@ -319,10 +370,13 @@ Reject or revise goals with these anti-patterns:
 - "make it better", "clean everything up", "do whatever it takes", "use every tool".
 - Success without proof path.
 - Scope of "whole repo" without an enumerable source or boundary.
-- Stop-if rules that are subjective or unsupported by local supervisor behavior.
+- Hardcoded historical context: stale file paths, old todos, prior-session findings, memory summaries, or `.scratch` artifacts pasted into the goal as mandatory truth without re-verification.
+- Rigid execution order copied from old plans/todos instead of adaptive source-of-truth discovery.
+- Stop-if rules, calendar cadence, or fixed budgets that are subjective or unsupported by local supervisor behavior.
 - Verification postponed until the very end when intermediate checks are possible.
 - Permission-sensitive work hidden inside broad wording.
 - Tests passing used as sole proof when acceptance criteria remain unmet.
+- Tool, extension, CLI, provider, integration, rendering, or prompt-behavior goals that stop at checks/docs/diff hygiene without a representative behavior verifier or an explicit unavailable-live caveat.
 - First-pass correctness treated as enough after the user asks for a better, faster, cleaner, or more robust solution.
 - Unnecessary abstraction or helper extraction where a small inline/local change is clearer.
 - New alternate path verified while the existing path is left unverified.

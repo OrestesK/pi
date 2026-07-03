@@ -322,7 +322,7 @@ export function registerGoalSupervisor(
 ): void {
   pi.registerCommand?.("goal", {
     description:
-      "Run a session-scoped goal until evidence-backed completion. Usage: /goal <objective> | start <objective> | status | pause | resume | clear | done <evidence> | help",
+      "Run a session-scoped goal until evidence-backed completion. Usage: /goal <objective> | status | pause | resume | clear",
     getArgumentCompletions: getGoalArgumentCompletions,
     handler: async (args: string, rawCtx: unknown) => {
       const ctx = rawCtx as ContextLike;

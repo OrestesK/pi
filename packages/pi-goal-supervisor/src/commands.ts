@@ -10,9 +10,7 @@ export type GoalCommand =
   | { action: "start"; objective: string }
   | { action: "pause"; reason?: string }
   | { action: "resume" }
-  | { action: "clear" }
-  | { action: "done"; evidence: string }
-  | { action: "help" };
+  | { action: "clear" };
 
 export type CommandResult = {
   state: GoalSupervisorState | undefined;
@@ -24,12 +22,9 @@ export type CommandResult = {
 
 const RESERVED = new Set([
   "status",
-  "start",
   "pause",
   "resume",
   "clear",
-  "done",
-  "help",
 ]);
 
 function splitArgs(args: string): string[] {
@@ -50,24 +45,12 @@ export function parseGoalCommand(args: string): GoalCommand {
   switch (first) {
     case "status":
       return { action: "status" };
-    case "start": {
-      const objective = restAfterFirst(args);
-      if (!objective) throw new Error("Goal objective is required");
-      return { action: "start", objective };
-    }
     case "pause":
       return { action: "pause", reason: restAfterFirst(args) || undefined };
     case "resume":
       return { action: "resume" };
     case "clear":
       return { action: "clear" };
-    case "done": {
-      const evidence = restAfterFirst(args);
-      if (!evidence) throw new Error("Completion evidence is required");
-      return { action: "done", evidence };
-    }
-    case "help":
-      return { action: "help" };
     default:
       throw new Error(`Unknown goal command: ${first}`);
   }
@@ -96,13 +79,6 @@ export function handleCommand(
       return {
         state,
         message: formatStatus(state),
-        shouldQueueContinuation: false,
-      };
-    case "help":
-      return {
-        state,
-        message:
-          "Usage: /goal <objective> | start <objective> | status | pause | resume | clear | done <evidence> | help",
         shouldQueueContinuation: false,
       };
     case "start": {
@@ -163,19 +139,6 @@ export function handleCommand(
         abortTurn: false,
       };
     }
-    case "done": {
-      const next = reduceState(requireState(state), {
-        type: "done_claimed",
-        evidence: command.evidence,
-        source: "command",
-        now: ctx.now,
-      });
-      return {
-        state: next,
-        message: "Goal completion evidence recorded; judging required.",
-        shouldQueueContinuation: false,
-      };
-    }
   }
 }
 
@@ -183,7 +146,7 @@ export function getGoalArgumentCompletions(
   argumentText: string,
 ): Array<{ value: string; label: string }> {
   const current = argumentText.trim().split(/\s+/).at(-1) ?? "";
-  return ["status", "start", "pause", "resume", "clear", "done", "help"]
+  return ["status", "pause", "resume", "clear"]
     .filter((item) => item.startsWith(current))
     .map((item) => ({ value: item, label: item }));
 }

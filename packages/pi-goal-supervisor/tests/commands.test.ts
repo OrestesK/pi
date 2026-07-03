@@ -7,12 +7,12 @@ import {
 } from "../src/commands.ts";
 import { createInitialState } from "../src/state.ts";
 
-test("parses status, implicit start, explicit start, and reserved commands", () => {
+test("parses status, objective text, and reserved commands", () => {
   assert.deepEqual(parseGoalCommand(""), { action: "status" });
   assert.deepEqual(parseGoalCommand("status"), { action: "status" });
   assert.deepEqual(parseGoalCommand("start ship it"), {
     action: "start",
-    objective: "ship it",
+    objective: "start ship it",
   });
   assert.deepEqual(parseGoalCommand("ship it"), {
     action: "start",
@@ -27,37 +27,32 @@ test("parses status, implicit start, explicit start, and reserved commands", () 
     reason: "waiting",
   });
   assert.deepEqual(parseGoalCommand("done tests passed"), {
-    action: "done",
-    evidence: "tests passed",
+    action: "start",
+    objective: "done tests passed",
+  });
+  assert.deepEqual(parseGoalCommand("help"), {
+    action: "start",
+    objective: "help",
   });
 });
 
-test("rejects empty objective for explicit start", () => {
-  assert.throws(() => parseGoalCommand("start"), /objective/i);
-});
-
-test("status and help with no active goal do not create placeholder state", () => {
+test("status with no active goal does not create placeholder state", () => {
   const context = {
     cwd: "/tmp/project",
     sessionId: "s",
     now: "2026-06-03T00:00:00.000Z",
   };
   const result = handleCommand(undefined, "status", context);
-  const help = handleCommand(undefined, "help", context);
 
   assert.equal(result.state, undefined);
   assert.equal(result.shouldQueueContinuation, false);
   assert.match(result.message, /no active goal/i);
-  assert.equal(help.state, undefined);
-  assert.equal(help.shouldQueueContinuation, false);
-  assert.match(help.message, /\| help/);
-  assert.match(help.message, /\| clear/);
-  assert.doesNotMatch(help.message, /\| stop/);
   assert.deepEqual(
     getGoalArgumentCompletions(""),
-    ["status", "start", "pause", "resume", "clear", "done", "help"].map(
-      (value) => ({ value, label: value }),
-    ),
+    ["status", "pause", "resume", "clear"].map((value) => ({
+      value,
+      label: value,
+    })),
   );
 });
 
@@ -107,7 +102,7 @@ test("command handler starts pauses resumes and clears", () => {
   assert.doesNotMatch(status.message, /\d+\/\d+/);
 });
 
-test("manual done records evidence and enters judging state", () => {
+test("done text replaces the active objective instead of recording completion evidence", () => {
   const state = createInitialState({
     objective: "finish",
     cwd: "/tmp/project",
@@ -122,6 +117,8 @@ test("manual done records evidence and enters judging state", () => {
   });
 
   assert.ok(result.state);
-  assert.equal(result.state.status, "judging");
-  assert.equal(result.state.lastDoneClaim?.evidence, "tests passed");
+  assert.equal(result.state.status, "running");
+  assert.equal(result.state.objective, "done tests passed");
+  assert.equal(result.state.lastDoneClaim, undefined);
+  assert.equal(result.shouldQueueContinuation, true);
 });
