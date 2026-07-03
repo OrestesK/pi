@@ -6,6 +6,7 @@
           "id": "gpt-5.5",
           "name": "GPT-5.5",
           "reasoning": true,
+          "thinkingLevelMap": { "xhigh": "xhigh", "minimal": "low" },
           "input": ["text", "image"],
           "contextWindow": 272000,
           "maxTokens": 128000
@@ -14,6 +15,7 @@
           "id": "gpt-5.4",
           "name": "GPT-5.4",
           "reasoning": true,
+          "thinkingLevelMap": { "xhigh": "xhigh", "minimal": "low" },
           "input": ["text", "image"],
           "contextWindow": 272000,
           "maxTokens": 128000
@@ -22,6 +24,7 @@
           "id": "gpt-5.4-mini",
           "name": "GPT-5.4 Mini",
           "reasoning": true,
+          "thinkingLevelMap": { "xhigh": "xhigh", "minimal": "low" },
           "input": ["text", "image"],
           "contextWindow": 272000,
           "maxTokens": 128000
