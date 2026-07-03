@@ -94,6 +94,8 @@ Test names should state the behavior and expected outcome. Avoid vague names lik
 
 Prefer small, readable test bodies. A single test may cover multiple tightly related cases in one flow when that is clearer than splitting into repetitive one-assertion tests. Use separate tests for independent behaviors, materially different failure modes, or cases that need different setup.
 
+When deleting a feature, do not replace the test or assert that checked for it with one that checks that it is not there.
+
 ## Fixtures, Helpers, and Test Data
 
 Use fixtures and helpers to remove noise, not to hide the behavior being tested.
