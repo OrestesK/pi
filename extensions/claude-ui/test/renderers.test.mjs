@@ -636,3 +636,26 @@ test("intercom renderer covers normal senders, subagent result compaction, reply
   assert.match(rendered, /To reply: \/reply abc123/);
   assertRenderedWithinWidth(subagentResult);
 });
+
+test("subagent control notice renderer covers orchestrator straggler notices and width", () => {
+  const component = ui.renderSubagentControlNotice(
+    {
+      content: "Parallel barrier blocked by straggler: top-level parallel\n3/4 complete; 1 still running.\nRunning: researcher 2/4, elapsed 9m10s, last activity 1m2s ago, 84 tools, 407320 tokens\nThreshold: slower than 9m8s (6m5s peer baseline).\nNo automatic action taken.\nActions: wait, inspect status/activity, nudge if available, interrupt, or detach/background when available.",
+      details: {
+        key: "parallel-straggler:run-1",
+        runId: "run-1",
+        source: "foreground",
+        noticeText: "Parallel barrier blocked by straggler: top-level parallel\n3/4 complete; 1 still running.",
+      },
+    },
+    { expanded: false },
+    theme,
+  );
+
+  const rendered = render(component, 80);
+  assert.match(rendered, /Subagent notice/);
+  assert.match(rendered, /Parallel barrier blocked by straggler: top-level parallel/);
+  assert.match(rendered, /3\/4 complete; 1 still running/);
+  assert.doesNotMatch(rendered, /subagent_control_notice/);
+  assertRenderedWithinWidth(component);
+});

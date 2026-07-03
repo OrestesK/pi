@@ -4741,6 +4741,17 @@ type IntercomMessageDetails = {
   replyCommand?: string;
 };
 
+type SubagentControlNoticeMessage = {
+  content?: unknown;
+  details?: unknown;
+};
+
+const SUBAGENT_CONTROL_NOTICE_TYPES = [
+  "subagent_control_notice",
+  "subagent-control",
+  "subagent-control-notice",
+];
+
 function compactSubagentResultMessage(text: string): string | undefined {
   if (!/^Run:/m.test(text) || !/^Status:/m.test(text)) return undefined;
   const run = text.match(/^Run:\s*(.+)$/m)?.[1]?.trim();
@@ -4815,6 +4826,53 @@ function renderIntercomMessage(
   };
 }
 
+function subagentControlNoticeTitle(details: unknown): string {
+  const event = isRecord(details) && isRecord(details.event) ? details.event : undefined;
+  if (!event) return "Subagent notice";
+  const type = typeof event.type === "string" ? event.type : "notice";
+  const agent = typeof event.agent === "string" ? event.agent : undefined;
+  return `Subagent ${type.replaceAll("_", " ")}${agent ? `: ${agent}` : ""}`;
+}
+
+function subagentControlNoticeBody(message: SubagentControlNoticeMessage): string {
+  const details = message.details;
+  if (isRecord(details) && typeof details.noticeText === "string") {
+    return details.noticeText;
+  }
+  return typeof message.content === "string" ? message.content : "";
+}
+
+function renderSubagentControlNotice(
+  message: SubagentControlNoticeMessage,
+  _options: { expanded: boolean },
+  theme: Theme,
+): Component | undefined {
+  const body = subagentControlNoticeBody(message);
+  if (!body.trim()) return undefined;
+  const title = subagentControlNoticeTitle(message.details);
+
+  return {
+    invalidate() {},
+    render(width: number): string[] {
+      if (width < 3) return [truncateToWidth(title, width)];
+      const bodyWidth = Math.max(1, width - 2);
+      const header = ` ⚠ ${title} `;
+      const headerText = truncateToWidth(header, bodyWidth, "");
+      const headerPadding = Math.max(0, bodyWidth - visibleWidth(headerText));
+      const lines = [
+        theme.fg("warning", `╭${headerText}${"─".repeat(headerPadding)}╮`),
+      ];
+      for (const line of wrapTextWithAnsi(body, bodyWidth)) {
+        const text = truncateToWidth(line, bodyWidth, "");
+        const padding = Math.max(0, bodyWidth - visibleWidth(text));
+        lines.push(theme.fg("warning", `│${text}${" ".repeat(padding)}│`));
+      }
+      lines.push(theme.fg("warning", `╰${"─".repeat(bodyWidth)}╯`));
+      return lines;
+    },
+  };
+}
+
 export const __claudeUiTestInternals = {
   allowlistedToolNames: [...EXTENSION_TOOL_WRAPPER_ALLOWLIST],
   agentToolCallBody,
@@ -4833,6 +4891,7 @@ export const __claudeUiTestInternals = {
   renderIntercomMessage,
   renderLsResult,
   renderReadResult,
+  renderSubagentControlNotice,
   renderSubagentToolResult,
   renderWriteResult,
   shouldUseOriginalToolCallRenderer,
@@ -4942,6 +5001,9 @@ export default function (pi: ExtensionAPI) {
   registerClaudeToolRenderers(pi);
   registerContextCommand(pi);
   pi.registerMessageRenderer("intercom_message", renderIntercomMessage);
+  for (const type of SUBAGENT_CONTROL_NOTICE_TYPES) {
+    pi.registerMessageRenderer(type, renderSubagentControlNotice);
+  }
 
   pi.on("session_start", (_event, ctx) => {
     try {
