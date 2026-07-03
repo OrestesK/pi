@@ -9,6 +9,7 @@ export interface MemoryFrontmatter {
 	description: string;
 	limit?: number;
 	status?: string;
+	load_priority?: string;
 	tags?: string[];
 	created?: string;
 	updated?: string;

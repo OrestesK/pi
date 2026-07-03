@@ -9,8 +9,8 @@ Search memory files with **multi-mode** search capability.
 
 ## Search Modes
 
-### 1. Tags & Description (Built-in)
-Automatically searches tags and descriptions based on query:
+### 1. Parsed Metadata (Built-in)
+Automatically searches parsed JSON/YAML frontmatter plus file paths and headings based on query. Query terms are tokenized, so multi-word searches can match hyphenated tags or filenames:
 
 ```
 memory_search(query="typescript")
@@ -85,10 +85,18 @@ memory_search({
 
 ## Search Priority
 
-1. **Tags** - Exact tag matches (grep)
-2. **Description** - Description keyword matches (grep)
-3. **Custom grep** - Optional grep pattern
-4. **Custom rg** - Optional ripgrep pattern
+1. **Parsed metadata** - Path, description, tags, and markdown headings from JSON or YAML frontmatter
+2. **Custom grep** - Optional grep pattern
+3. **Custom rg** - Optional ripgrep pattern
+
+## Empty Search Fallback Before Writing
+
+Before creating or overwriting a memory, an empty `memory_search(query=...)` is not enough evidence that no related memory exists. Retry with at least one broader surface:
+
+- `memory_search(rg="keyword1|keyword2")` for body/path terms; or
+- `memory_list(directory="core/project")` or a narrower directory when the likely location is known.
+
+Only write a new memory after that fallback still fails to reveal a focused existing file to update.
 
 ## Related Skills
 

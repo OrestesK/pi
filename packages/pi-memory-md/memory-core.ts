@@ -22,14 +22,33 @@ export { DEFAULT_LOCAL_PATH, getCurrentDate } from "./utils.js";
 
 export const DEFAULT_MEMORY_SCAN: [number, number] = [72, 168];
 export const DEFAULT_GLOBAL_MEMORY_DIRNAME = "global";
+export const MEMORY_CONTEXT_FILE_LIMIT_PER_SCOPE = 24;
 const HIDDEN_MEMORY_INDEX_STATUSES = new Set(["superseded"]);
+const MEMORY_LOAD_PRIORITY_SCORES = new Map([
+	["high", 300],
+	["medium", 200],
+	["low", 100],
+]);
+const MEMORY_STATUS_SCORES = new Map([
+	["current", 80],
+	["resolved", 60],
+	["partial", 40],
+	["unknown", 0],
+	["historical", -40],
+	["abandoned", -80],
+]);
+const objectHasOwnProperty = Object.prototype.hasOwnProperty;
+
+function hasOwn(value: object, key: PropertyKey): boolean {
+	return objectHasOwnProperty.call(value, key);
+}
 
 export function isMemoryVisibleInIndex(
 	memory: MemoryFile | null,
 ): memory is MemoryFile {
 	if (!memory) return false;
 
-	const status = memory.frontmatter.status?.trim().toLowerCase();
+	const status = normalizedFrontmatterValue(memory.frontmatter.status);
 	return !status || !HIDDEN_MEMORY_INDEX_STATUSES.has(status);
 }
 
@@ -269,7 +288,7 @@ export function getMemoryDir(settings: MemoryMdSettings, cwd: string): string {
 }
 
 export function getGlobalMemoryDir(settings: MemoryMdSettings): string | null {
-	if (!Object.hasOwn(settings.memoryDir ?? {}, "globalMemory")) return null;
+	if (!hasOwn(settings.memoryDir ?? {}, "globalMemory")) return null;
 
 	const globalMemory = settings.memoryDir?.globalMemory;
 	if (
@@ -426,6 +445,7 @@ function parseInvalidFrontmatterMemoryFile(
 				"Invalid frontmatter",
 			created: readFrontmatterScalar(split.frontmatter, "created"),
 			updated: readFrontmatterScalar(split.frontmatter, "updated"),
+			load_priority: readFrontmatterScalar(split.frontmatter, "load_priority"),
 			tags: readFrontmatterStringArray(split.frontmatter, "tags"),
 		},
 		content: split.body,
@@ -589,9 +609,85 @@ export function countMemoryContextFiles(context: string): number {
 	return context.split("\n").filter((line) => line.startsWith("-")).length;
 }
 
+function normalizedFrontmatterValue(value: unknown): string {
+	return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function frontmatterScore(value: unknown, scores: Map<string, number>): number {
+	return scores.get(normalizedFrontmatterValue(value)) ?? 0;
+}
+
+function frontmatterTimestamp(frontmatter: MemoryFrontmatter): number {
+	const value = frontmatter.updated ?? frontmatter.created;
+	if (!value) return 0;
+	const timestamp = Date.parse(value);
+	return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function memoryPathRelevanceScore(
+	filePath: string,
+	relevanceTerms: string[],
+): number {
+	const normalizedPath = filePath.replace(/\\/g, "/").toLowerCase();
+	return relevanceTerms.reduce((score, term) => {
+		const normalizedTerm = term.trim().toLowerCase();
+		if (!normalizedTerm) return score;
+		if (normalizedPath.includes(`/${normalizedTerm}/`)) return score + 120;
+		return normalizedPath.includes(normalizedTerm) ? score + 40 : score;
+	}, 0);
+}
+
+function memoryContextRank(
+	filePath: string,
+	memory: MemoryFile,
+	relevanceTerms: string[],
+): number {
+	return (
+		frontmatterScore(
+			memory.frontmatter.load_priority,
+			MEMORY_LOAD_PRIORITY_SCORES,
+		) +
+		frontmatterScore(memory.frontmatter.status, MEMORY_STATUS_SCORES) +
+		memoryPathRelevanceScore(filePath, relevanceTerms)
+	);
+}
+
+function compareMemoryContextEntries(
+	a: { filePath: string; memory: MemoryFile },
+	b: { filePath: string; memory: MemoryFile },
+	relevanceTerms: string[],
+): number {
+	const rankDelta =
+		memoryContextRank(b.filePath, b.memory, relevanceTerms) -
+		memoryContextRank(a.filePath, a.memory, relevanceTerms);
+	if (rankDelta !== 0) return rankDelta;
+
+	const timeDelta =
+		frontmatterTimestamp(b.memory.frontmatter) -
+		frontmatterTimestamp(a.memory.frontmatter);
+	if (timeDelta !== 0) return timeDelta;
+
+	return a.filePath.localeCompare(b.filePath);
+}
+
+function buildMemoryRelevanceTerms(cwd: string): string[] {
+	const project = getProjectMeta(cwd);
+	const candidates = [
+		project.name,
+		path.basename(project.mainRoot ?? project.root),
+		path.basename(cwd),
+	];
+	return [...new Set(candidates.map((term) => term.trim()).filter(Boolean))];
+}
+
 async function readMemoryFiles(
 	memoryDir: string,
-): Promise<{ files: string[]; memories: Array<MemoryFile | null> } | null> {
+	relevanceTerms: string[],
+): Promise<{
+	files: string[];
+	memories: MemoryFile[];
+	omittedCount: number;
+} | null> {
 	try {
 		const stat = await fs.promises.stat(memoryDir);
 		if (!stat.isDirectory()) {
@@ -613,22 +709,29 @@ async function readMemoryFiles(
 		.map((filePath, index) => ({ filePath, memory: memories[index] }))
 		.filter((entry): entry is { filePath: string; memory: MemoryFile } =>
 			isMemoryVisibleInIndex(entry.memory),
-		);
+		)
+		.sort((a, b) => compareMemoryContextEntries(a, b, relevanceTerms));
 
 	if (visibleEntries.length === 0) {
 		return null;
 	}
 
+	const selectedEntries = visibleEntries.slice(
+		0,
+		MEMORY_CONTEXT_FILE_LIMIT_PER_SCOPE,
+	);
+
 	return {
-		files: visibleEntries.map((entry) => entry.filePath),
-		memories: visibleEntries.map((entry) => entry.memory),
+		files: selectedEntries.map((entry) => entry.filePath),
+		memories: selectedEntries.map((entry) => entry.memory),
+		omittedCount: visibleEntries.length - selectedEntries.length,
 	};
 }
 
 function appendMemoryFileLines(
 	lines: string[],
 	files: string[],
-	memories: Array<MemoryFile | null>,
+	memories: MemoryFile[],
 ): void {
 	for (let index = 0; index < files.length; index++) {
 		const filePath = files[index];
@@ -653,8 +756,12 @@ type MemoryContextScope = {
 
 async function buildMemoryContextSection(
 	scope: MemoryContextScope,
+	relevanceTerms: string[],
 ): Promise<string[] | null> {
-	const scannedFiles = await readMemoryFiles(scope.scanDir ?? scope.memoryDir);
+	const scannedFiles = await readMemoryFiles(
+		scope.scanDir ?? scope.memoryDir,
+		relevanceTerms,
+	);
 	if (!scannedFiles) return null;
 
 	const lines: string[] = [
@@ -664,6 +771,12 @@ async function buildMemoryContextSection(
 		"",
 	];
 	appendMemoryFileLines(lines, scannedFiles.files, scannedFiles.memories);
+	if (scannedFiles.omittedCount > 0) {
+		lines.push(
+			`${scannedFiles.omittedCount} more ${scope.label} files available via memory_search or memory_list.`,
+			"",
+		);
+	}
 	return lines;
 }
 
@@ -687,8 +800,11 @@ export async function buildMemoryContextAsync(
 		memoryDir: projectMemoryDir,
 	});
 
+	const relevanceTerms = buildMemoryRelevanceTerms(cwd);
 	const sections = (
-		await Promise.all(scopes.map((scope) => buildMemoryContextSection(scope)))
+		await Promise.all(
+			scopes.map((scope) => buildMemoryContextSection(scope, relevanceTerms)),
+		)
 	).filter((section): section is string[] => section !== null);
 
 	if (sections.length === 0) {

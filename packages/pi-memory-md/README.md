@@ -7,7 +7,7 @@ Letta-like memory management for [pi](https://github.com/badlogic/pi-mono) using
 - **Persistent Memory**: Store context, preferences, and knowledge across sessions
 - **Local-first**: Read, write, list, and search memory from a local directory
 - **Optional Git sync**: Add `repoUrl` when you want version control and cross-device sync
-- **Prompt delivery**: Memory index is delivered before the first agent turn according to the configured delivery mode
+- **Prompt delivery**: A ranked, capped memory index is delivered before the first agent turn according to the configured delivery mode
 - **On-demand access**: LLM reads full content via tools when needed
 - **Multi-project**: Separate memory spaces per project
 
@@ -57,11 +57,11 @@ Session Start
     ↓
 2. Scan visible, non-superseded `.md` files under the project memory root and configured shared-global memory
     ↓
-3. Build index (descriptions + tags only - NOT full content)
+3. Rank startup entries by `load_priority`, status, project-path relevance, and recency
     ↓
-4. Deliver memory index before the first agent turn via `message-append` or `system-prompt`
+4. Deliver up to 24 files per scope before the first agent turn via `message-append` or `system-prompt`
     ↓
-5. LLM reads full file content via tools when needed
+5. LLM uses `memory_search`, `memory_list`, or `read` for omitted or full file content when needed
 ```
 
 ## Slash Commands In Pi
@@ -86,8 +86,10 @@ The LLM can use these tools to interact with memory:
 | `memory_sync`   | `{action: "pull" / "push" / "status"}` | Git status/sync when the memory directory is git-backed; status also reports local-only initialization  |
 | `memory_write`  | `{path, content, description, tags?}`  | Write a project memory file by relative path                                                            |
 | `memory_list`   | `{directory?: string}`                 | List visible memory by relative path; global paths stay absolute; `status: superseded` files are hidden |
-| `memory_search` | `{query?, grep?, rg?}`                 | Search by tags/description and custom grep/ripgrep patterns, including superseded files                 |
+| `memory_search` | `{query?, grep?, rg?}`                 | Search parsed metadata/path/headings and custom grep/ripgrep patterns, including superseded files       |
 | `memory_check`  | `{}`                                   | Inspect project memory plus configured shared-global memory, including file counts                      |
+
+`memory_search(query=...)` tokenizes query terms and searches parsed JSON/YAML frontmatter, relative paths, and markdown headings. Startup context is capped for prompt size, but `memory_search` and `memory_list` still inspect the full memory corpus. If a query returns no results before a planned write, retry with `memory_search(rg=...)` or `memory_list(directory=...)` to avoid duplicating an existing memory.
 
 ## Memory File Format
 
@@ -97,6 +99,7 @@ description: "User identity and background"
 tags: ["user", "identity"]
 created: "2026-02-14"
 updated: "2026-02-14"
+load_priority: "high" # Optional startup ranking hint: high, medium, or low
 ---
 
 # Your Content Here
@@ -321,7 +324,7 @@ Memory directory: /home/user/.pi/memory-md/my-project
 
 Paths below are relative to that directory.
 
-Available memory files (use read to view full content):
+Available memory files (ranked and capped; use memory_search or memory_list to find omitted files):
 
 - core/USER.md [high priority]
   recent focus: read 12-28

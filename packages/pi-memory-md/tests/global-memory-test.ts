@@ -8,6 +8,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import memoryMdExtension from "../index.js";
 import {
 	listMemoryFilesAsync,
+	MEMORY_CONTEXT_FILE_LIMIT_PER_SCOPE,
 	type MemoryFrontmatter,
 	readMemoryFileAsync,
 	writeMemoryFile,
@@ -308,6 +309,156 @@ test("startup delivery hides superseded memories", async () => {
 	});
 });
 
+test("startup delivery ranks high-priority and project-relevant memory first", async () => {
+	await withGlobalOnlyMemory(async ({ root, cwd }) => {
+		const relevantDir = path.join(
+			root,
+			"memory",
+			"common",
+			"core",
+			"project",
+			path.basename(cwd),
+		);
+		const otherDir = path.join(
+			root,
+			"memory",
+			"common",
+			"core",
+			"project",
+			"unrelated",
+		);
+		writeMemoryFile(path.join(otherDir, "old-low.md"), "# Old Low\n", {
+			description: "old low priority unrelated memory",
+			tags: ["old-low"],
+			load_priority: "low",
+			updated: "2026-01-01",
+		});
+		writeMemoryFile(
+			path.join(relevantDir, "current-high.md"),
+			"# Current High\n",
+			{
+				description: "current high priority project relevant memory",
+				tags: ["current-high"],
+				status: "current",
+				load_priority: "high",
+				updated: "2026-07-01",
+			},
+		);
+		const harness = createHarness();
+		const ctx = createContext(cwd, harness.notifications);
+
+		await harness.handlers.get("session_start")?.({ reason: "new" }, ctx);
+		const result = (await harness.handlers.get("before_agent_start")?.(
+			{ prompt: "hello", systemPrompt: "BASE" },
+			ctx,
+		)) as { systemPrompt?: string } | undefined;
+		const text = result?.systemPrompt ?? "";
+
+		assert.ok(text.indexOf("current-high") < text.indexOf("old-low"));
+	});
+});
+
+test("startup delivery treats non-string ranking metadata as absent", async () => {
+	await withGlobalOnlyMemory(async ({ root, cwd }) => {
+		const memoryDir = path.join(root, "memory", "common", "core");
+		await writeFile(
+			path.join(memoryDir, "bad-priority.md"),
+			[
+				"---",
+				"description: Bad priority memory",
+				"load_priority:",
+				"  bad: true",
+				"tags:",
+				"  - bad-priority",
+				"---",
+				"",
+				"# Bad Priority",
+			].join("\n"),
+		);
+		writeMemoryFile(path.join(memoryDir, "good.md"), "# Good\n", {
+			description: "Good memory",
+			tags: ["good"],
+			load_priority: "high",
+		});
+		const harness = createHarness();
+		const ctx = createContext(cwd, harness.notifications);
+
+		await harness.handlers.get("session_start")?.({ reason: "new" }, ctx);
+		const result = (await harness.handlers.get("before_agent_start")?.(
+			{ prompt: "hello", systemPrompt: "BASE" },
+			ctx,
+		)) as { systemPrompt?: string } | undefined;
+		const text = result?.systemPrompt ?? "";
+
+		assert.match(text, /Good memory/);
+		assert.match(text, /Bad priority memory/);
+	});
+});
+
+test("startup delivery trims per scope while memory_search still finds omitted files", async () => {
+	await withGlobalOnlyMemory(async ({ root, cwd }) => {
+		const bulkDir = path.join(
+			root,
+			"memory",
+			"common",
+			"core",
+			"project",
+			"bulk",
+		);
+		for (
+			let index = 0;
+			index < MEMORY_CONTEXT_FILE_LIMIT_PER_SCOPE + 1;
+			index++
+		) {
+			const suffix = String(index).padStart(2, "0");
+			writeMemoryFile(
+				path.join(bulkDir, `${suffix}-bulk.md`),
+				`# Bulk ${suffix}\n\n${suffix === String(MEMORY_CONTEXT_FILE_LIMIT_PER_SCOPE).padStart(2, "0") ? "trimmed unique needle" : "ordinary memory"}`,
+				{
+					description: `bulk memory ${suffix}`,
+					tags: [
+						suffix ===
+						String(MEMORY_CONTEXT_FILE_LIMIT_PER_SCOPE).padStart(2, "0")
+							? "trimmed-unique-needle"
+							: `bulk-${suffix}`,
+					],
+					updated: "2026-01-01",
+				},
+			);
+		}
+		const harness = createHarness();
+		const ctx = createContext(cwd, harness.notifications);
+
+		await harness.handlers.get("session_start")?.({ reason: "new" }, ctx);
+		const result = (await harness.handlers.get("before_agent_start")?.(
+			{ prompt: "hello", systemPrompt: "BASE" },
+			ctx,
+		)) as { systemPrompt?: string } | undefined;
+		const text = result?.systemPrompt ?? "";
+
+		assert.doesNotMatch(text, /trimmed-unique-needle/);
+		assert.match(
+			text,
+			/more Shared Global Memory files available via memory_search or memory_list/,
+		);
+
+		const searchResult = await harness.tools
+			.get("memory_search")
+			?.execute(
+				"test-call",
+				{ query: "trimmed-unique-needle" },
+				undefined,
+				undefined,
+				ctx,
+			);
+		assert.equal(searchResult?.details?.count, 1);
+		assert.match(
+			searchResult?.content?.[0]?.text ?? "",
+			/trimmed-unique-needle/,
+		);
+	});
+});
+
 test("memory_list hides superseded memories but memory_search can find them", async () => {
 	await withGlobalOnlyMemory(async ({ root, cwd }) => {
 		await writeFile(
@@ -398,6 +549,102 @@ test("project memory outside core is delivered and searchable", async () => {
 			],
 		},
 	);
+});
+
+test("memory_search query finds JSON frontmatter written by memory_write", async () => {
+	await withGlobalOnlyMemory(async ({ root, cwd }) => {
+		const projectMemoryDir = path.join(
+			root,
+			"memory",
+			path.basename(cwd),
+			"core",
+			"project",
+		);
+		writeMemoryFile(
+			path.join(projectMemoryDir, "goal-supervisor-compaction-latch.md"),
+			[
+				"# pi-goal-supervisor compaction pendingContinuation latch",
+				"",
+				"## Root cause",
+				"The stale pendingContinuation latch blocked compact continuation.",
+			].join("\n"),
+			{
+				description:
+					"pi-goal-supervisor compaction stale pendingContinuation latch root cause and fix",
+				tags: [
+					"pi-goal-supervisor",
+					"goal",
+					"compaction",
+					"pendingContinuation",
+					"category-root-cause",
+					"status-resolved",
+				],
+			},
+		);
+		const harness = createHarness();
+		const ctx = createContext(cwd, harness.notifications);
+
+		const searchResult = await harness.tools
+			.get("memory_search")
+			?.execute(
+				"test-call",
+				{ query: "status-resolved" },
+				undefined,
+				undefined,
+				ctx,
+			);
+
+		assert.equal(searchResult?.details?.count, 1);
+		assert.match(
+			searchResult?.content?.[0]?.text ?? "",
+			/goal-supervisor-compaction-latch\.md/,
+		);
+		assert.match(searchResult?.content?.[0]?.text ?? "", /tags:/);
+	});
+});
+
+test("memory_search query tokenizes multi-word searches across path and headings", async () => {
+	await withGlobalOnlyMemory(async ({ root, cwd }) => {
+		const projectMemoryDir = path.join(
+			root,
+			"memory",
+			path.basename(cwd),
+			"core",
+			"project",
+		);
+		writeMemoryFile(
+			path.join(projectMemoryDir, "goal-crafter-user-preferences.md"),
+			[
+				"# Goal-crafter user preferences",
+				"",
+				"## Core preferences",
+				"Keep stable workflow preferences searchable.",
+			].join("\n"),
+			{
+				description:
+					"Pi goal-crafter durable user workflow preferences extracted from session-history mining",
+				tags: ["goal-crafter", "goals", "user-preferences"],
+			},
+		);
+		const harness = createHarness();
+		const ctx = createContext(cwd, harness.notifications);
+
+		const searchResult = await harness.tools
+			.get("memory_search")
+			?.execute(
+				"test-call",
+				{ query: "goal-crafter user preferences" },
+				undefined,
+				undefined,
+				ctx,
+			);
+
+		assert.equal(searchResult?.details?.count, 1);
+		assert.match(
+			searchResult?.content?.[0]?.text ?? "",
+			/goal-crafter-user-preferences\.md/,
+		);
+	});
 });
 
 test("global memory tools work without a project memory directory", async () => {

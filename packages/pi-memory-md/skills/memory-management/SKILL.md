@@ -110,7 +110,7 @@ Read/search memory before nontrivial debugging, implementation, refactoring, arc
 
 Write memory only for information likely to save future work: repo runbooks, command flows, root causes, gotchas, environment setup, successful verification, failed approaches, and stable user preferences. Do not store secrets, raw logs, trivial one-off notes, or long transcripts. Keep files focused and searchable; split unrelated or growing topics into separate memories.
 
-Before writing, search/list existing memory and update an existing focused file when possible. If new facts supersede old ones, edit the current memory or mark stale duplicates with `status: superseded` and a replacement pointer. Do not duplicate authoritative rules from `AGENTS.md`; memory should store repo/debug/runbook knowledge and short pointers.
+Before writing, search/list existing memory and update an existing focused file when possible. If `memory_search(query=...)` returns empty, retry once with a broader `memory_search(rg=...)` body/path pattern or `memory_list(directory=...)` for the likely folder before creating a new file. If new facts supersede old ones, edit the current memory or mark stale duplicates with `status: superseded` and a replacement pointer. Do not duplicate authoritative rules from `AGENTS.md`; memory should store repo/debug/runbook knowledge and short pointers.
 
 After substantial debugging/running, write the 30-minute-saving memory before final response, or explicitly state why no durable memory was written.
 

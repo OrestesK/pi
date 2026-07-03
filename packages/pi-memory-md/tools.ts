@@ -529,10 +529,12 @@ export function registerMemorySearch(
 		name: "memory_search",
 		label: "Memory Search",
 		description:
-			"Search memory files by tags, description, or custom grep/rg pattern",
+			"Search memory files by parsed metadata, paths, headings, or custom grep/rg pattern",
 		parameters: Type.Object({
 			query: Type.Optional(
-				Type.String({ description: "Search query for tags and description" }),
+				Type.String({
+					description: "Search query for path, description, tags, and headings",
+				}),
 			),
 			grep: Type.Optional(
 				Type.String({
@@ -603,10 +605,82 @@ export function registerMemorySearch(
 				};
 			}
 
-			const escapedQuery = query
-				? query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-				: null;
+			const queryTerms: string[] = query
+				? [
+						...new Set(
+							query
+								.toLowerCase()
+								.match(/[a-z0-9]+/g)
+								?.filter((term) => term.length > 0) ?? [],
+						),
+					]
+				: [];
 			const searchLabel = query ?? grep ?? rg ?? "search";
+
+			function formatMatchedPath(filePath: string): string {
+				const root = searchRoots.find((candidate) =>
+					filePath.startsWith(`${candidate.memoryDir}${path.sep}`),
+				);
+				return root
+					? `${root.label}: ${path.relative(root.memoryDir, filePath)}`
+					: path.relative(memoryDir, filePath);
+			}
+
+			function fieldMatches(value: string): boolean {
+				const tokens: string[] = value.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+				return queryTerms.every((term) => tokens.includes(term));
+			}
+
+			function headingMatches(content: string): string[] {
+				return content
+					.split("\n")
+					.map((line) => line.trim())
+					.filter((line) => line.startsWith("#") && fieldMatches(line));
+			}
+
+			async function searchParsedMemoryMetadata(
+				label: string,
+				searchDir: string,
+			): Promise<string[]> {
+				if (queryTerms.length === 0) return [];
+
+				const results: string[] = [];
+				const files = await listMemoryFilesAsync(searchDir);
+
+				for (const filePath of files) {
+					const memory = await readMemoryFileAsync(filePath);
+					if (!memory) continue;
+
+					const displayPath = formatMatchedPath(filePath);
+					const tags = memory.frontmatter.tags ?? [];
+					const matches: string[] = [];
+
+					if (fieldMatches(displayPath)) {
+						matches.push(`${displayPath}: path: ${displayPath}`);
+					}
+					if (fieldMatches(memory.frontmatter.description ?? "")) {
+						matches.push(
+							`${displayPath}: description: ${memory.frontmatter.description}`,
+						);
+					}
+					if (fieldMatches(tags.join(" "))) {
+						matches.push(`${displayPath}: tags: ${tags.join(", ")}`);
+					}
+					for (const heading of headingMatches(memory.content)) {
+						matches.push(`${displayPath}: heading: ${heading}`);
+					}
+
+					if (matches.length === 0) continue;
+
+					matchedFiles.add(filePath);
+					results.push(...matches.slice(0, 3));
+					if (results.length >= MAX_SEARCH_RESULTS) break;
+				}
+
+				return results.length > 0
+					? [`## ${label} metadata matching: ${query}`, ...results.slice(0, 20)]
+					: [];
+			}
 
 			async function runTool(tool: string, args: string[]): Promise<string[]> {
 				const controller = new AbortController();
@@ -631,12 +705,7 @@ export function registerMemorySearch(
 
 					const matchedFilePath = line.slice(0, separatorIndex);
 					matchedFiles.add(matchedFilePath);
-					const root = searchRoots.find((candidate) =>
-						matchedFilePath.startsWith(`${candidate.memoryDir}${path.sep}`),
-					);
-					const displayPath = root
-						? `${root.label}: ${path.relative(root.memoryDir, matchedFilePath)}`
-						: path.relative(memoryDir, matchedFilePath);
+					const displayPath = formatMatchedPath(matchedFilePath);
 					results.push(
 						`${displayPath}: ${line.slice(separatorIndex + 1).trim()}`,
 					);
@@ -646,39 +715,12 @@ export function registerMemorySearch(
 			}
 
 			for (const { label, memoryDir: searchDir } of searchDirs) {
-				if (escapedQuery) {
-					const tagResults = await runTool("grep", [
-						"-rn",
-						"--include=*.md",
-						"-m",
-						String(MAX_SEARCH_RESULTS),
-						"-E",
-						`^\\s*-\\s*${escapedQuery}`,
-						searchDir,
-					]);
-					if (tagResults.length > 0) {
-						sections.push(
-							`## ${label} tags matching: ${query}`,
-							...tagResults.slice(0, 20),
-						);
-					}
-
-					const descResults = await runTool("grep", [
-						"-rn",
-						"--include=*.md",
-						"-m",
-						String(MAX_SEARCH_RESULTS),
-						"-E",
-						`^description:\\s*.*${escapedQuery}`,
-						searchDir,
-					]);
-					if (descResults.length > 0) {
-						sections.push(
-							"",
-							`## ${label} descriptions matching: ${query}`,
-							...descResults.slice(0, 20),
-						);
-					}
+				const metadataResults = await searchParsedMemoryMetadata(
+					label,
+					searchDir,
+				);
+				if (metadataResults.length > 0) {
+					sections.push(...metadataResults);
 				}
 
 				if (grep) {
@@ -719,14 +761,7 @@ export function registerMemorySearch(
 				}
 			}
 
-			const fileList = Array.from(matchedFiles).map((filePath) => {
-				const root = searchRoots.find((candidate) =>
-					filePath.startsWith(`${candidate.memoryDir}${path.sep}`),
-				);
-				return root
-					? `${root.label}: ${path.relative(root.memoryDir, filePath)}`
-					: path.relative(memoryDir, filePath);
-			});
+			const fileList = Array.from(matchedFiles).map(formatMatchedPath);
 
 			if (sections.length === 0) {
 				return {
