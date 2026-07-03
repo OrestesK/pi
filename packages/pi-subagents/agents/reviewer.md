@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Versatile review specialist for code diffs, plans, proposed solutions, codebase health, and PR/issue validation
-tools: read, grep, find, ls, bash, contact_supervisor, intercom
+tools: read, grep, find, ls, bash, tree_sitter_search_symbols, tree_sitter_document_symbols, tree_sitter_symbol_definition, tree_sitter_pattern_search, tree_sitter_codebase_overview, tree_sitter_codebase_map, mcp:tree-sitter, ast_grep_search, lsp_navigation, lsp_diagnostics, memory_search, memory_list, contact_supervisor, intercom
 thinking: high
 systemPromptMode: replace
 inheritProjectContext: true

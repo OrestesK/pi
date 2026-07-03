@@ -20,6 +20,7 @@ export interface ParallelWriterGuardChainStep {
 }
 
 const WORKSPACE_MUTATION_TOOLS = new Set(["edit", "write", "ast_grep_replace"]);
+const READ_ONLY_MCP_DIRECT_TOOLS = new Set(["tree-sitter"]);
 const KNOWN_ADVISORY_TOOLS = new Set([
 	"read",
 	"grep",
@@ -36,10 +37,13 @@ const KNOWN_ADVISORY_TOOLS = new Set([
 	"tree_sitter_codebase_map",
 	"ast_grep_search",
 	"lsp_navigation",
+	"lsp_diagnostics",
 	"code_search",
 	"web_search",
 	"fetch_content",
 	"get_search_content",
+	"memory_search",
+	"memory_list",
 ]);
 function isPiIntercomExtensionPath(value: string): boolean {
 	const normalized = value.trim().replace(/\\/g, "/").toLowerCase();
@@ -52,7 +56,11 @@ export function agentCanMutateWorkspace(
 	agent: ParallelWriterGuardAgent | undefined,
 ): boolean {
 	if (!agent) return false;
-	if ((agent.mcpDirectTools?.length ?? 0) > 0) return true;
+	if (
+		agent.mcpDirectTools?.some(
+			(tool) => !READ_ONLY_MCP_DIRECT_TOOLS.has(tool),
+		)
+	) return true;
 	if (agent.extensions?.some((extension) => !isPiIntercomExtensionPath(extension))) return true;
 	if (!agent.tools) return true;
 	return agent.tools.some(

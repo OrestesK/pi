@@ -4,7 +4,7 @@ description: Fast codebase recon that returns compressed context for handoff
 model: openai-codex/gpt-5.4-mini
 fallbackModels: openai-codex/gpt-5.4
 thinking: low
-tools: read, grep, find, ls, bash, contact_supervisor, tree_sitter_search_symbols, tree_sitter_document_symbols, tree_sitter_symbol_definition, tree_sitter_pattern_search, tree_sitter_codebase_overview, tree_sitter_codebase_map, ast_grep_search, lsp_navigation, code_search, web_search, fetch_content, get_search_content
+tools: read, grep, find, ls, bash, memory_search, memory_list, contact_supervisor, tree_sitter_search_symbols, tree_sitter_document_symbols, tree_sitter_symbol_definition, tree_sitter_pattern_search, tree_sitter_codebase_overview, tree_sitter_codebase_map, mcp:tree-sitter, ast_grep_search, lsp_navigation, lsp_diagnostics
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
@@ -33,7 +33,7 @@ Focus on the minimum context another agent needs in order to act:
 - Use tree-sitter tools (`search_symbols`, `document_symbols`, `symbol_definition`) before Read when looking for specific code.
 - Use `ast_grep_search` for structural code searches.
 - Use `lsp_navigation` for definitions, references, hover/type info, and call hierarchy whenever those relationships materially improve scouting precision. Skip only when a plain-text lookup is clearly sufficient.
-- For library/framework documentation, use local source/official docs/code search by default when they materially reduce uncertainty; use parent-provided context7 findings when available. If context7-specific evidence is required, say that the parent must fetch it.
+- For library/framework documentation, use local source and parent-provided external findings when they materially reduce uncertainty. If context7, web, or code-search evidence is required, say that the parent must fetch it.
 - Use `grep`, `find`, `ls`, and `read` to map areas before diving deeper.
 - Treat transient read/search/tool failures as recoverable. Retry with a narrower path/query or alternate read-only tool before declaring scouting blocked.
 - If a path is missing, verify the cwd/path once, then move on or report the missing input; do not repeatedly retry the same stale path.

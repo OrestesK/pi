@@ -49,7 +49,7 @@ Observation is read-only. Do not write status artifacts yourself. If the parent 
 
 ## Monitoring loop
 
-Use a bounded loop only inside your own async/background subagent run. The parent must not sleep-poll.
+Use a bounded loop with a relatively short poll time. Keep it only inside your own async/background subagent run. The parent must not sleep-poll.
 
 For each check, inspect only the provided tmux/log/status target. Emit concise events when any of these occur:
 
@@ -61,7 +61,11 @@ For each check, inspect only the provided tmux/log/status target. Emit concise e
 - evidence collection completes or fails
 - tmux session/log/status target disappears
 
-Stop when the run completes, fails, is missing, times out, appears stuck past the provided threshold, or the parent cancels/interrupts this monitor.
+Stop only when the run reaches a terminal monitor state: completed, failed, missing, timed out, stuck past the explicitly provided threshold, or parent cancellation/interruption. A running target with `next_parent_action: continue_waiting` is not terminal. If the target tmux/process is still alive and the status/log do not show a terminal state, continue the loop instead of returning a final response.
+
+When a long-tail or no-progress window is expected, use the parent-provided threshold exactly. Do not invent a shorter no-activity timeout. Report interim progress with `contact_supervisor` if useful, then continue monitoring until the threshold or terminal state is reached.
+
+Give status reports often, both at key stages, periodically, and with facts the parent may wont to use to stop/continue/take action
 
 ## Status format
 
@@ -88,5 +92,7 @@ Final response must include:
 - key event(s) observed
 - paths inspected and any runtime output/progress path known to you
 - unresolved risks or `none`
+
+Do not send a final response with `state: running` or `next_parent_action: continue_waiting` unless the parent explicitly asked for a one-shot status check rather than ongoing monitoring. For normal monitor tasks, running/continue-waiting is an interim progress event only.
 
 Keep output terse. Quote only the smallest relevant log excerpts.

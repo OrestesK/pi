@@ -57,6 +57,29 @@ const advisoryAgents = [
 	"scout.md",
 ];
 
+const localCodeAdvisoryAgents = [
+	"context-builder.md",
+	"delegate.md",
+	"oracle.md",
+	"planner.md",
+	"reviewer.md",
+	"scout.md",
+];
+
+const localTreeSitterMcpDirectTool = "tree-sitter";
+
+const localCodeInspectionTools = [
+	"tree_sitter_search_symbols",
+	"tree_sitter_document_symbols",
+	"tree_sitter_symbol_definition",
+	"tree_sitter_pattern_search",
+	"tree_sitter_codebase_overview",
+	"tree_sitter_codebase_map",
+	"ast_grep_search",
+	"lsp_navigation",
+	"lsp_diagnostics",
+];
+
 for (const fileName of advisoryAgents) {
 	test(`${fileName} is advisory and has no direct file mutation tools`, () => {
 		const filePath = path.join(agentsDir, fileName);
@@ -77,6 +100,16 @@ for (const fileName of advisoryAgents) {
 			false,
 			`${fileName} must not have ast_grep_replace`,
 		);
+		assert.equal(
+			tools.includes("memory_search"),
+			true,
+			`${fileName} must include memory_search`,
+		);
+		assert.equal(
+			tools.includes("memory_list"),
+			true,
+			`${fileName} must include memory_list`,
+		);
 	});
 }
 
@@ -91,6 +124,52 @@ test("same-name advisory overrides cannot reintroduce direct mutation tools", ()
 	assert.deepEqual(sanitized.extensions, []);
 });
 
+for (const fileName of localCodeAdvisoryAgents) {
+	test(`${fileName} includes safe local code inspection tools`, () => {
+		const filePath = path.join(agentsDir, fileName);
+		const tools = frontmatterTools(fs.readFileSync(filePath, "utf8"));
+
+		for (const tool of localCodeInspectionTools) {
+			assert.equal(tools.includes(tool), true, `${fileName} lacks ${tool}`);
+		}
+		assert.equal(
+			tools.includes(`mcp:${localTreeSitterMcpDirectTool}`),
+			true,
+			`${fileName} lacks mcp:${localTreeSitterMcpDirectTool}`,
+		);
+	});
+}
+
+for (const name of advisoryAgents.map((fileName) => fileName.replace(/\.md$/, ""))) {
+	test(`${name} defaults include memory lookup tools`, () => {
+		const sanitized = sanitizeProtectedAdvisoryAgentTools({
+			name,
+			source: "user",
+		});
+
+		assert.equal(sanitized.tools?.includes("memory_search"), true);
+		assert.equal(sanitized.tools?.includes("memory_list"), true);
+		assert.equal(sanitized.extensions, undefined);
+	});
+}
+
+for (const name of localCodeAdvisoryAgents.map((fileName) =>
+	fileName.replace(/\.md$/, ""),
+)) {
+	test(`${name} defaults include safe local code inspection tools`, () => {
+		const sanitized = sanitizeProtectedAdvisoryAgentTools({
+			name,
+			source: "user",
+		});
+
+		for (const tool of localCodeInspectionTools) {
+			assert.equal(sanitized.tools?.includes(tool), true, `${name} lacks ${tool}`);
+		}
+		assert.deepEqual(sanitized.mcpDirectTools, [localTreeSitterMcpDirectTool]);
+		assert.equal(sanitized.extensions, undefined);
+	});
+}
+
 test("same-name advisory overrides cannot regain unrestricted default tools by omitting tools", () => {
 	const sanitized = sanitizeProtectedAdvisoryAgentTools({
 		name: "scout",
@@ -102,10 +181,14 @@ test("same-name advisory overrides cannot regain unrestricted default tools by o
 		"find",
 		"ls",
 		"bash",
+		...localCodeInspectionTools,
+		"memory_search",
+		"memory_list",
 		"contact_supervisor",
 		"intercom",
 	]);
-	assert.deepEqual(sanitized.extensions, []);
+	assert.deepEqual(sanitized.mcpDirectTools, [localTreeSitterMcpDirectTool]);
+	assert.equal(sanitized.extensions, undefined);
 });
 
 test("protected advisory overrides with omitted tools preserve role-specific defaults", () => {
@@ -118,8 +201,12 @@ test("protected advisory overrides with omitted tools preserve role-specific def
 		source: "user",
 	});
 	assert.equal(reviewer.tools?.includes("web_search"), false);
-	assert.deepEqual(reviewer.extensions, []);
+	assert.equal(reviewer.tools?.includes("memory_search"), true);
+	assert.equal(reviewer.tools?.includes("memory_list"), true);
+	assert.equal(reviewer.extensions, undefined);
 	assert.equal(researcher.tools?.includes("web_search"), true);
+	assert.equal(researcher.tools?.includes("memory_search"), true);
+	assert.equal(researcher.tools?.includes("memory_list"), true);
 	assert.equal(researcher.extensions, undefined);
 });
 
@@ -136,24 +223,26 @@ for (const name of ["researcher", "context-builder"]) {
 }
 
 for (const name of ["scout", "reviewer", "planner", "delegate", "oracle"]) {
-	test(`${name} disables extensions when no safe extension-backed tools are allowed`, () => {
+	test(`${name} keeps default extensions for memory lookup tools`, () => {
 		const sanitized = sanitizeProtectedAdvisoryAgentTools({
 			name,
 			source: "user",
 		});
 
-		assert.deepEqual(sanitized.extensions, []);
+		assert.equal(sanitized.tools?.includes("memory_search"), true);
+		assert.equal(sanitized.tools?.includes("memory_list"), true);
+		assert.equal(sanitized.extensions, undefined);
 	});
 
-	test(`${name} disables extensions even when overrides request safe extension-backed tools`, () => {
+	test(`${name} strips non-role extension-backed research tools from overrides`, () => {
 		const sanitized = sanitizeProtectedAdvisoryAgentTools({
 			name,
 			source: "user",
-			tools: ["read", "web_search"],
+			tools: ["read", "web_search", "memory_search"],
 		});
 
-		assert.deepEqual(sanitized.tools, ["read", "web_search"]);
-		assert.deepEqual(sanitized.extensions, []);
+		assert.deepEqual(sanitized.tools, ["read", "memory_search"]);
+		assert.equal(sanitized.extensions, undefined);
 	});
 }
 
@@ -196,19 +285,49 @@ test("protected advisory generic/direct MCP tools and extensions are stripped", 
 	assert.deepEqual(sanitized.extensions, []);
 });
 
+test("protected local-code advisory roles keep only local tree-sitter direct MCP when needed", () => {
+	const sanitized = sanitizeProtectedAdvisoryAgentTools({
+		name: "scout",
+		source: "user",
+		tools: ["read", "tree_sitter_search_symbols"],
+		mcpDirectTools: ["tree-sitter", "google_docs_editDocument"],
+	});
+	assert.deepEqual(sanitized.tools, ["read", "tree_sitter_search_symbols"]);
+	assert.deepEqual(sanitized.mcpDirectTools, [localTreeSitterMcpDirectTool]);
+	assert.deepEqual(sanitized.extensions, []);
+});
+
+test("researcher does not gain local tree-sitter direct MCP", () => {
+	const sanitized = sanitizeProtectedAdvisoryAgentTools({
+		name: "researcher",
+		source: "user",
+	});
+	assert.equal(
+		sanitized.tools?.some((tool) => tool.startsWith("tree_sitter_")),
+		false,
+	);
+	assert.equal(sanitized.mcpDirectTools, undefined);
+	assert.equal(sanitized.extensions, undefined);
+});
+
 test("same-name advisory override is sanitized after user/project precedence", () => {
 	const merged = mergeAgentsForScope(
 		"both",
 		[{ name: "scout", source: "user", tools: ["read", "write"] }],
-		[{ name: "scout", source: "project", tools: ["read", "edit", "grep"] }],
+		[
+			{
+				name: "scout",
+				source: "project",
+				tools: ["read", "edit", "grep", "memory_search"],
+			},
+		],
 		[{ name: "scout", source: "builtin", tools: ["read", "grep"] }],
 	);
 	assert.deepEqual(merged, [
 		{
 			name: "scout",
 			source: "project",
-			tools: ["read", "grep"],
-			extensions: [],
+			tools: ["read", "grep", "memory_search"],
 		},
 	]);
 });

@@ -15,6 +15,15 @@ const {
 
 const worker = { name: "worker", tools: ["read", "edit", "write"] };
 const reviewer = { name: "reviewer", tools: ["read", "grep", "bash"] };
+const memoryScout = {
+	name: "memory-scout",
+	tools: ["read", "memory_search", "memory_list"],
+};
+const diagnosticScout = {
+	name: "diagnostic-scout",
+	tools: ["read", "tree_sitter_search_symbols", "lsp_diagnostics"],
+	mcpDirectTools: ["tree-sitter"],
+};
 const scout = { name: "scout", tools: ["read", "grep"] };
 const writeOnlyAgent = { name: "note-taker", tools: ["read", "write"] };
 const customToolAgent = {
@@ -51,6 +60,8 @@ test("detects workspace-mutation-capable agents", () => {
 	assert.equal(agentCanMutateWorkspace(extensionAgent), true);
 	assert.equal(agentCanMutateWorkspace(intercomBridgedReviewer), false);
 	assert.equal(agentCanMutateWorkspace(reviewer), false);
+	assert.equal(agentCanMutateWorkspace(memoryScout), false);
+	assert.equal(agentCanMutateWorkspace(diagnosticScout), false);
 	assert.equal(agentCanMutateWorkspace(scout), false);
 	assert.equal(agentCanMutateWorkspace(unrestricted), true);
 	assert.equal(agentCanMutateWorkspace(undefined), false);
@@ -106,6 +117,30 @@ test("allows wrapper-output scouts sharing cwd", () => {
 		findSharedCwdParallelWriterError({
 			tasks: [{ agent: "scout" }, { agent: "scout" }],
 			agents: [scout],
+			baseCwd: "/repo",
+			label: "Parallel",
+		}),
+		undefined,
+	);
+});
+
+test("allows parallel memory lookup scouts sharing cwd", () => {
+	assert.equal(
+		findSharedCwdParallelWriterError({
+			tasks: [{ agent: "memory-scout" }, { agent: "memory-scout" }],
+			agents: [memoryScout],
+			baseCwd: "/repo",
+			label: "Parallel",
+		}),
+		undefined,
+	);
+});
+
+test("allows parallel diagnostics scouts sharing cwd", () => {
+	assert.equal(
+		findSharedCwdParallelWriterError({
+			tasks: [{ agent: "diagnostic-scout" }, { agent: "diagnostic-scout" }],
+			agents: [diagnosticScout],
 			baseCwd: "/repo",
 			label: "Parallel",
 		}),
