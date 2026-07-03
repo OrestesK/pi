@@ -89,6 +89,14 @@ const expectedAllowlist = [
   "memory_list",
   "memory_check",
   "memory_sync",
+  "tool_result_outline",
+  "tool_result_get",
+  "tool_result_search",
+  "tool_result_list",
+  "tool_result_diagnostics",
+  "tool_result_retention_preview",
+  "tool_result_export_details",
+  "tool_result_export",
 ];
 
 const callMatrix = [
@@ -149,6 +157,14 @@ const callMatrix = [
   ["memory_list", { directory: "core/project" }, "core/project"],
   ["memory_check", {}, "project"],
   ["memory_sync", { action: "status" }, "status"],
+  ["tool_result_outline", { sourceId: "tr_abc123", reason: "triage failure" }, "tr_abc123"],
+  ["tool_result_get", { sourceId: "tr_abc123", lineStart: 20, lineLimit: 40, reason: "inspect failure lines" }, "20-59"],
+  ["tool_result_search", { sourceId: "tr_abc123", query: "ERROR_TARGET", limit: 3, reason: "find failure" }, "ERROR_TARGET"],
+  ["tool_result_list", { limit: 10, reason: "recent receipts" }, "limit 10"],
+  ["tool_result_diagnostics", { limit: 5, reason: "store health" }, "store health"],
+  ["tool_result_retention_preview", { maxSources: 20, limit: 5, reason: "growth check" }, "maxSources 20"],
+  ["tool_result_export_details", { sourceId: "tr_abc123", filePath: ".scratch/details.json", reason: "audit details" }, "tr_abc123"],
+  ["tool_result_export", { sourceId: "tr_abc123", lineStart: 20, lineLimit: 3, filePath: ".scratch/export.txt", reason: "offline inspect" }, "20-22"],
 ];
 
 test("call renderer matrix is coupled to the real claude-ui allowlist", () => {
@@ -206,7 +222,7 @@ test("subagent call renderer makes execution modes explicit", () => {
   );
   assert.equal(
     ui.webToolCallBody("subagent", { workflow: "builtin.generate-filter", task: "ideas" }, theme),
-    "builtin.generate-filter · run",
+    "builtin.generate-filter · ideas",
   );
 });
 
@@ -217,7 +233,7 @@ test("subagent call-renderer original fallback is explicit for partial args", ()
   assert.equal(ui.shouldUseOriginalToolCallRenderer({ task: "ideas" }), false);
   assert.equal(ui.shouldUseOriginalToolCallRenderer({ action: "status" }), false);
   assert.equal(ui.webToolCallBody("subagent", {}, theme), "run");
-  assert.equal(ui.webToolCallBody("subagent", { task: "ideas" }, theme), "run");
+  assert.equal(ui.webToolCallBody("subagent", { task: "ideas" }, theme), "ideas");
 });
 
 function richSubagentResult() {
@@ -266,7 +282,10 @@ test("subagent result renderer covers chain, failure, file-only, and artifacts",
   assert.match(collapsed, /chain/);
   assert.match(collapsed, /2 steps/);
   assert.match(collapsed, /1 failed/);
-  assert.match(collapsed, /active \/ attention|attention/);
+  assert.match(collapsed, /Step 1\/2: scout/);
+  assert.match(collapsed, /Step 2\/2: reviewer/);
+  assert.match(collapsed, /mode: file-only/);
+  assert.match(collapsed, /error: expected test error/);
   assert.match(collapsed, /artifacts: \/tmp\/subagent-artifacts/);
   assertRenderedWithinWidth(collapsedComponent);
 
@@ -285,6 +304,43 @@ test("subagent result renderer covers chain, failure, file-only, and artifacts",
   assert.match(expanded, /error: expected test error/);
   assert.match(expanded, /debug: review failed details/);
   assertRenderedWithinWidth(expandedComponent);
+
+  const roleComponent = ui.renderSubagentToolResult(
+    textResult("Chain complete", {
+      mode: "chain",
+      routeLabel: "role-test",
+      results: [{ agent: "delegate", task: "review renderer", exitCode: 0 }],
+    }),
+    options({ expanded: true }),
+    theme,
+    context({}, { toolCallId: "subagent-chain-role" }),
+    "Subagent",
+  );
+  const roleRendered = render(roleComponent);
+  assert.match(roleRendered, /Step 1: delegate/);
+  assert.doesNotMatch(roleRendered, /delegate \(reviewer\)/);
+  assert.doesNotMatch(roleRendered, /Step 1: reviewer/);
+  assertRenderedWithinWidth(roleComponent);
+
+  const largeRoleComponent = ui.renderSubagentToolResult(
+    textResult("Chain complete", {
+      mode: "chain",
+      routeLabel: "large-role-test",
+      results: Array.from({ length: 6 }, (_, index) => ({
+        agent: "delegate",
+        task: `review renderer ${index + 1}`,
+        exitCode: 0,
+      })),
+    }),
+    options(),
+    theme,
+    context({}, { toolCallId: "subagent-chain-large-role" }),
+    "Subagent",
+  );
+  const largeRoleRendered = render(largeRoleComponent);
+  assert.doesNotMatch(largeRoleRendered, /reviewer/);
+  assert.doesNotMatch(largeRoleRendered, /stages:/);
+  assertRenderedWithinWidth(largeRoleComponent);
 });
 
 test("subagent result renderer covers single, parallel, paused, detached, interrupted, save-error states", () => {
@@ -324,11 +380,14 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
     ["code_search", "Code Search", textResult("line 1\nline 2", { resultCount: 2 }), /2 lines/],
     ["todo", "Todo", textResult(JSON.stringify({ assigned: [], open: [{ id: "TODO-1", title: "Thing" }], closed: [] }), undefined), /1 open todo/],
     ["memory_list", "Memory List", textResult("Memory files (3):\n- a\n- b"), /3 files/],
+    ["memory_list", "Memory List", textResult("", { count: 2, files: ["a.md", "b.md"] }), /2 files/],
     ["subagent", "Subagent", textResult("- scout\n- reviewer"), /2 agents/],
+    ["subagent_list", "Subagent List", textResult("- scout\n- reviewer"), /2 agents/],
+    ["subagent_done", "Subagent Done", textResult("Done", { status: "done" }), /done/],
     ["lsp_navigation", "LSP", textResult("definition", { operation: "definition", resultCount: 2 }), /definition · 2 results/],
     ["lsp_diagnostics", "Diagnostics", textResult("clean", { mode: "workspace", totalDiagnostics: 0, filesChecked: 3 }), /workspace · 0 diagnostics · 3 files/],
-    ["ast_grep_search", "AST Grep", textResult("matches", { matchCount: 4 }), /4 matchs/],
-    ["ast_grep_replace", "AST Replace", textResult("dry", { matchCount: 2, applied: false }), /2 matchs · dry run/],
+    ["ast_grep_search", "AST Grep", textResult("matches", { matchCount: 4 }), /4 matches/],
+    ["ast_grep_replace", "AST Replace", textResult("dry", { matchCount: 2, applied: false }), /2 matches · dry run/],
     ["ast_grep_replace", "AST Replace", textResult("applied", { matchCount: 1, applied: true }), /1 match · applied/],
     ["intercom", "Intercom", textResult("No unresolved inbound asks."), /no pending asks/],
     ["intercom", "Intercom", textResult("**Pending asks:**\n- worker · msg-1 · 5s ago · Need review\n- reviewer · msg-2 · 7s ago · Need reply"), /2 pending asks/],
@@ -346,6 +405,14 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
     ["tape_handoff", "Tape Handoff", textResult("{}", { name: "task/begin" }), /anchor task\/begin/],
     ["tape_delete", "Tape Delete", textResult("{}", { id: "anchor-1", deleted: true, name: "task/begin" }), /deleted task\/begin/],
     ["tape_reset", "Tape Reset", textResult("Anchor index cleared", { archived: false }), /reset/],
+    ["tool_result_outline", "Tool Result Outline", textResult("outline body", { sourceId: "tr_abc123", keywordHitCount: 2, omittedMiddleLineCount: 80 }), /tr_abc123 · 2 keyword hits · 80 omitted/],
+    ["tool_result_get", "Tool Result Get", textResult("raw line 1\nraw line 2", { sourceId: "tr_abc123", startLine: 20, endLine: 21, lineCount: 2 }), /tr_abc123:20-21 · 2 lines/],
+    ["tool_result_search", "Tool Result Search", textResult("No matches found.", { matchCount: 0 }), /0 matches/],
+    ["tool_result_list", "Tool Result List", textResult("list body", { count: 7 }), /7 sources/],
+    ["tool_result_diagnostics", "Tool Result Diagnostics", textResult("diag body", { sourceCount: 7, totalStoredBytes: 12345 }), /7 sources · 12345 bytes/],
+    ["tool_result_retention_preview", "Tool Result Retention", textResult("preview body", { candidateCount: 3, keptCount: 10, candidateStoredBytes: 4567 }), /3 candidates · 10 kept · 4567 bytes/],
+    ["tool_result_export_details", "Tool Result Details Export", textResult("export details", { sourceId: "tr_abc123", byteCount: 3500 }), /tr_abc123 · 3500 bytes/],
+    ["tool_result_export", "Tool Result Export", textResult("export source", { sourceId: "tr_abc123", startLine: 20, endLine: 22, lineCount: 3, byteCount: 120 }), /tr_abc123:20-22 · 3 lines · 120 bytes/],
   ];
 
   for (const toolName of ["tape_read", "tape_search"]) {
@@ -374,6 +441,41 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
     assert.match(render(component), expected, `${toolName} result summary mismatch`);
     assertRenderedWithinWidth(component);
   }
+
+  const collapsedGet = render(
+    ui.wrappedToolResult(
+      "tool_result_get",
+      textResult("raw retrieved line 1\nraw retrieved line 2", { sourceId: "tr_abc123", startLine: 1, endLine: 2, lineCount: 2 }),
+      options({ expanded: false }),
+      theme,
+      context({}, { toolCallId: "tool-result-get-collapsed" }),
+      "Tool Result Get",
+    ),
+  );
+  assert.match(collapsedGet, /Tool Result Get tr_abc123:1-2 · 2 lines/);
+  assert.doesNotMatch(collapsedGet, /raw retrieved line/);
+
+  const expandedGet = render(
+    ui.wrappedToolResult(
+      "tool_result_get",
+      textResult("raw retrieved line 1\nraw retrieved line 2", { sourceId: "tr_abc123", startLine: 1, endLine: 2, lineCount: 2 }),
+      options({ expanded: true }),
+      theme,
+      context({}, { toolCallId: "tool-result-get-expanded" }),
+      "Tool Result Get",
+    ),
+  );
+  assert.match(expandedGet, /raw retrieved line 1/);
+  assertRenderedWithinWidth(
+    ui.wrappedToolResult(
+      "tool_result_get",
+      textResult("raw retrieved line 1\nraw retrieved line 2", { sourceId: "tr_abc123", startLine: 1, endLine: 2, lineCount: 2 }),
+      options({ expanded: false }),
+      theme,
+      context({}, { toolCallId: "tool-result-get-width" }),
+      "Tool Result Get",
+    ),
+  );
 
   const noPendingIntercom = render(
     ui.wrappedToolResult(
@@ -414,6 +516,26 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
   );
   assert.match(statusIntercom, /Intercom Status:/);
   assert.doesNotMatch(statusIntercom, /\*\*Intercom Status:\*\*/);
+
+  const partialMcpConnect = ui.wrappedToolResult(
+    "mcp",
+    textResult("waiting"),
+    options({ isPartial: true }),
+    theme,
+    context({ connect: "context7" }, { toolCallId: "mcp-partial-connect" }),
+    "MCP",
+  );
+  assert.match(render(partialMcpConnect), /MCP connect context7/);
+
+  const partialMcpTool = ui.wrappedToolResult(
+    "mcp",
+    textResult("waiting"),
+    options({ isPartial: true }),
+    theme,
+    context({ tool: "slack_search" }, { toolCallId: "mcp-partial-tool" }),
+    "MCP",
+  );
+  assert.match(render(partialMcpTool), /MCP slack_search/);
 
   const partialIntercomAsk = ui.wrappedToolResult(
     "intercom",
@@ -524,9 +646,14 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
 test("local built-in tool call/result renderers cover temp-safe branches", () => {
   assert.match(ui.formatReadCall({ path: "/tmp/file.txt", offset: 2, limit: 3 }, theme), /Read/);
   assert.match(ui.formatGrepCall({ pattern: "needle", path: "/tmp" }, theme), /needle/);
+  assert.match(ui.formatGrepCall({ pattern: "foo.bar", path: "/tmp", literal: true, ignoreCase: true, context: 2 }, theme), /literal \/foo\.bar\/ in \/tmp · ignore-case · context 2/);
   assert.match(ui.formatFindCall({ pattern: "*.ts", path: "/tmp" }, theme), /Find/);
   assert.match(ui.formatLsCall({ path: "/tmp" }, theme), /List/);
   assert.match(ui.formatBashCall({ command: "printf ok" }, theme), /printf ok/);
+  assert.equal(
+    ui.formatBashCall({ command: "printf one\nprintf two" }, theme),
+    "● Bash(2-line script · starts: printf one)",
+  );
   assert.match(ui.formatEditCall({ path: "/tmp/file.txt" }, theme), /Update/);
   assert.match(ui.formatWriteCall({ path: "/tmp/file.txt", content: "a\nb" }, theme), /Write/);
 
@@ -536,8 +663,62 @@ test("local built-in tool call/result renderers cover temp-safe branches", () =>
     theme,
     context({ path: "/tmp/file.txt" }, { toolCallId: "read" }),
   );
-  assert.match(render(readComponent), /Read 2 lines/);
+  const readRendered = render(readComponent);
+  assert.match(readRendered, /Read 2 lines/);
+  assert.match(readRendered, /alpha/);
   assertRenderedWithinWidth(readComponent);
+
+  const expandedReadComponent = ui.renderReadResult(
+    textResult("1\n2\n3\n4\n5\n6\n7\n8", { path: "/tmp/file.txt", totalLines: 8 }),
+    options({ expanded: true }),
+    theme,
+    context({}, { toolCallId: "read-expanded" }),
+  );
+  const expandedReadRendered = render(expandedReadComponent, 120);
+  assert.match(expandedReadRendered, /│ 8/);
+  assert.doesNotMatch(expandedReadRendered, /… 2 more lines/);
+  assertRenderedWithinWidth(expandedReadComponent);
+
+  const skillReadComponent = ui.renderReadResult(
+    textResult("# Skill\nbody", { path: "/home/orestes/.pi/agent/skills/foo/SKILL.md", truncation: { truncated: true } }),
+    options(),
+    theme,
+    context({}, { toolCallId: "skill-read" }),
+  );
+  const skillReadRendered = render(skillReadComponent, 120);
+  assert.match(skillReadRendered, /Skill read foo · 2 lines · truncated/);
+  assert.doesNotMatch(skillReadRendered, /# Skill/);
+  assertRenderedWithinWidth(skillReadComponent);
+
+  const virtualizedSkillReadComponent = ui.renderReadResult(
+    textResult('[tool-result-virtualizer] Large read result stored locally\nSource: tr_mock\nCapture: read.input.path; size: 8.5 KiB, 144 lines; sha256: abc\nOutline: tool_result_outline sourceId:"tr_mock"'),
+    options(),
+    theme,
+    context({ path: "/home/orestes/.pi/agent/skills/review/SKILL.md" }, { toolCallId: "skill-read-virtualized" }),
+  );
+  const virtualizedSkillReadRendered = render(virtualizedSkillReadComponent, 120);
+  assert.match(virtualizedSkillReadRendered, /Skill read review · 144 lines · stored/);
+  assert.doesNotMatch(virtualizedSkillReadRendered, /tool-result-virtualizer/);
+  assertRenderedWithinWidth(virtualizedSkillReadComponent);
+
+  const grepComponent = ui.renderGrepResult(
+    textResult("file.ts-1-before\nfile.ts:2:match\nfile.ts-3-after", { matchCount: 1 }),
+    options(),
+    theme,
+    context({ pattern: "match", path: ".", context: 1 }, { toolCallId: "grep-context" }),
+  );
+  const grepRendered = render(grepComponent, 120);
+  assert.match(grepRendered, /Grep 1 match · 3 output lines · context 1/);
+  assertRenderedWithinWidth(grepComponent);
+
+  const grepFallbackComponent = ui.renderGrepResult(
+    textResult("file.ts:2:match", {}),
+    options(),
+    theme,
+    context({ pattern: "match", path: "." }, { toolCallId: "grep-fallback" }),
+  );
+  assert.match(render(grepFallbackComponent, 120), /Grep 1 output line/);
+  assertRenderedWithinWidth(grepFallbackComponent);
 
   const bashComponent = ui.renderBashResult(
     textResult("ok", { exitCode: 0 }),
@@ -548,6 +729,28 @@ test("local built-in tool call/result renderers cover temp-safe branches", () =>
   assert.match(render(bashComponent), /Done/);
   assert.match(render(bashComponent), /1 line/);
   assertRenderedWithinWidth(bashComponent);
+
+  const failedBashComponent = ui.renderBashResult(
+    textResult("stderr line 1\nstderr line 2", { exitCode: 17 }),
+    options(),
+    theme,
+    context({}, { toolCallId: "bash-failed", isError: true }),
+  );
+  const failedBashRendered = render(failedBashComponent, 120);
+  assert.match(failedBashRendered, /Failed · exit 17 · 2 lines/);
+  assert.match(failedBashRendered, /stderr line 2/);
+  assertRenderedWithinWidth(failedBashComponent);
+
+  const readErrorComponent = ui.renderReadResult(
+    textResult("ENOENT first line\nsecond detail line"),
+    options(),
+    theme,
+    context({}, { toolCallId: "read-error", isError: true }),
+  );
+  const readErrorRendered = render(readErrorComponent, 120);
+  assert.match(readErrorRendered, /Failed · ENOENT first line/);
+  assert.match(readErrorRendered, /second detail line/);
+  assertRenderedWithinWidth(readErrorComponent);
 
   const editComponent = ui.renderEditResult(
     textResult("Updated", { diff: "--- a\n+++ b\n@@\n-old\n+new" }),
@@ -580,8 +783,11 @@ test("temp-dir local mutation simulation remains sandboxed and renderable", () =
       theme,
       context({ path: target, content: after }, { toolCallId: "temp-write" }),
     );
-    assert.match(render(writeComponent), /Wrote 1 line/);
-    assert.match(render(writeComponent), /diff unavailable/);
+    const writeRendered = render(writeComponent, 120);
+    assert.match(writeRendered, /Wrote 1 line/);
+    assert.match(writeRendered, /preview/);
+    assert.match(writeRendered, /new/);
+    assert.doesNotMatch(writeRendered, /diff unavailable because previous content was not captured/);
     assertRenderedWithinWidth(writeComponent);
 
     const editComponent = ui.renderEditResult(
@@ -613,7 +819,7 @@ test("intercom renderer covers normal senders, subagent result compaction, reply
   );
   const normalRendered = render(normal, 80);
   assert.match(normalRendered, /From: worker/);
-  assert.match(normalRendered, /\/tmp\/project/);
+  assert.doesNotMatch(normalRendered, /\/tmp\/project/);
   assert.match(normalRendered, /normal intercom body/);
   assertRenderedWithinWidth(normal);
 
@@ -621,7 +827,7 @@ test("intercom renderer covers normal senders, subagent result compaction, reply
     {
       details: {
         from: { name: "subagent-result", cwd: "/tmp/project" },
-        bodyText: "Run: abc123\nMode: chain\nRoute: builtin.quality-gate\nStatus: completed\nChildren: 2 completed\n\n1. scout — completed\nSummary:\nAll good\n",
+        bodyText: "Run: abc123\nMode: chain\nRoute: builtin.quality-gate\nStatus: completed\nChildren: 2 completed\n\n1. scout — completed\nSummary:\nAll good\n\n2. reviewer — failed\nSummary:\nNeeds fixes\n",
         replyCommand: "/reply abc123",
       },
     },
@@ -633,11 +839,84 @@ test("intercom renderer covers normal senders, subagent result compaction, reply
   assert.match(rendered, /run: abc123/);
   assert.match(rendered, /route: builtin\.quality-gate/);
   assert.match(rendered, /scout/);
+  assert.match(rendered, /reviewer/);
+  assert.match(rendered, /Needs fixes/);
+  assert.doesNotMatch(rendered, /\/tmp\/project/);
   assert.match(rendered, /To reply: \/reply abc123/);
   assertRenderedWithinWidth(subagentResult);
 });
 
-test("subagent control notice renderer covers orchestrator straggler notices and width", () => {
+test("subagent control notice renderer shows a factual user card without control internals", () => {
+  const component = ui.renderSubagentControlNotice(
+    {
+      content: 'Subagent needs attention: run-monitor\nRun: 1f81f67c-b17f-4360-8b67-42e754f7860a step 1\nSignal: run-monitor needs attention (no observed activity for 60s)\nHint: Inspect status first unless the run is clearly blocked.\nNudge: intercom({ action: "send", to: "subagent-run-monitor-1f81f67c-b17f-4360-8b67-42e754f7860a-1", message: "What are you blocked on?" })\nStatus: subagent({ action: "status", id: "1f81f67c-b17f-4360-8b67-42e754f7860a" })\nInterrupt: subagent({ action: "interrupt", id: "1f81f67c-b17f-4360-8b67-42e754f7860a" })',
+      details: {
+        event: {
+          type: "needs_attention",
+          to: "needs_attention",
+          ts: 1790000000000,
+          agent: "run-monitor",
+          index: 0,
+          runId: "1f81f67c-b17f-4360-8b67-42e754f7860a",
+          message: "run-monitor needs attention (no observed activity for 60s)",
+          reason: "idle",
+          elapsedMs: 60000,
+        },
+        childIntercomTarget: "subagent-run-monitor-1f81f67c-b17f-4360-8b67-42e754f7860a-1",
+      },
+    },
+    { expanded: false },
+    theme,
+  );
+
+  const rendered = render(component, 80);
+  assert.match(rendered, /Subagent monitor/);
+  assert.match(rendered, /Agent: run-monitor · step 1/);
+  assert.match(rendered, /Activity: no observed activity for 60s/);
+  assert.match(rendered, /Run: 1f81f67c…/);
+  assert.doesNotMatch(rendered, /Nudge:/);
+  assert.doesNotMatch(rendered, /Status:/);
+  assert.doesNotMatch(rendered, /Interrupt:/);
+  assert.doesNotMatch(rendered, /parent/i);
+  assert.doesNotMatch(rendered, /orchestrator/i);
+  assert.doesNotMatch(rendered, /No action needed/i);
+  assert.doesNotMatch(rendered, /I'll/i);
+  assertRenderedWithinWidth(component);
+});
+
+test("subagent control notice renderer includes useful failure context", () => {
+  const component = ui.renderSubagentControlNotice(
+    {
+      details: {
+        event: {
+          type: "needs_attention",
+          to: "needs_attention",
+          ts: 1790000000000,
+          agent: "worker",
+          index: 1,
+          runId: "7a92c01b-b17f-4360-8b67-42e754f7860a",
+          message: "worker needs attention after repeated mutating tool failures",
+          reason: "tool_failures",
+          currentTool: "edit",
+          currentPath: "src/app.ts",
+          recentFailureSummary: "edit src/app.ts: old text did not match",
+        },
+      },
+    },
+    { expanded: false },
+    theme,
+  );
+
+  const rendered = render(component, 80);
+  assert.match(rendered, /Subagent monitor/);
+  assert.match(rendered, /Agent: worker · step 2/);
+  assert.match(rendered, /Activity: repeated edit failures/);
+  assert.match(rendered, /Last tool: edit · src\/app\.ts/);
+  assert.match(rendered, /Recent failure: edit src\/app\.ts: old text did not match/);
+  assertRenderedWithinWidth(component);
+});
+
+test("subagent control notice renderer covers straggler notices and width", () => {
   const component = ui.renderSubagentControlNotice(
     {
       content: "Parallel barrier blocked by straggler: top-level parallel\n3/4 complete; 1 still running.\nRunning: researcher 2/4, elapsed 9m10s, last activity 1m2s ago, 84 tools, 407320 tokens\nThreshold: slower than 9m8s (6m5s peer baseline).\nNo automatic action taken.\nActions: wait, inspect status/activity, nudge if available, interrupt, or detach/background when available.",
@@ -653,11 +932,59 @@ test("subagent control notice renderer covers orchestrator straggler notices and
   );
 
   const rendered = render(component, 80);
-  assert.match(rendered, /Subagent notice/);
+  assert.match(rendered, /Subagent monitor/);
   assert.match(rendered, /Parallel barrier blocked by straggler: top-level parallel/);
   assert.match(rendered, /3\/4 complete; 1 still running/);
+  assert.doesNotMatch(rendered, /Actions:/);
   assert.doesNotMatch(rendered, /subagent_control_notice/);
   assertRenderedWithinWidth(component);
+});
+
+test("subagent-control intercom duplicates are hidden in the user UI", () => {
+  const component = ui.renderIntercomMessage(
+    {
+      details: {
+        from: { name: "subagent-control", cwd: "/tmp/project" },
+        bodyText: 'subagent needs attention\n\nrun-monitor needs attention in run 1f81f67c-b17f-4360-8b67-42e754f7860a.\n\nSubagent needs attention: run-monitor\nRun: 1f81f67c-b17f-4360-8b67-42e754f7860a step 1\nSignal: run-monitor needs attention (no observed activity for 60s)\nNudge: intercom({ action: "send", to: "subagent-run-monitor", message: "What are you blocked on?" })\nStatus: subagent({ action: "status", id: "1f81f67c-b17f-4360-8b67-42e754f7860a" })\nInterrupt: subagent({ action: "interrupt", id: "1f81f67c-b17f-4360-8b67-42e754f7860a" })',
+      },
+    },
+    { expanded: false },
+    theme,
+  );
+
+  assert.equal(render(component, 80), "");
+  assertRenderedWithinWidth(component);
+
+  const extraComponent = ui.renderIntercomMessage(
+    {
+      details: {
+        from: { name: "subagent-control" },
+        bodyText: "subagent needs attention\n\nExtra user-visible note: check logs before retrying.\n\nSubagent needs attention: run-monitor\nRun: 1f81f67c-b17f-4360-8b67-42e754f7860a step 1\nSignal: run-monitor needs attention (no observed activity for 60s)\n\nSuffix note: keep me visible.",
+      },
+    },
+    { expanded: false },
+    theme,
+  );
+  const extraRendered = render(extraComponent, 80);
+  assert.match(extraRendered, /Extra user-visible note/);
+  assert.match(extraRendered, /Suffix note: keep me visible/);
+  assert.doesNotMatch(extraRendered, /Subagent needs attention: run-monitor/);
+  assertRenderedWithinWidth(extraComponent);
+
+  const labeledSuffixComponent = ui.renderIntercomMessage(
+    {
+      details: {
+        from: { name: "subagent-control" },
+        bodyText: "subagent needs attention\n\nSubagent needs attention: run-monitor\nRun: 1f81f67c-b17f-4360-8b67-42e754f7860a step 1\nSignal: run-monitor needs attention (no observed activity for 60s)\nHint: Inspect status first unless the run is clearly blocked.\n\nHint: keep this user-visible suffix.",
+      },
+    },
+    { expanded: false },
+    theme,
+  );
+  const labeledSuffixRendered = render(labeledSuffixComponent, 80);
+  assert.match(labeledSuffixRendered, /Hint: keep this user-visible suffix/);
+  assert.doesNotMatch(labeledSuffixRendered, /Subagent needs attention: run-monitor/);
+  assertRenderedWithinWidth(labeledSuffixComponent);
 });
 
 test("subagent control notice renderer hides stale straggler notices after run completion", () => {

@@ -31,6 +31,57 @@ interface AsyncJobTrackerOptions {
 	now?: () => number;
 }
 
+function widgetRenderSignature(jobs: Iterable<AsyncJobState>): string {
+	return JSON.stringify([...jobs].map((job) => ({
+		asyncId: job.asyncId,
+		status: job.status,
+		mode: job.mode,
+		agents: job.agents,
+		chainStepCount: job.chainStepCount,
+		parallelGroups: job.parallelGroups,
+		stepsTotal: job.stepsTotal,
+		hasParallelGroups: job.hasParallelGroups,
+		activeParallelGroup: job.activeParallelGroup,
+		runningSteps: job.runningSteps,
+		completedSteps: job.completedSteps,
+		currentStep: job.currentStep,
+		activityState: job.activityState,
+		lastActivityAt: job.lastActivityAt,
+		currentTool: job.currentTool,
+		currentToolStartedAt: job.currentToolStartedAt,
+		currentPath: job.currentPath,
+		turnCount: job.turnCount,
+		toolCount: job.toolCount,
+		startedAt: job.startedAt,
+		outputFile: job.outputFile,
+		totalTokens: job.totalTokens,
+		steps: job.steps?.map((step) => ({
+			index: step.index,
+			agent: step.agent,
+			status: step.status,
+			sessionFile: step.sessionFile,
+			activityState: step.activityState,
+			lastActivityAt: step.lastActivityAt,
+			currentTool: step.currentTool,
+			currentToolArgs: step.currentToolArgs,
+			currentToolStartedAt: step.currentToolStartedAt,
+			currentPath: step.currentPath,
+			recentTools: step.recentTools,
+			recentOutput: step.recentOutput,
+			turnCount: step.turnCount,
+			toolCount: step.toolCount,
+			endedAt: step.endedAt,
+			exitCode: step.exitCode,
+			tokens: step.tokens,
+			skills: step.skills,
+			model: step.model,
+			attemptedModels: step.attemptedModels,
+			modelAttempts: step.modelAttempts,
+			error: step.error,
+		})),
+	})));
+}
+
 export function maybeEmitAsyncStragglerNotice(
 	pi: Pick<ExtensionAPI, "events">,
 	job: AsyncJobState,
@@ -89,7 +140,7 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 	const resultsDir = options.resultsDir ?? RESULTS_DIR;
 	const rerenderWidget = (ctx: ExtensionContext, jobs = Array.from(state.asyncJobs.values())) => {
 		renderWidget(ctx, jobs);
-		ctx.ui.requestRender?.();
+		(ctx.ui as typeof ctx.ui & { requestRender?: () => void }).requestRender?.();
 	};
 	const scheduleCleanup = (asyncId: string) => {
 		const existingTimer = state.cleanupTimers.get(asyncId);
@@ -162,6 +213,7 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 	const ensurePoller = () => {
 		if (state.poller) return;
 		state.poller = setInterval(() => {
+			const beforeWidgetRender = widgetRenderSignature(state.asyncJobs.values());
 			if (state.asyncJobs.size === 0) {
 				if (state.lastUiContext?.hasUI) rerenderWidget(state.lastUiContext, []);
 				if (state.poller) {
@@ -247,7 +299,8 @@ export function createAsyncJobTracker(pi: Pick<ExtensionAPI, "events">, state: S
 				}
 			}
 
-			if (state.lastUiContext?.hasUI) rerenderWidget(state.lastUiContext);
+			const afterWidgetRender = widgetRenderSignature(state.asyncJobs.values());
+			if (state.lastUiContext?.hasUI && afterWidgetRender !== beforeWidgetRender) rerenderWidget(state.lastUiContext);
 		}, pollIntervalMs);
 		state.poller.unref?.();
 	};

@@ -94,7 +94,8 @@ function truncLine(text: string, maxWidth: number): string {
 }
 
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const WIDGET_ANIMATION_MS = 80;
+const RESULT_ANIMATION_MS = 80;
+const WIDGET_REFRESH_MS = 1000;
 
 let widgetTimer: ReturnType<typeof setInterval> | undefined;
 let latestWidgetCtx: ExtensionContext | undefined;
@@ -110,7 +111,7 @@ interface ResultAnimationContext {
 }
 
 function spinnerFrame(): string {
-	return SPINNER[Math.floor(Date.now() / WIDGET_ANIMATION_MS) % SPINNER.length]!;
+	return SPINNER[Math.floor(Date.now() / RESULT_ANIMATION_MS) % SPINNER.length]!;
 }
 
 function isStaleExtensionContextError(error: unknown): boolean {
@@ -145,7 +146,7 @@ export function syncResultAnimation(result: AgentToolResult<Details>, context: R
 			if (!isStaleExtensionContextError(error)) throw error;
 			stopResultAnimation(context);
 		}
-	}, WIDGET_ANIMATION_MS);
+	}, RESULT_ANIMATION_MS);
 	timer.unref?.();
 	context.state.subagentResultAnimationTimer = timer;
 	resultAnimationTimers.set(timer, context.state);
@@ -808,7 +809,7 @@ function ensureWidgetAnimation(): void {
 			return;
 		}
 		refreshAnimatedWidget();
-	}, WIDGET_ANIMATION_MS);
+	}, WIDGET_REFRESH_MS);
 	widgetTimer.unref?.();
 }
 

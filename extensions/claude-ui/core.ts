@@ -1630,6 +1630,14 @@ const EXTENSION_TOOL_WRAPPER_ALLOWLIST = new Set([
   "memory_list",
   "memory_check",
   "memory_sync",
+  "tool_result_outline",
+  "tool_result_get",
+  "tool_result_search",
+  "tool_result_list",
+  "tool_result_diagnostics",
+  "tool_result_retention_preview",
+  "tool_result_export_details",
+  "tool_result_export",
 ]);
 
 const PRESERVE_ORIGINAL_TOOL_RENDERERS = new Set(["subagent"]);
@@ -1883,6 +1891,15 @@ function compactOneLine(value: string, maxWidth = 80): string {
   return truncateVisible(value.replace(/\s+/g, " ").trim(), maxWidth);
 }
 
+function toolResultArgRange(args: unknown): string | undefined {
+  const start = argNumber(args, "lineStart");
+  const limit = argNumber(args, "lineLimit");
+  if (start !== undefined && limit !== undefined) return `${start}-${start + Math.max(1, Math.floor(limit)) - 1}`;
+  if (start !== undefined) return `from ${start}`;
+  if (limit !== undefined) return `${limit} lines`;
+  return undefined;
+}
+
 function label(theme: Theme, value: string): string {
   return theme.fg("toolTitle", theme.bold(value));
 }
@@ -2075,11 +2092,13 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
           ),
           compactOneLine(tasks.map(subagentChainStepLabel).join(" + "), 90),
         ]);
+      const task = argValueLabel(args, "task") ?? argValueLabel(args, "description");
+      const target =
+        argValueLabel(args, "agent") ?? argValueLabel(args, "chainName") ?? task;
       return joinBodyParts(theme, [
         argValueLabel(args, "workflow"),
-        argValueLabel(args, "agent") ??
-          argValueLabel(args, "chainName") ??
-          "run",
+        target ?? "run",
+        target && task && target !== task ? compactOneLine(task, 90) : undefined,
         args.async === true ? "async" : undefined,
       ]);
     }
@@ -2282,6 +2301,50 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
       return muted(theme, "project");
     case "memory_sync":
       return pathText(theme, argValueLabel(args, "action") ?? "status");
+    case "tool_result_outline":
+      return joinBodyParts(theme, [
+        pathText(theme, argValueLabel(args, "sourceId") ?? "…"),
+        argValueLabel(args, "reason"),
+      ]);
+    case "tool_result_get":
+      return joinBodyParts(theme, [
+        pathText(theme, argValueLabel(args, "sourceId") ?? "…"),
+        toolResultArgRange(args),
+        argValueLabel(args, "reason"),
+      ]);
+    case "tool_result_search":
+      return joinBodyParts(theme, [
+        pathText(theme, argValueLabel(args, "sourceId") ?? "all sources"),
+        argValueLabel(args, "query"),
+        argValueLabel(args, "limit") ? `limit ${argValueLabel(args, "limit")}` : undefined,
+        argValueLabel(args, "reason"),
+      ]);
+    case "tool_result_list":
+    case "tool_result_diagnostics":
+      return joinBodyParts(theme, [
+        argValueLabel(args, "limit") ? `limit ${argValueLabel(args, "limit")}` : undefined,
+        argValueLabel(args, "reason"),
+      ]);
+    case "tool_result_retention_preview":
+      return joinBodyParts(theme, [
+        argValueLabel(args, "maxSources") ? `maxSources ${argValueLabel(args, "maxSources")}` : undefined,
+        argValueLabel(args, "maxAgeHours") ? `maxAgeHours ${argValueLabel(args, "maxAgeHours")}` : undefined,
+        argValueLabel(args, "limit") ? `limit ${argValueLabel(args, "limit")}` : undefined,
+        argValueLabel(args, "reason"),
+      ]);
+    case "tool_result_export_details":
+      return joinBodyParts(theme, [
+        pathText(theme, argValueLabel(args, "sourceId") ?? "…"),
+        compactPathList(args, theme),
+        argValueLabel(args, "reason"),
+      ]);
+    case "tool_result_export":
+      return joinBodyParts(theme, [
+        pathText(theme, argValueLabel(args, "sourceId") ?? "…"),
+        toolResultArgRange(args),
+        compactPathList(args, theme),
+        argValueLabel(args, "reason"),
+      ]);
     default:
       return muted(theme, "…");
   }
@@ -2357,6 +2420,22 @@ function webToolTitle(name: string): string {
       return "Memory Check";
     case "memory_sync":
       return "Memory Sync";
+    case "tool_result_outline":
+      return "Tool Result Outline";
+    case "tool_result_get":
+      return "Tool Result Get";
+    case "tool_result_search":
+      return "Tool Result Search";
+    case "tool_result_list":
+      return "Tool Result List";
+    case "tool_result_diagnostics":
+      return "Tool Result Diagnostics";
+    case "tool_result_retention_preview":
+      return "Tool Result Retention";
+    case "tool_result_export_details":
+      return "Tool Result Details Export";
+    case "tool_result_export":
+      return "Tool Result Export";
     default:
       return name;
   }
@@ -2422,6 +2501,15 @@ function memoryListSummary(output: string): string | undefined {
   return match ? plural(Number(match[1]), "file") : undefined;
 }
 
+function memoryListSummaryFromDetails(details: unknown): string | undefined {
+  const count = detailNumber(details, "count");
+  if (count !== undefined) return plural(count, "file");
+  if (isRecord(details) && Array.isArray(details.files)) {
+    return plural(details.files.length, "file");
+  }
+  return undefined;
+}
+
 function subagentListSummary(output: string): string | undefined {
   const agentCount = contentLines(output).filter((line) =>
     line.startsWith("- "),
@@ -2464,6 +2552,33 @@ function pendingToolLabel(
       return "Checking Memory";
     case "memory_sync":
       return "Syncing Memory";
+    case "tool_result_outline":
+      return "Outlining Tool Result";
+    case "tool_result_get":
+      return "Reading Tool Result";
+    case "tool_result_search":
+      return "Searching Tool Result";
+    case "tool_result_list":
+      return "Listing Tool Results";
+    case "tool_result_diagnostics":
+      return "Checking Tool Result Store";
+    case "tool_result_retention_preview":
+      return "Checking Retention";
+    case "tool_result_export_details":
+    case "tool_result_export":
+      return "Exporting Tool Result";
+    case "mcp": {
+      const tool = argValueLabel(args, "tool");
+      if (tool) return `MCP ${tool}`;
+      const connect = argValueLabel(args, "connect");
+      if (connect) return `MCP connect ${connect}`;
+      const describe = argValueLabel(args, "describe");
+      if (describe) return `MCP describe ${describe}`;
+      const search = argValueLabel(args, "search");
+      if (search) return `MCP search ${search}`;
+      const action = argValueLabel(args, "action");
+      return action ? `MCP ${action}` : "MCP";
+    }
     case "intercom": {
       const action = argValueLabel(args, "action");
       if (action === "ask") return "Waiting for Reply";
@@ -2889,50 +3004,23 @@ function subagentStatusCountsLine(details: SubagentDetails): string {
   return `${plural(total, "agent")}: ${outcome}`;
 }
 
-function subagentRole(result: SubagentSingleResult): string {
-  const text = `${result.agent} ${result.task ?? ""}`.toLowerCase();
-  if (/reduc|synth|dedupe|rank|filter|shortlist/.test(text)) return "reducer";
-  if (/validat|false positive|evidence quality/.test(text)) return "validator";
-  if (/research/.test(text)) return "researcher";
-  if (/review|audit|check/.test(text)) return "reviewer";
-  if (/scout|recon|context/.test(text)) return "scout";
-  if (/plan/.test(text)) return "planner";
-  if (/worker|implement|fix/.test(text)) return "worker";
-  return result.agent;
-}
-
-function pluralRole(count: number, role: string): string {
-  return `${count} ${count === 1 ? role : `${role}s`}`;
+function pluralAgentLabel(count: number, agent: string): string {
+  return `${count} ${count === 1 ? agent : `${agent}s`}`;
 }
 
 function subagentStageSummary(details: SubagentDetails): string | undefined {
   const counts = new Map<string, number>();
   for (const result of details.results) {
-    const role = subagentRole(result);
-    counts.set(role, (counts.get(role) ?? 0) + 1);
+    counts.set(result.agent, (counts.get(result.agent) ?? 0) + 1);
   }
-  const preferredOrder = [
-    "reviewer",
-    "validator",
-    "reducer",
-    "researcher",
-    "scout",
-    "planner",
-    "worker",
-  ];
-  const ordered = [
-    ...preferredOrder.filter((role) => counts.has(role)),
-    ...[...counts.keys()]
-      .filter((role) => !preferredOrder.includes(role))
-      .sort((left, right) => left.localeCompare(right)),
-  ];
+  const ordered = [...counts.keys()];
   if (
     ordered.length <= 1 &&
     !details.chainAgents?.some((agent) => agent.startsWith("["))
   )
     return undefined;
   return ordered
-    .map((role) => pluralRole(counts.get(role) ?? 0, role))
+    .map((agent) => pluralAgentLabel(counts.get(agent) ?? 0, agent))
     .join(" → ");
 }
 
@@ -2966,11 +3054,10 @@ function subagentOutputSummary(details: SubagentDetails): string | undefined {
 }
 
 function subagentDisplayAgent(
-  details: SubagentDetails,
+  _details: SubagentDetails,
   result: SubagentSingleResult,
 ): string {
-  if (details.mode !== "chain") return result.agent;
-  return subagentRole(result);
+  return result.agent;
 }
 
 function textFromUnknown(value: unknown): string[] {
@@ -3386,11 +3473,7 @@ function renderSubagentToolResult(
       subagentErrorBlock(result, theme, options.expanded),
     );
 
-  if (
-    !options.expanded &&
-    (details.results.length >= SUBAGENT_LARGE_RESULT_THRESHOLD ||
-      details.mode === "chain")
-  ) {
+  if (!options.expanded && details.results.length >= SUBAGENT_LARGE_RESULT_THRESHOLD) {
     return setText(
       context.lastComponent,
       renderSubagentLargeSummary(details, theme, title).join("\n"),
@@ -3566,6 +3649,12 @@ function toolPreviewBlock(
     case "tape_delete":
     case "tape_reset":
       return "";
+    case "tool_result_get":
+    case "tool_result_export_details":
+    case "tool_result_export":
+      return expanded
+        ? previewBlock(output, theme, expanded, EXPANDED_PREVIEW_LINES)
+        : "";
     default:
       return previewBlock(output, theme, expanded, EXPANDED_PREVIEW_LINES);
   }
@@ -3586,14 +3675,18 @@ function resultDetailSummary(
       );
     case "memory_list":
       return (
+        memoryListSummaryFromDetails(details) ??
         memoryListSummary(output) ??
         (lines > 0 ? plural(lines, "line") : "done")
       );
     case "subagent":
+    case "subagent_list":
       return (
         subagentListSummary(output) ??
-        (lines > 0 ? plural(lines, "line") : "done")
+        (lines > 0 ? plural(lines, "agent") : "done")
       );
+    case "subagent_done":
+      return detailString(details, "status") ?? (lines > 0 ? compactOneLine(output, 60) : "done");
     case "intercom":
       return intercomResultSummary(output) ?? (lines > 0 ? plural(lines, "line") : "done");
     case "contact_supervisor": {
@@ -3709,10 +3802,86 @@ function resultDetailSummary(
             : "dry run"
           : undefined;
       const parts = [
-        matchCount !== undefined ? plural(matchCount, "match") : undefined,
+        matchCount !== undefined ? plural(matchCount, "match", "matches") : undefined,
         mode,
       ].filter(Boolean);
       return parts.length > 0 ? parts.join(" · ") : "done";
+    }
+    case "tool_result_outline": {
+      const sourceId = detailString(details, "sourceId");
+      const keywordHits = detailNumber(details, "keywordHitCount");
+      const omitted = detailNumber(details, "omittedMiddleLineCount");
+      const parts = [
+        sourceId,
+        keywordHits !== undefined ? plural(keywordHits, "keyword hit") : undefined,
+        omitted !== undefined ? `${omitted} omitted` : undefined,
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(" · ") : "outline";
+    }
+    case "tool_result_get": {
+      const sourceId = detailString(details, "sourceId");
+      const startLine = detailNumber(details, "startLine");
+      const endLine = detailNumber(details, "endLine");
+      const lineCount = detailNumber(details, "lineCount");
+      const range = sourceId && startLine !== undefined && endLine !== undefined
+        ? `${sourceId}:${startLine}-${endLine}`
+        : sourceId;
+      const parts = [
+        range,
+        lineCount !== undefined ? plural(lineCount, "line") : undefined,
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(" · ") : "retrieved";
+    }
+    case "tool_result_search": {
+      const matchCount = detailNumber(details, "matchCount");
+      return matchCount !== undefined ? plural(matchCount, "match", "matches") : "search complete";
+    }
+    case "tool_result_list": {
+      const count = detailNumber(details, "count");
+      return count !== undefined ? plural(count, "source") : "sources";
+    }
+    case "tool_result_diagnostics": {
+      const sourceCount = detailNumber(details, "sourceCount");
+      const bytes = detailNumber(details, "totalStoredBytes");
+      const parts = [
+        sourceCount !== undefined ? plural(sourceCount, "source") : undefined,
+        bytes !== undefined ? `${bytes} bytes` : undefined,
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(" · ") : "diagnostics";
+    }
+    case "tool_result_retention_preview": {
+      const candidates = detailNumber(details, "candidateCount");
+      const kept = detailNumber(details, "keptCount");
+      const bytes = detailNumber(details, "candidateStoredBytes");
+      const parts = [
+        candidates !== undefined ? plural(candidates, "candidate") : undefined,
+        kept !== undefined ? `${kept} kept` : undefined,
+        bytes !== undefined ? `${bytes} bytes` : undefined,
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(" · ") : "retention preview";
+    }
+    case "tool_result_export_details": {
+      const sourceId = detailString(details, "sourceId");
+      const bytes = detailNumber(details, "byteCount");
+      return [sourceId, bytes !== undefined ? `${bytes} bytes` : undefined]
+        .filter(Boolean)
+        .join(" · ") || "exported details";
+    }
+    case "tool_result_export": {
+      const sourceId = detailString(details, "sourceId");
+      const startLine = detailNumber(details, "startLine");
+      const endLine = detailNumber(details, "endLine");
+      const lineCount = detailNumber(details, "lineCount");
+      const bytes = detailNumber(details, "byteCount");
+      const range = sourceId && startLine !== undefined && endLine !== undefined
+        ? `${sourceId}:${startLine}-${endLine}`
+        : sourceId;
+      const parts = [
+        range,
+        lineCount !== undefined ? plural(lineCount, "line") : undefined,
+        bytes !== undefined ? `${bytes} bytes` : undefined,
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(" · ") : "exported";
     }
     default:
       return lines > 0 ? plural(lines, "line") : "done";
@@ -3773,6 +3942,20 @@ function errorLine(theme: Theme, message: string): string {
     "error",
     truncateVisible(message, 120),
   )}`;
+}
+
+function errorResultBlock(
+  result: AgentToolResult<unknown>,
+  theme: Theme,
+  details: string,
+  expanded: boolean,
+): string {
+  const output = textContent(result);
+  const summary = `${muted(theme, `${RESULT_INDENT}└ `)}${theme.fg(
+    "error",
+    "Failed",
+  )}${details ? muted(theme, ` · ${truncateVisible(details, 120)}`) : ""}`;
+  return `${summary}${previewBlock(output, theme, expanded, EXPANDED_PREVIEW_LINES, 120, 4)}`;
 }
 
 function previewBlock(
@@ -3879,13 +4062,18 @@ function formatReadCall(args: unknown, theme: Theme, pending = false): string {
 function formatGrepCall(args: unknown, theme: Theme, pending = false): string {
   const pattern = argString(args, "pattern", "");
   const path = argString(args, "path", ".");
+  const literal = isRecord(args) && args.literal === true;
+  const ignoreCase = isRecord(args) && args.ignoreCase === true;
+  const contextLines = argNumber(args, "context");
+  const patternLabel = `${literal ? "literal " : ""}/${compactOneLine(pattern, 60)}/`;
+  const extras = [
+    ignoreCase ? "ignore-case" : undefined,
+    contextLines !== undefined ? `context ${contextLines}` : undefined,
+  ].filter((part): part is string => part !== undefined);
   return callLine(
     theme,
     "Grep",
-    `${pathText(theme, `/${compactOneLine(pattern, 60)}/`)}${muted(
-      theme,
-      " in ",
-    )}${pathText(theme, path)}`,
+    `${pathText(theme, patternLabel)}${muted(theme, " in ")}${pathText(theme, path)}${extras.length ? muted(theme, ` · ${extras.join(" · ")}`) : ""}`,
     pending,
   );
 }
@@ -3914,12 +4102,12 @@ function formatLsCall(args: unknown, theme: Theme, pending = false): string {
 }
 
 function formatBashCall(args: unknown, theme: Theme, pending = false): string {
-  return callLine(
-    theme,
-    "Bash",
-    pathText(theme, argString(args, "command", "")),
-    pending,
-  );
+  const command = argString(args, "command", "");
+  const lines = contentLines(command);
+  const body = lines.length > 1
+    ? `${lines.length}-line script · starts: ${compactOneLine(lines[0] ?? "", 70)}`
+    : compactOneLine(command, 100);
+  return callLine(theme, "Bash", pathText(theme, body), pending);
 }
 
 function formatEditCall(args: unknown, theme: Theme, pending = false): string {
@@ -3944,6 +4132,11 @@ function formatWriteCall(args: unknown, theme: Theme, pending = false): string {
   );
 }
 
+function storedToolResultLineCount(output: string): number | undefined {
+  const match = output.match(/\bsize:\s*[^;\n]*?,\s*(\d+)\s+lines\b/i);
+  return match ? Number(match[1]) : undefined;
+}
+
 function renderReadResult(
   result: AgentToolResult<ReadToolDetails | undefined>,
   options: ToolRenderOptions,
@@ -3956,25 +4149,26 @@ function renderReadResult(
   if (context.isError) {
     return setText(
       context.lastComponent,
-      errorLine(theme, firstTextLine(result)),
+      errorResultBlock(result, theme, firstTextLine(result), options.expanded),
     );
   }
 
-  // Collapse skill reads — don't show line count
   const details = result.details;
-  const filePath = detailString(details, "path") ?? "";
-  if (/\/skills\/[^/]+\/SKILL\.md$/.test(filePath)) {
-    return setText(context.lastComponent, "");
+  const filePath = detailString(details, "path") ?? argString(context.args, "path", "", true);
+  const output = textContent(result);
+  const lineCount = detailNumber(details, "totalLines") ?? storedToolResultLineCount(output) ?? countLines(output);
+  const stored = output.startsWith("[tool-result-virtualizer]");
+  const suffix = `${details?.truncation?.truncated ? " · truncated" : ""}${stored ? " · stored" : ""}`;
+  const skillMatch = filePath.match(/\/skills\/([^/]+)\/SKILL\.md$/);
+  if (skillMatch) {
+    return setText(
+      context.lastComponent,
+      treeLine(theme, "Skill read", `${skillMatch[1]} · ${plural(lineCount, "line")}${suffix}`),
+    );
   }
 
-  const output = textContent(result);
-  const suffix = details?.truncation?.truncated ? " · truncated" : "";
-  const summary = treeLine(
-    theme,
-    "Read",
-    `${plural(countLines(output), "line")}${suffix}`,
-  );
-  const expanded = toolExecutionExpandedById.get(context.toolCallId) === true;
+  const summary = treeLine(theme, "Read", `${plural(lineCount, "line")}${suffix}`);
+  const expanded = options.expanded || toolExecutionExpandedById.get(context.toolCallId) === true;
   return setText(
     context.lastComponent,
     `${summary}${previewBlock(output, theme, expanded, EXPANDED_PREVIEW_LINES, 120, READ_PREVIEW_LINES)}`,
@@ -3993,13 +4187,23 @@ function renderGrepResult(
   if (context.isError) {
     return setText(
       context.lastComponent,
-      errorLine(theme, firstTextLine(result)),
+      errorResultBlock(result, theme, firstTextLine(result), options.expanded),
     );
   }
 
   const output = textContent(result);
   const details = result.details;
+  const outputLineCount = lineCountFromOutput(output, ["No matches found"]);
+  const matchCount = detailNumber(details, "matchCount");
+  const contextLines = argNumber(context.args, "context");
   const extra = [
+    matchCount !== undefined ? plural(matchCount, "match", "matches") : undefined,
+    matchCount !== undefined && outputLineCount !== matchCount
+      ? plural(outputLineCount, "output line")
+      : matchCount === undefined
+        ? plural(outputLineCount, "output line")
+        : undefined,
+    contextLines !== undefined ? `context ${contextLines}` : undefined,
     details?.matchLimitReached
       ? `limit ${details.matchLimitReached}`
       : undefined,
@@ -4008,13 +4212,7 @@ function renderGrepResult(
   ]
     .filter(Boolean)
     .join(" · ");
-  const summary = treeLine(
-    theme,
-    "Grep",
-    `${plural(lineCountFromOutput(output, ["No matches found"]), "line")}${
-      extra ? ` · ${extra}` : ""
-    }`,
-  );
+  const summary = treeLine(theme, "Grep", extra);
   return setText(
     context.lastComponent,
     `${summary}${grepPreviewBlock(
@@ -4121,13 +4319,18 @@ function renderBashResult(
 
   const output = textContent(result);
   const lineCount = output.trim() === "(no output)" ? 0 : countLines(output);
+  const exitCode = detailNumber(result.details, "exitCode");
   const status = context.isError
     ? theme.fg("error", "Failed")
     : label(theme, "Done");
-  const firstLine = context.isError ? ` · ${firstTextLine(result)}` : "";
+  const details = context.isError
+    ? [exitCode !== undefined ? `exit ${exitCode}` : undefined, plural(lineCount, "line")]
+        .filter(Boolean)
+        .join(" · ")
+    : plural(lineCount, "line");
   const summary = `${muted(theme, `${RESULT_INDENT}└ `)}${status}${muted(
     theme,
-    ` · ${plural(lineCount, "line")}${firstLine}`,
+    ` · ${details}`,
   )}`;
   return setText(
     context.lastComponent,
@@ -4418,17 +4621,12 @@ function renderWriteResult(
   const summary = treeLine(
     theme,
     `Wrote ${plural(countLines(content), "line")}`,
-    `to ${path} · diff unavailable`,
+    `to ${path} · preview`,
   );
 
-  return setDiffResult(
+  return setText(
     context.lastComponent,
-    summary,
-    "",
-    theme,
-    options.expanded,
-    COLLAPSED_WRITE_DIFF_LINES,
-    "diff unavailable because previous content was not captured",
+    `${summary}${previewBlock(content, theme, options.expanded, EXPANDED_PREVIEW_LINES, 120, COLLAPSED_WRITE_DIFF_LINES)}`,
   );
 }
 
@@ -4757,24 +4955,70 @@ const SUBAGENT_CONTROL_NOTICE_TYPES = [
   "subagent-control-notice",
 ];
 
+function subagentControlIntercomVisibleText(
+  sender: string,
+  rawText: string,
+): string | undefined {
+  if (sender !== "subagent-control") return undefined;
+  const duplicateStart = rawText.search(
+    /^Subagent (needs attention|failed|active but long-running):/m,
+  );
+  if (duplicateStart < 0) return undefined;
+  const duplicateTail = rawText.slice(duplicateStart);
+  const nextParagraphIndex = duplicateTail.indexOf("\n\n");
+  const duplicateEnd = nextParagraphIndex < 0
+    ? rawText.length
+    : duplicateStart + nextParagraphIndex;
+  const duplicateBlock = rawText.slice(duplicateStart, duplicateEnd);
+  if (!/^Run:/m.test(duplicateBlock)) return undefined;
+
+  const visibleLines = contentLines(
+    `${rawText.slice(0, duplicateStart)}\n${rawText.slice(duplicateEnd)}`,
+  )
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(
+      (line) =>
+        !/^subagent (needs attention|failed|active but long-running)\b/i.test(line) &&
+        !/\bin run [0-9a-f-]+\.?$/i.test(line),
+    );
+  const visibleText = visibleLines.join("\n");
+  return visibleText.trim().length > 0 ? visibleText : "";
+}
+
+function emptyComponent(): Component {
+  return {
+    invalidate() {},
+    render(): string[] {
+      return [];
+    },
+  };
+}
+
 function compactSubagentResultMessage(text: string): string | undefined {
   if (!/^Run:/m.test(text) || !/^Status:/m.test(text)) return undefined;
   const run = text.match(/^Run:\s*(.+)$/m)?.[1]?.trim();
   const status = text.match(/^Status:\s*(.+)$/m)?.[1]?.trim();
   const route = text.match(/^Route:\s*(.+)$/m)?.[1]?.trim();
   const children = text.match(/^Children:\s*(.+)$/m)?.[1]?.trim();
-  const child = text.match(/^1\.\s+(.+)$/m)?.[1]?.trim();
-  const summary = text
-    .match(/^Summary:\s*\n([\s\S]*?)(?:\n\n|$)/m)?.[1]
-    ?.trim();
+  const childMatches = [
+    ...text.matchAll(
+      /^(\d+\.\s+.+?)\nSummary:\s*\n([\s\S]*?)(?=\n\n\d+\.\s+|\n\n?$)/gm,
+    ),
+  ];
+  const childLines = childMatches.slice(0, 4).map((match) => {
+    const child = compactOneLine(match[1] ?? "", 100);
+    const summary = compactOneLine((match[2] ?? "").split("\n", 1)[0] ?? "", 100);
+    return summary ? `${child} · ${summary}` : child;
+  });
+  if (childMatches.length > childLines.length) {
+    childLines.push(`… ${plural(childMatches.length - childLines.length, "more child", "more children")}`);
+  }
   return [
     `subagent result${status ? ` · ${status}` : ""}${children ? ` · ${children}` : ""}`,
     run ? `run: ${run}` : undefined,
     route ? `route: ${route}` : undefined,
-    child,
-    summary
-      ? `summary: ${compactOneLine(summary.split("\n", 1)[0] ?? "", 100)}`
-      : undefined,
+    ...childLines,
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
@@ -4788,22 +5032,23 @@ function renderIntercomMessage(
   const details = message.details as IntercomMessageDetails | undefined;
   const from = details?.from;
   const sender = from?.name || from?.id?.slice(0, 8) || "intercom";
-  const cwd = from?.cwd ?? "";
   const rawText =
     details?.bodyText ??
     details?.message?.content?.text ??
     (typeof message.content === "string" ? message.content : "");
-  const body =
-    sender === "subagent-result"
+  const visibleControlText = subagentControlIntercomVisibleText(sender, rawText);
+  if (visibleControlText === "") return emptyComponent();
+  const body = visibleControlText ??
+    (sender === "subagent-result"
       ? (compactSubagentResultMessage(rawText) ?? rawText)
-      : rawText;
+      : rawText);
 
   return {
     invalidate() {},
     render(width: number): string[] {
       if (width < 3) return [truncateToWidth(`From ${sender}`, width)];
       const bodyWidth = Math.max(1, width - 2);
-      const header = ` 📨 From: ${sender}${cwd ? ` (${cwd})` : ""} `;
+      const header = ` 📨 From: ${sender} `;
       const headerText = truncateToWidth(header, bodyWidth, "");
       const headerPadding = Math.max(0, bodyWidth - visibleWidth(headerText));
       const lines = [
@@ -4831,20 +5076,101 @@ function renderIntercomMessage(
   };
 }
 
-function subagentControlNoticeTitle(details: unknown): string {
-  const event = isRecord(details) && isRecord(details.event) ? details.event : undefined;
-  if (!event) return "Subagent notice";
-  const type = typeof event.type === "string" ? event.type : "notice";
-  const agent = typeof event.agent === "string" ? event.agent : undefined;
-  return `Subagent ${type.replaceAll("_", " ")}${agent ? `: ${agent}` : ""}`;
+function subagentControlNoticeTitle(_details: unknown): string {
+  return "Subagent monitor";
+}
+
+function recordString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
+
+function recordNumber(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function shortRunId(runId: string): string {
+  return runId.length > 8 ? `${runId.slice(0, 8)}…` : runId;
+}
+
+function formatControlDuration(ms: number): string {
+  const seconds = Math.max(1, Math.floor(ms / 1000));
+  return seconds < 300 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`;
+}
+
+function subagentControlEvent(details: unknown): Record<string, unknown> | undefined {
+  return isRecord(details) && isRecord(details.event) ? details.event : undefined;
+}
+
+function subagentControlActivityLine(event: Record<string, unknown>): string | undefined {
+  const reason = recordString(event, "reason");
+  const type = recordString(event, "type");
+  const message = recordString(event, "message");
+  const elapsedMs = recordNumber(event, "elapsedMs");
+  if (reason === "completion_guard") return "Result: finished without expected edits";
+  if (reason === "tool_failures") return "Activity: repeated edit failures";
+  if (type === "active_long_running") return "Activity: active but long-running";
+  if (reason === "idle") {
+    const observed = elapsedMs !== undefined
+      ? formatControlDuration(elapsedMs)
+      : message?.match(/no observed activity for\s+([^)]+)/i)?.[1]?.trim();
+    return observed ? `Activity: no observed activity for ${observed}` : "Activity: no observed activity";
+  }
+  return message ? `Activity: ${compactOneLine(message, 110)}` : undefined;
+}
+
+function subagentControlEventBody(event: Record<string, unknown>): string {
+  const agent = recordString(event, "agent") ?? "unknown";
+  const index = recordNumber(event, "index");
+  const currentTool = recordString(event, "currentTool");
+  const currentPath = recordString(event, "currentPath");
+  const recentFailure = recordString(event, "recentFailureSummary");
+  const runId = recordString(event, "runId");
+  return [
+    `Agent: ${agent}${index !== undefined ? ` · step ${index + 1}` : ""}`,
+    subagentControlActivityLine(event),
+    currentTool
+      ? `Last tool: ${currentTool}${currentPath ? ` · ${compactOneLine(currentPath, 90)}` : ""}`
+      : undefined,
+    recentFailure ? `Recent failure: ${compactOneLine(recentFailure, 110)}` : undefined,
+    runId ? `Run: ${shortRunId(runId)}` : undefined,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+}
+
+function sanitizedSubagentControlNoticeBody(raw: string, details: unknown): string {
+  const lines = contentLines(raw)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(
+      (line) =>
+        !/^(Hint|Nudge|Status|Interrupt|Actions|Next|Run intercom target):/i.test(line) &&
+        !/^No automatic action taken\.?$/i.test(line),
+    )
+    .slice(0, 4);
+  const runId = isRecord(details) && typeof details.runId === "string"
+    ? details.runId
+    : undefined;
+  if (runId && !lines.some((line) => line.startsWith("Run:"))) {
+    lines.push(`Run: ${shortRunId(runId)}`);
+  }
+  return lines.join("\n");
 }
 
 function subagentControlNoticeBody(message: SubagentControlNoticeMessage): string {
   const details = message.details;
-  if (isRecord(details) && typeof details.noticeText === "string") {
-    return details.noticeText;
-  }
-  return typeof message.content === "string" ? message.content : "";
+  const event = subagentControlEvent(details);
+  if (event) return subagentControlEventBody(event);
+  const raw = isRecord(details) && typeof details.noticeText === "string"
+    ? details.noticeText
+    : typeof message.content === "string"
+      ? message.content
+      : "";
+  return sanitizedSubagentControlNoticeBody(raw, details);
 }
 
 function subagentControlNoticeRunId(
