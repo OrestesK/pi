@@ -49,6 +49,11 @@
         "set -e; set -a; source \"${PI_CONFIG_DIR:-$HOME/.config/pi}/mcp-oauth/slack/env.sh\"; set +a; exec \"${PI_SLACK_MCP_SERVER_BIN:-$HOME/.local/bin/slack-mcp-server-patched}\" --transport stdio"
       ],
       "lifecycle": "lazy"
+    },
+    "retool": {
+      "url": "https://valsai.retool.com/mcp",
+      "lifecycle": "lazy",
+      "directTools": true
     }
   }
 }
