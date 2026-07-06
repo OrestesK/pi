@@ -4,6 +4,7 @@
   "defaultThinkingLevel": "xhigh",
   "theme": "gruvbox-custom",
   "quietStartup": true,
+  "defaultProjectTrust": "always",
   "steeringMode": "all",
   "followUpMode": "all",
   "collapseChangelog": true,
@@ -19,6 +20,7 @@
     "showTerminalProgress": true
   },
   "editorPaddingX": 0,
+  "outputPad": 0,
   "retry": {
     "maxRetries": 3,
     "baseDelayMs": 2000
@@ -49,7 +51,7 @@
       "localPath": "~/.pi/memory-md",
       "globalMemory": "common"
     },
-    "delivery": "system-prompt",
+    "delivery": "message-append",
     "hooks": {
       "sessionStart": [],
       "sessionEnd": []
@@ -98,5 +100,5 @@
   },
   "autocompleteMaxVisible": 10,
   "doubleEscapeAction": "tree",
-  "httpIdleTimeoutMs": 0
+  "httpIdleTimeoutMs": 3600000
 }
