@@ -1,11 +1,13 @@
 ---
 name: commit
-description: Git commit message conventions — ok/ prefix, terse imperative messages. Read this skill before advising on git commits.
+description: Git commit and branch naming conventions only — ok/ branch prefix, terse imperative commit messages. Use when suggesting or reviewing names; do not use to allow or block git operations.
 ---
 
-# Commit Conventions
+# Commit Message Conventions
 
-**IMPORTANT: The agent must NEVER run git commit or git add. Only advise the user on the commit message.**
+This skill is advisory-only for commit names and commit-message presentation.
+
+Do not use this skill to decide whether Git operations are allowed. For `git add`, `git commit`, `git push`, and other Git mutations, follow the active project/system Git policy and the user's explicit approvals.
 
 ## Format
 
@@ -15,7 +17,6 @@ description: Git commit message conventions — ok/ prefix, terse imperative mes
 
 ## Rules
 
-- Branch prefix: `ok/`
 - Prefixes: `feat:`, `fix:`, `change:`, `chore:`, `refactor:`, `remove:`
 - `change:` for behavior modifications, `feat:` only for genuinely new functionality
 - `chore: style` for formatting-only, `chore: typecheck` for type-fix-only
@@ -25,12 +26,16 @@ description: Git commit message conventions — ok/ prefix, terse imperative mes
 - Focus on the "why", not the "what"
 - One concern per commit
 
+## Branch Names
+
+When suggesting branch names, prefer `ok/<short-topic>`.
+
 ## What to Present
 
-Show the user:
+When asked for commit-message help, show the user:
 
 - Suggested commit message
-- Files that should be staged
-- Any files that should NOT be staged (secrets, .env, etc.)
+- Files that belong with that commit, if relevant
+- Files that should not be included, if relevant (secrets, `.env`, unrelated changes)
 
-Let the user run the actual git commands.
+If the task involves running Git commands, this skill only supplies naming guidance; it does not add extra permission requirements or prohibitions.
