@@ -1,5 +1,5 @@
 // @ts-expect-error Pi runtime resolves SDK imports outside this config repo.
-import { copyToClipboard } from "@mariozechner/pi-coding-agent";
+import { copyToClipboard } from "@earendil-works/pi-coding-agent";
 
 interface MessageContent {
 	type: string;

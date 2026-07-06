@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { visibleWidth } from "@mariozechner/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 
 import { loadTs } from "../../../packages/pi-subagents/test/support/load-ts.mjs";
 
@@ -652,7 +652,15 @@ test("local built-in tool call/result renderers cover temp-safe branches", () =>
   assert.match(ui.formatBashCall({ command: "printf ok" }, theme), /printf ok/);
   assert.equal(
     ui.formatBashCall({ command: "printf one\nprintf two" }, theme),
-    "● Bash(2-line script · starts: printf one)",
+    "● Bash(2-line script · printf one · printf two)",
+  );
+  assert.equal(
+    ui.formatBashCall({ command: "printf one\nprintf two\nprintf three\nprintf four\nprintf five" }, theme),
+    "● Bash(5-line script · printf one · printf two · … · printf four · printf five)",
+  );
+  assert.equal(
+    ui.formatBashCall({ command: "printf one\nprintf two\nprintf three\nprintf four\nprintf five" }, theme, true),
+    "◦ Bash(5-line script · printf one · printf two · … · printf four · printf five)",
   );
   assert.match(ui.formatEditCall({ path: "/tmp/file.txt" }, theme), /Update/);
   assert.match(ui.formatWriteCall({ path: "/tmp/file.txt", content: "a\nb" }, theme), /Write/);

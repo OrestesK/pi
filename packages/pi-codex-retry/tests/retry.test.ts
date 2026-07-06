@@ -9,7 +9,7 @@ import {
 	type Model,
 	type SimpleStreamOptions,
 	type StreamOptions,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 
 import {
 	createCodexRetrySimpleStream,

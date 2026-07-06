@@ -9,12 +9,11 @@ import {
 	type StreamFunction,
 	type StreamOptions,
 	type Transport,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import {
-	closeOpenAICodexWebSocketSessions,
 	streamOpenAICodexResponses,
 	streamSimpleOpenAICodexResponses,
-} from "@mariozechner/pi-ai/openai-codex-responses";
+} from "@earendil-works/pi-ai/compat";
 
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_BASE_DELAY_MS = 1_000;
@@ -51,6 +50,12 @@ export interface CodexRetryOptions {
 	retryTransport?: Transport;
 	streamCodex?: CodexStream;
 	closeWebSocketSessions?: (sessionId?: string) => void;
+}
+
+function closeOpenAICodexWebSocketSessions(sessionId?: string): void {
+	void import("@earendil-works/pi-ai/api/openai-codex-responses")
+		.then((mod) => mod.closeOpenAICodexWebSocketSessions(sessionId))
+		.catch(() => undefined);
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {

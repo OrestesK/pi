@@ -8,6 +8,7 @@ import { STRUCTURED_OUTPUT_CAPTURE_ENV, STRUCTURED_OUTPUT_SCHEMA_ENV, STRUCTURED
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
 const TEAM_TOOL_NAMES = ["team_send_message", "team_read_messages", "team_ack_message"];
 const REVIEWER_TEAM_TOOL_NAMES = ["team_decide"];
+const SUPERVISOR_TOOL_NAMES = ["ack_supervisor_message"];
 const TASK_ARG_LIMIT = 8000;
 const PROMPT_RUNTIME_EXTENSION_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "subagent-prompt-runtime.ts");
 export const SUBAGENT_CHILD_ENV = "PI_SUBAGENT_CHILD";
@@ -18,6 +19,9 @@ export const SUBAGENT_CHILD_INDEX_ENV = "PI_SUBAGENT_CHILD_INDEX";
 export const SUBAGENT_TEAM_RUN_DIR_ENV = "PI_SUBAGENT_TEAM_RUN_DIR";
 export const SUBAGENT_TEAM_AGENT_NAME_ENV = "PI_SUBAGENT_TEAM_AGENT_NAME";
 export const SUBAGENT_TEAM_ROLE_ENV = "PI_SUBAGENT_TEAM_ROLE";
+export const SUBAGENT_SUPERVISOR_RUN_DIR_ENV = "PI_SUBAGENT_SUPERVISOR_RUN_DIR";
+export const SUBAGENT_SUPERVISOR_AGENT_ENV = "PI_SUBAGENT_SUPERVISOR_AGENT";
+export const SUBAGENT_SUPERVISOR_INDEX_ENV = "PI_SUBAGENT_SUPERVISOR_INDEX";
 
 interface BuildPiArgsInput {
 	baseArgs: string[];
@@ -44,6 +48,11 @@ interface BuildPiArgsInput {
 		runDir: string;
 		agentName: string;
 		role: "worker" | "reviewer";
+	};
+	supervisor?: {
+		runDir: string;
+		agentName: string;
+		index: number;
 	};
 	structuredOutput?: {
 		schema: JsonSchemaObject;
@@ -93,6 +102,7 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 				...(input.structuredOutput ? [STRUCTURED_OUTPUT_TOOL_NAME] : []),
 				...(input.team ? TEAM_TOOL_NAMES : []),
 				...(input.team?.role === "reviewer" ? REVIEWER_TEAM_TOOL_NAMES : []),
+				...(input.supervisor ? SUPERVISOR_TOOL_NAMES : []),
 			]
 		: input.tools;
 	if (effectiveTools?.length) {
@@ -168,6 +178,11 @@ export function buildPiArgs(input: BuildPiArgsInput): BuildPiArgsResult {
 		env[SUBAGENT_TEAM_RUN_DIR_ENV] = input.team.runDir;
 		env[SUBAGENT_TEAM_AGENT_NAME_ENV] = input.team.agentName;
 		env[SUBAGENT_TEAM_ROLE_ENV] = input.team.role;
+	}
+	if (input.supervisor) {
+		env[SUBAGENT_SUPERVISOR_RUN_DIR_ENV] = input.supervisor.runDir;
+		env[SUBAGENT_SUPERVISOR_AGENT_ENV] = input.supervisor.agentName;
+		env[SUBAGENT_SUPERVISOR_INDEX_ENV] = String(input.supervisor.index);
 	}
 	if (input.mcpDirectTools?.length) {
 		env.MCP_DIRECT_TOOLS = input.mcpDirectTools.join(",");

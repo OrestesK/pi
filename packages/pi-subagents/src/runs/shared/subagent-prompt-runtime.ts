@@ -1,9 +1,16 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { recordTeamDecision } from "../../shared/team-decisions.ts";
 import { ackTeamMessage, appendTeamMessage, popUnreadTeamMessages } from "../../shared/team-mailbox.ts";
+import {
+	ackSupervisorMessage,
+	formatSupervisorMessagesForContext,
+	listPendingSupervisorMessages,
+	markSupervisorMessagesPresented,
+} from "../../shared/supervisor-inbox.ts";
 import type { JsonSchemaObject } from "../../shared/types.ts";
+import { isMutatingTool } from "./long-running-guard.ts";
 import { STRUCTURED_OUTPUT_CAPTURE_ENV, STRUCTURED_OUTPUT_SCHEMA_ENV, STRUCTURED_OUTPUT_TOOL_NAME, validateStructuredOutputValue } from "./structured-output.ts";
 
 const SUBAGENT_INHERIT_PROJECT_CONTEXT_ENV = "PI_SUBAGENT_INHERIT_PROJECT_CONTEXT";
@@ -12,6 +19,10 @@ export const SUBAGENT_INTERCOM_SESSION_NAME_ENV = "PI_SUBAGENT_INTERCOM_SESSION_
 const SUBAGENT_TEAM_RUN_DIR_ENV = "PI_SUBAGENT_TEAM_RUN_DIR";
 const SUBAGENT_TEAM_AGENT_NAME_ENV = "PI_SUBAGENT_TEAM_AGENT_NAME";
 const SUBAGENT_TEAM_ROLE_ENV = "PI_SUBAGENT_TEAM_ROLE";
+const SUBAGENT_SUPERVISOR_RUN_DIR_ENV = "PI_SUBAGENT_SUPERVISOR_RUN_DIR";
+const SUBAGENT_SUPERVISOR_AGENT_ENV = "PI_SUBAGENT_SUPERVISOR_AGENT";
+const SUBAGENT_SUPERVISOR_INDEX_ENV = "PI_SUBAGENT_SUPERVISOR_INDEX";
+const SUPERVISOR_ACK_TOOL_NAME = "ack_supervisor_message";
 
 export const CHILD_SUBAGENT_BOUNDARY_INSTRUCTIONS = [
 	"You are a child subagent, not the parent orchestrator.",
@@ -150,6 +161,70 @@ export function stripParentOnlySubagentMessages(messages: unknown[]): unknown[] 
 		filtered.push(stripped);
 	}
 	return changed ? filtered : messages;
+}
+
+function normalizeSupervisorIndex(value: string | undefined): number | undefined {
+	if (value === undefined) return undefined;
+	const parsed = Number(value);
+	if (!Number.isInteger(parsed) || parsed < 0) return undefined;
+	return parsed;
+}
+
+function supervisorRuntimeState(): { runDir: string; agentName: string; index: number } | undefined {
+	const runDir = process.env[SUBAGENT_SUPERVISOR_RUN_DIR_ENV]?.trim();
+	const agentName = process.env[SUBAGENT_SUPERVISOR_AGENT_ENV]?.trim();
+	const index = normalizeSupervisorIndex(process.env[SUBAGENT_SUPERVISOR_INDEX_ENV]);
+	if (!runDir || !agentName || index === undefined) return undefined;
+	return { runDir, agentName, index };
+}
+
+function isSupervisorToolExempt(toolName: string | undefined): boolean {
+	return toolName === SUPERVISOR_ACK_TOOL_NAME || toolName === "contact_supervisor" || toolName === "intercom";
+}
+
+function registerSupervisorTools(pi: ExtensionAPI): void {
+	const supervisor = supervisorRuntimeState();
+	if (!supervisor) return;
+	const registerTool = pi.registerTool as unknown as (tool: {
+		name: string;
+		label: string;
+		description: string;
+		parameters: unknown;
+		execute: (_id: string, params: Record<string, unknown>) => Promise<unknown>;
+	}) => void;
+	registerTool({
+		name: SUPERVISOR_ACK_TOOL_NAME,
+		label: "Acknowledge Supervisor Message",
+		description: "Acknowledge a supervisor message that was injected into this child context. Use accepted when you will follow it, rejected when it conflicts with your role or safety contract, and blocked when you need supervisor clarification.",
+		parameters: {
+			type: "object",
+			properties: {
+				messageId: { type: "string" },
+				action: { type: "string", enum: ["accepted", "rejected", "blocked"] },
+				reason: { type: "string" },
+			},
+			required: ["messageId", "action", "reason"],
+			additionalProperties: false,
+		},
+		async execute(_id, params) {
+			if (!isRecord(params)) throw new Error("ack_supervisor_message params must be an object");
+			const messageId = requireString(params.messageId, "messageId");
+			const action = params.action;
+			if (action !== "accepted" && action !== "rejected" && action !== "blocked") {
+				throw new Error(`Invalid supervisor acknowledgement action: ${String(action)}`);
+			}
+			const reason = requireString(params.reason, "reason");
+			const message = await ackSupervisorMessage(supervisor.runDir, supervisor.index, messageId, {
+				by: supervisor.agentName,
+				action,
+				reason,
+			});
+			return {
+				content: [{ type: "text", text: `Supervisor message acknowledged: ${message.ackAction} (${message.id}).` }],
+				details: { messageId: message.id, action: message.ackAction },
+			};
+		},
+	});
 }
 
 function registerLiveSteeringTeamTools(pi: ExtensionAPI): void {
@@ -296,6 +371,7 @@ function registerLiveSteeringTeamTools(pi: ExtensionAPI): void {
 }
 
 export default function registerSubagentPromptRuntime(pi: ExtensionAPI): void {
+	registerSupervisorTools(pi);
 	registerLiveSteeringTeamTools(pi);
 	const structuredOutputPath = process.env[STRUCTURED_OUTPUT_CAPTURE_ENV];
 	const structuredSchemaPath = process.env[STRUCTURED_OUTPUT_SCHEMA_ENV];
@@ -336,11 +412,46 @@ export default function registerSubagentPromptRuntime(pi: ExtensionAPI): void {
 	}
 
 	const onRuntimeEvent = pi.on as unknown as (event: string, handler: (event: unknown) => unknown) => void;
-	onRuntimeEvent("context", (event: unknown) => {
+	onRuntimeEvent("context", async (event: unknown) => {
 		const typedEvent = event as { messages: unknown[] };
-		const messages = stripParentOnlySubagentMessages(typedEvent.messages);
-		if (messages === typedEvent.messages) return undefined;
-		return { messages };
+		const strippedMessages = stripParentOnlySubagentMessages(typedEvent.messages);
+		const supervisor = supervisorRuntimeState();
+		if (!supervisor) {
+			if (strippedMessages === typedEvent.messages) return undefined;
+			return { messages: strippedMessages };
+		}
+		const pending = await listPendingSupervisorMessages(supervisor.runDir, supervisor.index);
+		if (pending.length === 0) {
+			if (strippedMessages === typedEvent.messages) return undefined;
+			return { messages: strippedMessages };
+		}
+		await markSupervisorMessagesPresented(supervisor.runDir, supervisor.index, pending.map((message) => message.id));
+		return {
+			messages: [
+				...strippedMessages,
+				{
+					role: "user",
+					customType: "subagent-supervisor-message",
+					content: [{ type: "text", text: formatSupervisorMessagesForContext(pending) }],
+				},
+			],
+		};
+	});
+
+	onRuntimeEvent("tool_call", async (event: unknown) => {
+		const supervisor = supervisorRuntimeState();
+		if (!supervisor) return undefined;
+		const typedEvent = event as { toolName?: string; input?: Record<string, unknown> };
+		if (isSupervisorToolExempt(typedEvent.toolName)) return undefined;
+		const pending = await listPendingSupervisorMessages(supervisor.runDir, supervisor.index);
+		if (pending.length === 0) return undefined;
+		if (typedEvent.toolName === STRUCTURED_OUTPUT_TOOL_NAME || isMutatingTool(typedEvent.toolName, typedEvent.input)) {
+			return {
+				block: true,
+				reason: `Blocked until pending supervisor message${pending.length === 1 ? "" : "s"} are acknowledged with ${SUPERVISOR_ACK_TOOL_NAME}.`,
+			};
+		}
+		return undefined;
 	});
 
 	onRuntimeEvent("before_agent_start", async (event: unknown) => {

@@ -5,6 +5,9 @@ import { loadTs } from "../support/load-ts.mjs";
 
 const {
 	buildPiArgs,
+	SUBAGENT_SUPERVISOR_AGENT_ENV,
+	SUBAGENT_SUPERVISOR_INDEX_ENV,
+	SUBAGENT_SUPERVISOR_RUN_DIR_ENV,
 	SUBAGENT_TEAM_AGENT_NAME_ENV,
 	SUBAGENT_TEAM_ROLE_ENV,
 	SUBAGENT_TEAM_RUN_DIR_ENV,
@@ -32,6 +35,29 @@ test("buildPiArgs includes structured_output in explicit tool allowlist", () => 
 	const toolsIndex = args.indexOf("--tools");
 	assert.notEqual(toolsIndex, -1);
 	assert.equal(args[toolsIndex + 1], "contact_supervisor,structured_output");
+});
+
+test("buildPiArgs includes supervisor ack tool in explicit tool allowlist", () => {
+	const { args, env } = buildPiArgs({
+		baseArgs: ["--mode", "json", "-p"],
+		task: "monitor run",
+		sessionEnabled: false,
+		inheritProjectContext: true,
+		inheritSkills: true,
+		tools: ["read"],
+		supervisor: {
+			runDir: "/tmp/supervisor-run",
+			agentName: "run-monitor",
+			index: 0,
+		},
+	});
+
+	const toolsIndex = args.indexOf("--tools");
+	assert.notEqual(toolsIndex, -1);
+	assert.equal(args[toolsIndex + 1], "read,ack_supervisor_message");
+	assert.equal(env[SUBAGENT_SUPERVISOR_RUN_DIR_ENV], "/tmp/supervisor-run");
+	assert.equal(env[SUBAGENT_SUPERVISOR_AGENT_ENV], "run-monitor");
+	assert.equal(env[SUBAGENT_SUPERVISOR_INDEX_ENV], "0");
 });
 
 test("buildPiArgs includes live steering team tools in explicit tool allowlist", () => {

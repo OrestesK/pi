@@ -15,12 +15,12 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentToolResult } from "@mariozechner/pi-agent-core";
+import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
 	ToolDefinition,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import {
 	Box,
 	Container,
@@ -30,7 +30,7 @@ import {
 	visibleWidth,
 	wrapTextWithAnsi,
 	type Component,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { discoverAgents } from "../agents/agents.ts";
 import { cleanupOldAsyncRunDirs } from "../shared/async-cleanup.ts";
 import {
@@ -64,7 +64,6 @@ import {
 	restoreSlashFinalSnapshots,
 	type SlashMessageDetails,
 } from "../slash/slash-live-state.ts";
-import { inspectSubagentStatus } from "../runs/background/run-status.ts";
 import registerSubagentNotify, {
 	type SubagentNotifyDetails,
 } from "../runs/background/notify.ts";
@@ -280,7 +279,7 @@ class SubagentControlNoticeComponent implements Component {
 	invalidate(): void {}
 
 	render(width: number): string[] {
-		const eventLabel = this.details.event.type.replaceAll("_", " ");
+		const eventLabel = this.details.event.type.split("_").join(" ");
 		if (width < 3) return [truncateToWidth(`Subagent ${eventLabel}`, width)];
 		const bodyWidth = Math.max(1, width - 2);
 		const borderChar = "─";
@@ -385,9 +384,10 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		(message, options, theme) => {
 			const details = resolveSlashMessageDetails(message.details);
 			if (!details) return undefined;
-			return createSlashResultComponent(details, options, theme, () =>
-				state.lastUiContext?.ui.requestRender?.(),
-			);
+			return createSlashResultComponent(details, options, theme, () => {
+				const requestRender = (state.lastUiContext?.ui as { requestRender?: () => void } | undefined)?.requestRender;
+				requestRender?.();
+			});
 		},
 	);
 
@@ -524,7 +524,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		}, 0);
 	}
 
-	const tool: ToolDefinition<typeof SubagentParams, Details> = {
+	const tool: ToolDefinition<any, Details> = {
 		name: "subagent",
 		label: "Subagent",
 		description: `Delegate to subagents or manage agent definitions.
@@ -555,13 +555,14 @@ CONTROL:
 • { action: "status", id: "..." } - inspect an async/background run by id or prefix
 • { action: "interrupt", id?: "..." } - soft-interrupt the current child turn and leave the run paused
 • { action: "resume", id: "...", message: "...", index?: 0 } - follow up with a live async child or revive a completed async/foreground child from its session
+• { action: "message", id: "...", message: "...", index?: 0 } - queue a supervisor message for a live/running child; the child sees it at the next LLM boundary and must ack it
 
 DIAGNOSTICS:
 • { action: "doctor" } - read-only report for runtime paths, discovery, sessions, and intercom`,
 		parameters: SubagentParams,
 
 		execute(id, params, signal, onUpdate, ctx) {
-			return executeSubagentCollapsed(id, params, signal, onUpdate, ctx);
+			return executeSubagentCollapsed(id, params as SubagentParamsLike, signal ?? new AbortController().signal, onUpdate, ctx);
 		},
 
 		renderCall(args, theme) {

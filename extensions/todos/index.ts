@@ -40,9 +40,9 @@ import {
   type ExtensionContext,
   type Theme,
   // @ts-expect-error Pi runtime resolves SDK imports outside this config repo.
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 // @ts-expect-error Pi runtime resolves AI imports outside this config repo.
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 // @ts-expect-error Pi runtime resolves package imports outside this config repo.
 import { Type } from "@sinclair/typebox";
 // @ts-expect-error Pi runtime resolves Node built-ins outside this config repo.
@@ -71,7 +71,7 @@ import {
   truncateToWidth,
   visibleWidth,
   // @ts-expect-error Pi runtime resolves TUI imports outside this config repo.
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 declare const process: {
   env: Record<string, string | undefined>;

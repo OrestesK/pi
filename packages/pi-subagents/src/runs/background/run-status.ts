@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { AgentToolResult } from "@mariozechner/pi-agent-core";
+import type { AgentToolResult as CoreAgentToolResult } from "@earendil-works/pi-agent-core";
 import { formatAsyncRunList, formatAsyncRunOutputPath, formatAsyncRunProgressLabel, listAsyncRuns } from "./async-status.ts";
 import { formatActivityLabel } from "../../shared/status-format.ts";
 import { ASYNC_DIR, RESULTS_DIR, type AsyncStatus, type Details } from "../../shared/types.ts";
@@ -8,6 +8,9 @@ import { resolveSubagentIntercomTarget } from "../../intercom/intercom-bridge.ts
 import { resolveAsyncRunLocation } from "./async-resume.ts";
 import { flatToLogicalStepIndex, normalizeParallelGroups } from "./parallel-groups.ts";
 import { reconcileAsyncRun } from "./stale-run-reconciler.ts";
+import { listSupervisorMessages, summarizeSupervisorMessages } from "../../shared/supervisor-inbox.ts";
+
+type AgentToolResult<T> = CoreAgentToolResult<T> & { isError?: boolean };
 
 interface RunStatusParams {
 	action?: "status";
@@ -56,7 +59,7 @@ function stepLineLabel(status: AsyncStatus, index: number): string {
 	return `Step ${index + 1}`;
 }
 
-export function inspectSubagentStatus(params: RunStatusParams, deps: RunStatusDeps = {}): AgentToolResult<Details> {
+export async function inspectSubagentStatus(params: RunStatusParams, deps: RunStatusDeps = {}): Promise<AgentToolResult<Details>> {
 	const asyncDirRoot = deps.asyncDirRoot ?? ASYNC_DIR;
 	const resultsDir = deps.resultsDir ?? RESULTS_DIR;
 	if (!params.id && !params.runId && !params.dir) {
@@ -144,6 +147,8 @@ export function inspectSubagentStatus(params: RunStatusParams, deps: RunStatusDe
 				const stepActivityText = step.status === "running" ? formatActivityLabel(step.lastActivityAt, step.activityState) : undefined;
 				const errorText = step.error ? `, error: ${step.error}` : "";
 				lines.push(`${stepLineLabel(status, index)}: ${step.agent} ${step.status}${stepActivityText ? `, ${stepActivityText}` : ""}${errorText}`);
+				const supervisorSummary = summarizeSupervisorMessages(await listSupervisorMessages(asyncDir, index));
+				if (supervisorSummary) lines.push(`  Supervisor: ${supervisorSummary}`);
 				const stepOutputPath = path.join(asyncDir, `output-${index}.log`);
 				if (stepOutputPath !== outputPath && fs.existsSync(stepOutputPath)) lines.push(`  Output: ${stepOutputPath}`);
 				if (step.status === "running") {

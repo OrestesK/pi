@@ -167,6 +167,8 @@ Background runs keep working after control returns to you. Inspect active runs w
 
 They also show a compact async widget and send completion notifications. Parallel background runs show per-agent progress instead of fake chain steps. Chains with parallel groups keep their grouped shape in progress and results, so failed or paused agents stay visible next to completed ones.
 
+While a child is running, a parent can steer it with `subagent({ action: "message", id, index, message })`. The message is injected into the child context at the next LLM boundary, must be acknowledged with `ack_supervisor_message`, and appears in `status` while pending.
+
 You can also ask naturally:
 
 ```text
@@ -471,7 +473,7 @@ Important fields:
 | `skills`                | Injects specific skills directly, regardless of `inheritSkills`.                                                                                                           |
 | `output`                | Default single-agent output file.                                                                                                                                          |
 | `defaultReads`          | Files to read before running in chain/parallel behavior.                                                                                                                   |
-| `defaultProgress`       | Maintain `progress.md`.                                                                                                                                                    |
+| `defaultProgress`       | Enable progress reporting using the configured `progress.reportMode`.                                                                                                      |
 | `interactive`           | Parsed for compatibility but not enforced in v1.                                                                                                                           |
 | `maxSubagentDepth`      | Tightens the inherited depth guard for this agent’s child process if the `subagent` tool is exposed.                                                                       |
 
@@ -729,7 +731,7 @@ Agent definitions are not loaded into context by default. Management actions let
 | `workflow`        | string                        | -                        | Builtin workflow selector, currently `builtin.quality-gate`, `builtin.research-decision`, `builtin.generate-filter`, or `builtin.live-steering-team`. Requires `task`; mutually exclusive with explicit execution/management fields. `builtin.live-steering-team` runs one worker with two live reviewers that record active `team_decide` pulses (`nothing`, `steer`, or `discuss`) and can steer the worker through a run-scoped mailbox. |
 | `agent`           | string                        | -                        | Agent name for single mode, or target for management actions.                                                                                                                                                                                                                                                           |
 | `task`            | string                        | -                        | Task string for single mode or builtin workflow target.                                                                                                                                                                                                                                                                 |
-| `action`          | string                        | -                        | `list`, `get`, `create`, `update`, `delete`, `status`, `interrupt`, `resume`, or `doctor`.                                                                                                                                                                                                                              |
+| `action`          | string                        | -                        | `list`, `get`, `create`, `update`, `delete`, `status`, `interrupt`, `resume`, `message`, or `doctor`. `message` queues supervisor input for a live/running child; it is not a resume/revive operation.                                                                                                                    |
 | `chainName`       | string                        | -                        | Chain name for management actions.                                                                                                                                                                                                                                                                                      |
 | `config`          | object/string                 | -                        | Agent or chain config for create/update.                                                                                                                                                                                                                                                                                |
 | `output`          | `string \| false`             | agent default            | Override single-agent output file.                                                                                                                                                                                                                                                                                      |
@@ -771,8 +773,16 @@ subagent({
   index: 1,
   message: "follow-up for child 2",
 });
+subagent({
+  action: "message",
+  id: "<run-id>",
+  index: 0,
+  message: "watch this additional log path too",
+});
 subagent({ action: "doctor" });
 ```
+
+`message` queues live supervisor input for a running foreground or async child. It requires `id`, `runId`, or `dir`; it never targets the most recent run implicitly. Pass `index` for multi-child runs. The child receives pending supervisor messages automatically at the next LLM boundary, not by polling, and must call `ack_supervisor_message` with `accepted`, `rejected`, or `blocked`. While a supervisor message is pending, child mutating/finalization paths are blocked and `status` shows the pending supervisor count. Use `message` for steering a live child; use `resume` for follow-up/revival semantics.
 
 `resume` sends the follow-up directly when an async child is still reachable over intercom. After completion, it revives the child by starting a new async child from the stored child session file. Multi-child async runs and remembered foreground single, parallel, or chain runs can be revived by passing `index` to choose the child. Revive starts a new child process from the old session context; it does not restart the same OS process, and it requires the chosen child to have a persisted `.jsonl` session file.
 
@@ -847,6 +857,21 @@ Forces depth-0 single, parallel, and chain runs into background mode and bypasse
 
 Session directory precedence is: `params.sessionDir`, then `config.defaultSessionDir`, then a directory derived from the parent session. Sessions are always enabled.
 
+### `progress`
+
+```json
+{
+  "progress": {
+    "reportMode": "supervisor"
+  }
+}
+```
+
+`reportMode` controls what `progress: true` means:
+
+- `"file"` keeps file-backed progress. Files are written under the run-owned artifact/session directory, such as `{sessionRoot}/progress/progress.md` or `{chainDir}/progress/progress.md`; they are not written to the target `cwd` or repository root.
+- `"supervisor"` disables progress files. Children are instructed to send concise `contact_supervisor({ reason: "progress_update", message: "UPDATE: <summary>" })` updates instead, and `progress.md` default reads are suppressed.
+
 ### `maxSubagentDepth`
 
 ```json
@@ -904,7 +929,7 @@ Each chain run creates a user-scoped temp directory like:
 <tmpdir>/pi-subagents-<scope>/chain-runs/{runId}/
 ```
 
-It may contain files such as `context.md`, `plan.md`, `progress.md`, and `parallel-{stepIndex}/.../output.md`. Directories older than 24 hours are cleaned up on extension startup.
+It may contain files such as `context.md`, `plan.md`, `progress/progress.md` when file progress is enabled, and `parallel-{stepIndex}/.../output.md`. Directories older than 24 hours are cleaned up on extension startup.
 
 Debug artifacts live under `{sessionDir}/subagent-artifacts/` or a user-scoped temp artifact directory. Per task you may see:
 
@@ -927,9 +952,10 @@ Async runs write:
   events.jsonl
   output-<n>.log
   subagent-log-<id>.md
+  supervisor-messages/
 ```
 
-`status.json` powers the widget and `subagent({ action: "status" })` output, including liveness details such as last activity, current tool, turn counts, and token counts. `events.jsonl` contains wrapper/control events plus compact child-event observations annotated with run and step metadata; it intentionally does not persist child message snapshots, tool arguments/results, stdout/stderr text, or thinking signatures. `output-<n>.log` is a live human-readable tail. Fallback information is persisted so background runs are debuggable after completion. On extension startup, async run directories older than 24 hours are removed after they reach a terminal state (`complete` or `failed`) or no longer contain a readable status file; `queued`, `running`, and `paused` runs are retained.
+`status.json` powers the widget and `subagent({ action: "status" })` output, including liveness details such as last activity, current tool, turn counts, token counts, and pending supervisor-message counts. `events.jsonl` contains wrapper/control events plus compact child-event observations annotated with run and step metadata; it intentionally does not persist child message snapshots, tool arguments/results, stdout/stderr text, or thinking signatures. `output-<n>.log` is a live human-readable tail. `supervisor-messages/` stores run-scoped parent-to-child message and ack state. Fallback information is persisted so background runs are debuggable after completion. On extension startup, async run directories older than 24 hours are removed after they reach a terminal state (`complete` or `failed`) or no longer contain a readable status file; `queued`, `running`, and `paused` runs are retained.
 
 ## Live progress
 

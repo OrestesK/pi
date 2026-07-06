@@ -2,9 +2,9 @@ import type {
 	ExtensionAPI,
 	SessionEntry,
 	Theme,
-} from "@mariozechner/pi-coding-agent";
-import { keyHint } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import { keyHint } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
 import type { MemoryMdSettings } from "../types.js";
 import { toLocaleDateTime, toLocaleTime, toTimestamp } from "../utils.js";

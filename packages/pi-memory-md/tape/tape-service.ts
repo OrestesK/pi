@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import type { SessionEntry } from "@mariozechner/pi-coding-agent";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { nowIso, toTimestamp } from "../utils.js";
 import {
 	AnchorStore,

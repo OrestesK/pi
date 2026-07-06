@@ -33,7 +33,7 @@ For async subagents, prefer event-based progress over timer polling.
 
 Use this protocol for long-running async runs:
 
-- For long-running tmux/log/status runs that are not themselves subagent children, start a paired async `run-monitor` with the exact tmux target, log/status paths, expected phase/timeout, success/failure patterns, and optional runtime output/progress capture configured by the parent.
+- For long-running tmux/log/status runs that are not themselves subagent children, start a paired async `run-monitor` with a specific monitoring intent: exact target/evidence surfaces, the parent decision it supports, minimum useful facts to report, escalation triggers, terminal/stop authority for timeout or stuck states, reporting expectations such as a rough maximum silence window, and optional runtime output capture configured by the parent. The parent may provide exact patterns, thresholds, or cadence when it knows them, but should not prescribe a rigid polling algorithm or report schema. If those details are absent, the monitor should infer sensible inspection and interim-reporting behavior and state its inferred plan in the first status; it must not finalize `stuck` or `timed_out` from an inferred threshold without parent terminal authority. If the parent later needs the monitor to watch an additional explicit path/pattern/threshold/reporting expectation, send `subagent({ action: "message", id, index, message })`; the monitor may acknowledge and update its own monitoring parameters but must not mutate the monitored run.
 - Give each long-running child an explicit progress file path under `.scratch/` whenever phase checkpoints materially improve parent visibility or recovery.
 - Ask children to update progress after meaningful phases, not every few seconds.
 - Ask children to interrupt/notify the parent only when blocked, when scope changes, when a must-fix/high-risk finding appears, or when complete.
@@ -660,7 +660,27 @@ const run = subagent({
 // Continue local inspection, then later call status with the returned id.
 ```
 
-Inspect async runs with `subagent({ action: "status", id: "..." })` or `subagent({ action: "status" })` for active runs.
+Inspect async runs with `subagent({ action: "status", id: "..." })` or `subagent({ action: "status" })` for active runs. Status includes pending supervisor-message counts when a parent has sent live instructions that the child has not acknowledged.
+
+Use `message` to steer a live/running child without reviving it or requiring child polling:
+
+```typescript
+subagent({
+  action: "message",
+  id: "run-id",
+  index: 0,
+  message: "Also watch this additional log path.",
+});
+```
+
+Message behavior:
+
+- `message` requires `id`, `runId`, or `dir`; it never targets the most recent run implicitly.
+- Multi-child runs require `index` unless only one child exists.
+- The child receives pending supervisor messages automatically at the next LLM boundary.
+- The child must call `ack_supervisor_message` with `accepted`, `rejected`, or `blocked`.
+- Pending supervisor messages block child mutating/finalization paths until acknowledged.
+- Use `message` for live steering of running children such as `run-monitor`; use `resume` for follow-up/revival semantics.
 
 Use `resume` for follow-up work after a delegated run:
 
@@ -979,6 +999,12 @@ user explicitly requests forked context.
 
 Give subagents specific tasks rather than vague mandates.
 `Review auth.ts for null-check gaps` works better than `Review everything`.
+
+### Specify intent, not implementation
+
+When dispatching a child, include what to inspect or act on, why the parent needs it, minimum facts needed back, and any active constraints or authority boundaries.
+
+Do not require a rigid schema, cadence, or algorithm unless that is the task. If the child has a concrete target and purpose, it should inspect first and ask only when missing information changes what it is allowed to do or what it may conclude.
 
 ### Escalate decisions upward
 

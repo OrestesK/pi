@@ -23,7 +23,7 @@
     "maxRetries": 3,
     "baseDelayMs": 2000
   },
-  "lastChangelogVersion": "0.73.1",
+  "lastChangelogVersion": "0.80.3",
   "transport": "auto",
   "compaction": {
     "enabled": true,
@@ -77,6 +77,7 @@
       "source": "npm:pi-ask-user",
       "skills": []
     },
+    "packages/pi-tool-result-virtualizer",
     {
       "source": "packages/context-mode",
       "skills": [
@@ -96,5 +97,6 @@
     "disableBuiltins": false
   },
   "autocompleteMaxVisible": 10,
-  "doubleEscapeAction": "tree"
+  "doubleEscapeAction": "tree",
+  "httpIdleTimeoutMs": 0
 }

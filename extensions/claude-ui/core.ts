@@ -41,14 +41,14 @@ import {
   type ThemeColor,
   ToolExecutionComponent,
   UserMessageComponent,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import type {
   Component,
   EditorTheme,
   ImageDimensions,
   MarkdownTheme,
   TUI,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import {
   getImageDimensions,
   Image,
@@ -58,7 +58,7 @@ import {
   truncateToWidth,
   visibleWidth,
   wrapTextWithAnsi,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 type RenderFn = (width: number) => string[];
 type WorkingState = "inactive" | "working" | "streaming";
@@ -1571,6 +1571,7 @@ type SpawnHookContributor = {
 
 const BASH_SPAWN_HOOK_REQUEST_EVENT = "ad:bash:spawn-hook:request";
 const COLLAPSED_PREVIEW_LINES = 4;
+const BASH_SCRIPT_PREVIEW_EDGE_LINES = 2;
 const READ_PREVIEW_LINES = 6;
 const COLLAPSED_EDIT_DIFF_LINES = 80;
 const COLLAPSED_WRITE_DIFF_LINES = 40;
@@ -4101,11 +4102,22 @@ function formatLsCall(args: unknown, theme: Theme, pending = false): string {
   );
 }
 
+function compactBashScriptPreview(lines: string[]): string {
+  const previewLines = lines.length <= BASH_SCRIPT_PREVIEW_EDGE_LINES * 2
+    ? lines
+    : [
+        ...lines.slice(0, BASH_SCRIPT_PREVIEW_EDGE_LINES),
+        "…",
+        ...lines.slice(-BASH_SCRIPT_PREVIEW_EDGE_LINES),
+      ];
+  return previewLines.map((line) => compactOneLine(line, 50)).join(" · ");
+}
+
 function formatBashCall(args: unknown, theme: Theme, pending = false): string {
   const command = argString(args, "command", "");
   const lines = contentLines(command);
   const body = lines.length > 1
-    ? `${lines.length}-line script · starts: ${compactOneLine(lines[0] ?? "", 70)}`
+    ? `${lines.length}-line script · ${compactBashScriptPreview(lines)}`
     : compactOneLine(command, 100);
   return callLine(theme, "Bash", pathText(theme, body), pending);
 }

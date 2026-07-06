@@ -4,9 +4,9 @@
 
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Message } from "@mariozechner/pi-ai";
+import type { Message } from "@earendil-works/pi-ai";
 import type { FSWatcher } from "node:fs";
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 // ============================================================================
 // Basic Types
@@ -574,6 +574,8 @@ export interface SubagentState {
 		turnCount?: number;
 		tokens?: number;
 		toolCount?: number;
+		supervisorRunDir?: string;
+		supervisorChildren?: Array<{ agent: string; index: number }>;
 		interrupt?: () => boolean;
 	}>;
 	lastForegroundControlId: string | null;
@@ -635,7 +637,7 @@ export interface RunSyncOptions {
 	interruptSignal?: AbortSignal;
 	allowIntercomDetach?: boolean;
 	intercomEvents?: IntercomEventBus;
-	onUpdate?: (r: import("@mariozechner/pi-agent-core").AgentToolResult<Details>) => void;
+	onUpdate?: (r: import("@earendil-works/pi-agent-core").AgentToolResult<Details>) => void;
 	onControlEvent?: (event: ControlEvent) => void;
 	controlConfig?: ResolvedControlConfig;
 	intercomSessionName?: string;
@@ -644,6 +646,11 @@ export interface RunSyncOptions {
 		runDir: string;
 		agentName: string;
 		role: "worker" | "reviewer";
+	};
+	supervisor?: {
+		runDir: string;
+		agentName: string;
+		index: number;
 	};
 	maxOutput?: MaxOutputConfig;
 	artifactsDir?: string;
@@ -686,6 +693,12 @@ export interface IntercomBridgeConfig {
 	instructionFile?: string;
 }
 
+export type ProgressReportMode = "file" | "supervisor";
+
+export interface ProgressConfig {
+	reportMode?: ProgressReportMode;
+}
+
 interface TopLevelParallelConfig {
 	maxTasks?: number;
 	concurrency?: number;
@@ -698,6 +711,7 @@ export interface ExtensionConfig {
 	maxSubagentDepth?: number;
 	control?: ControlConfig;
 	parallel?: TopLevelParallelConfig;
+	progress?: ProgressConfig;
 	worktreeSetupHook?: string;
 	worktreeSetupHookTimeoutMs?: number;
 	intercomBridge?: IntercomBridgeConfig;
@@ -791,7 +805,7 @@ export const SLASH_SUBAGENT_CANCEL_EVENT = "subagent:slash:cancel";
 export const POLL_INTERVAL_MS = 250;
 export const MAX_WIDGET_JOBS = 4;
 export const DEFAULT_SUBAGENT_MAX_DEPTH = 2;
-export const SUBAGENT_ACTIONS = ["list", "get", "create", "update", "delete", "status", "interrupt", "resume", "doctor"] as const;
+export const SUBAGENT_ACTIONS = ["list", "get", "create", "update", "delete", "status", "interrupt", "resume", "message", "doctor"] as const;
 
 export const DEFAULT_FORK_PREAMBLE =
 	"You are a delegated subagent running from a fork of the parent session. " +

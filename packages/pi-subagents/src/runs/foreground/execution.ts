@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, unlinkSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Message } from "@mariozechner/pi-ai";
+import type { Message } from "@earendil-works/pi-ai";
 import type { AgentConfig } from "../../agents/agents.ts";
 import {
 	ensureArtifactsDir,
@@ -53,6 +53,7 @@ import { attachPostExitStdioGuard, trySignalChild } from "../../shared/post-exit
 import { applyThinkingSuffix, buildPiArgs, cleanupTempDir } from "../shared/pi-args.ts";
 import { createStructuredOutputRuntime, readStructuredOutput } from "../shared/structured-output.ts";
 import { captureSingleOutputSnapshot, formatSavedOutputReference, resolveSingleOutput, validateFileOnlyOutputMode, type SingleOutputSnapshot } from "../shared/single-output.ts";
+import { listPendingSupervisorMessages } from "../../shared/supervisor-inbox.ts";
 import {
 	buildModelCandidates,
 	formatModelAttemptNote,
@@ -199,6 +200,7 @@ async function runSingleAttempt(
 		childAgentName: agent.name,
 		childIndex: options.index ?? 0,
 		team: options.team,
+		supervisor: options.supervisor,
 		structuredOutput: options.structuredOutput,
 	});
 
@@ -736,6 +738,13 @@ async function runSingleAttempt(
 			result.error = structured.error;
 		} else {
 			result.structuredOutput = structured.value;
+		}
+	}
+	if (options.supervisor && result.exitCode === 0 && !result.error) {
+		const pendingSupervisorMessages = await listPendingSupervisorMessages(options.supervisor.runDir, options.supervisor.index);
+		if (pendingSupervisorMessages.length > 0) {
+			result.exitCode = 1;
+			result.error = `Subagent completed with pending supervisor message${pendingSupervisorMessages.length === 1 ? "" : "s"}: ${pendingSupervisorMessages.map((message) => message.id).join(", ")}.`;
 		}
 	}
 

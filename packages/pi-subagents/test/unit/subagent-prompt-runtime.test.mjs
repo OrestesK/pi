@@ -17,6 +17,12 @@ const TEAM_ENV_NAMES = [
 	"PI_SUBAGENT_TEAM_ROLE",
 ];
 
+const SUPERVISOR_ENV_NAMES = [
+	"PI_SUBAGENT_SUPERVISOR_RUN_DIR",
+	"PI_SUBAGENT_SUPERVISOR_AGENT",
+	"PI_SUBAGENT_SUPERVISOR_INDEX",
+];
+
 async function withStructuredOutputEnv(fn) {
 	const previousCapture = process.env[STRUCTURED_OUTPUT_CAPTURE_ENV];
 	const previousSchema = process.env[STRUCTURED_OUTPUT_SCHEMA_ENV];
@@ -38,6 +44,21 @@ async function withTeamEnv(values, fn) {
 		await fn();
 	} finally {
 		for (const name of TEAM_ENV_NAMES) {
+			const value = previous.get(name);
+			if (value === undefined) delete process.env[name];
+			else process.env[name] = value;
+		}
+	}
+}
+
+async function withSupervisorEnv(values, fn) {
+	const previous = new Map(SUPERVISOR_ENV_NAMES.map((name) => [name, process.env[name]]));
+	try {
+		for (const name of SUPERVISOR_ENV_NAMES) delete process.env[name];
+		for (const [name, value] of Object.entries(values)) process.env[name] = value;
+		await fn();
+	} finally {
+		for (const name of SUPERVISOR_ENV_NAMES) {
 			const value = previous.get(name);
 			if (value === undefined) delete process.env[name];
 			else process.env[name] = value;
@@ -144,6 +165,63 @@ test("prompt runtime registers live steering team tools only when team env is pr
 			"team_decide",
 		]);
 	});
+});
+
+test("prompt runtime injects pending supervisor messages and registers acknowledgement tool", async () => {
+	const { default: registerSubagentPromptRuntime } = await loadTs("../../src/runs/shared/subagent-prompt-runtime.ts");
+	const { appendSupervisorMessage, listPendingSupervisorMessages } = await loadTs("../../src/shared/supervisor-inbox.ts");
+	const supervisorRunDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-supervisor-runtime-"));
+
+	try {
+		await appendSupervisorMessage(supervisorRunDir, {
+			toIndex: 0,
+			agent: "run-monitor",
+			text: "Also monitor /tmp/build.log for TypeError",
+			urgent: true,
+		}, { id: () => "sm-1", now: () => 1000 });
+
+		await withSupervisorEnv({
+			PI_SUBAGENT_SUPERVISOR_RUN_DIR: supervisorRunDir,
+			PI_SUBAGENT_SUPERVISOR_AGENT: "run-monitor",
+			PI_SUBAGENT_SUPERVISOR_INDEX: "0",
+		}, async () => {
+			const tools = new Map();
+			const handlers = new Map();
+			registerSubagentPromptRuntime({
+				registerTool(tool) {
+					tools.set(tool.name, tool);
+				},
+				on(event, handler) {
+					handlers.set(event, handler);
+				},
+			});
+
+			assert.equal(tools.has("ack_supervisor_message"), true);
+			assert.equal(tools.has("read_supervisor_messages"), false);
+
+			const injected = await handlers.get("context")({
+				messages: [{ role: "user", content: [{ type: "text", text: "Task" }] }],
+			});
+			const injectedText = JSON.stringify(injected.messages.at(-1));
+			assert.match(injectedText, /SUPERVISOR MESSAGE sm-1 \[urgent\]/);
+			assert.match(injectedText, /Also monitor \/tmp\/build\.log for TypeError/);
+			assert.match(injectedText, /ack_supervisor_message/);
+
+			let pending = await listPendingSupervisorMessages(supervisorRunDir, 0);
+			assert.equal(pending[0].presentedCount, 1);
+
+			const ackResult = await tools.get("ack_supervisor_message").execute("call-1", {
+				messageId: "sm-1",
+				action: "accepted",
+				reason: "Will add the log and failure pattern",
+			});
+			assert.match(ackResult.content[0].text, /Supervisor message acknowledged: accepted/);
+			pending = await listPendingSupervisorMessages(supervisorRunDir, 0);
+			assert.deepEqual(pending, []);
+		});
+	} finally {
+		fs.rmSync(supervisorRunDir, { recursive: true, force: true });
+	}
 });
 
 test("team_decide records reviewer pulses and sends steering messages", async () => {

@@ -5,9 +5,9 @@
  * Supports runtime editing of templates, output paths, reads lists, and progress toggle.
  */
 
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import type { Component, TUI } from "@mariozechner/pi-tui";
-import { matchesKey, visibleWidth, truncateToWidth } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { Component, TUI } from "@earendil-works/pi-tui";
+import { matchesKey, visibleWidth, truncateToWidth } from "@earendil-works/pi-tui";
 import type { AgentConfig } from "../../agents/agents.ts";
 import type { ResolvedStepBehavior } from "../../shared/settings.ts";
 import { resolveModelCandidate, splitThinkingSuffix } from "../shared/model-fallback.ts";
@@ -775,7 +775,7 @@ export class ChainClarifyComponent implements Component {
 
 	private handleEditInput(data: string): void {
 		const textWidth = this.width - 4; // Must match render: innerW - 2 = (width - 2) - 2
-		if (matchesKey(data, "shift+up") || matchesKey(data, "pageup")) {
+		if (matchesKey(data, "shift+up") || data === "\u001b[5~") {
 			const { lines: wrapped, starts } = wrapText(this.editState.buffer, textWidth);
 			const cursorPos = getCursorDisplayPos(this.editState.cursor, starts);
 			const targetLine = Math.max(0, cursorPos.line - this.EDIT_VIEWPORT_HEIGHT);
@@ -785,7 +785,7 @@ export class ChainClarifyComponent implements Component {
 			return;
 		}
 
-		if (matchesKey(data, "shift+down") || matchesKey(data, "pagedown")) {
+		if (matchesKey(data, "shift+down") || data === "\u001b[6~") {
 			const { lines: wrapped, starts } = wrapText(this.editState.buffer, textWidth);
 			const cursorPos = getCursorDisplayPos(this.editState.cursor, starts);
 			const targetLine = Math.min(wrapped.length - 1, cursorPos.line + this.EDIT_VIEWPORT_HEIGHT);
@@ -1300,10 +1300,7 @@ export class ChainClarifyComponent implements Component {
 			lines.push(this.row(`     ${skillsLabel}${truncateToWidth(skillsValue, innerW - 14)}`));
 
 			if (progressEnabled) {
-				const isFirstStep = i === 0;
-				const progressAction = isFirstStep 
-					? th.fg("success", "writes progress.md")
-					: th.fg("accent", "reads progress.md");
+				const progressAction = th.fg("success", "reports enabled");
 				const progressLabel = th.fg("dim", "progress: ");
 				lines.push(this.row(`     ${progressLabel}${progressAction}`));
 			}

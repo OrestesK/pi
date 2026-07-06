@@ -24,7 +24,9 @@ test("root prompt keeps sectioned-swarm details in the pi-subagents skill", () =
     rootAgents,
     /packages\/pi-subagents\/skills\/pi-subagents\/SKILL\.md/,
   );
-  assert.match(rootAgents, /no-edit\/no-artifact\/no-live/i);
+  assert.match(rootAgents, /do not grant write authority/i);
+  assert.match(rootAgents, /no-artifact/i);
+  assert.match(rootAgents, /no-live(?:-probe)?/i);
   assert.match(rootAgents, /async: false/i);
   assert.match(rootAgents, /inspect actual returned inline text/i);
   assert.match(rootAgents, /file-only pointers are not evidence/i);

@@ -5,7 +5,7 @@
  * follow-up continuation after Pi's successful compaction hook.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const COMPACTION_CANDIDATE_MAX_AGE_MS = 30_000;
 const AUTO_CONTINUE_MESSAGE = `Auto-compaction completed. Continue the active task from the compaction summary and recent messages.

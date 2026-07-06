@@ -12,15 +12,15 @@
  */
 
 // @ts-expect-error Pi runtime resolves SDK imports outside this config repo.
-import type { ExtensionAPI, SessionEntry } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, SessionEntry } from "@earendil-works/pi-coding-agent";
 // @ts-expect-error Pi runtime resolves SDK imports outside this config repo.
-import { complete, type Message } from "@mariozechner/pi-ai";
+import { complete, type Message } from "@earendil-works/pi-ai/compat";
 // @ts-expect-error Pi runtime resolves SDK imports outside this config repo.
-import { BorderedLoader } from "@mariozechner/pi-coding-agent";
+import { BorderedLoader } from "@earendil-works/pi-coding-agent";
 // @ts-expect-error Pi runtime resolves SDK imports outside this config repo.
-import { convertToLlm } from "@mariozechner/pi-coding-agent";
+import { convertToLlm } from "@earendil-works/pi-coding-agent";
 // @ts-expect-error Pi runtime resolves SDK imports outside this config repo.
-import { serializeConversation } from "@mariozechner/pi-coding-agent";
+import { serializeConversation } from "@earendil-works/pi-coding-agent";
 
 const SYSTEM_PROMPT = `You are a session continuity assistant. Given a conversation history, write a concise continuation file that a fresh coding agent session can read to pick up where this one left off.
 

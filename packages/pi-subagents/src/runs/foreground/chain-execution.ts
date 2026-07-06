@@ -4,8 +4,8 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { AgentToolResult } from "@mariozechner/pi-agent-core";
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { AgentToolResult } from "@earendil-works/pi-agent-core";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentConfig } from "../../agents/agents.ts";
 import {
 	ChainClarifyComponent,
@@ -20,6 +20,7 @@ import {
 	resolveStepBehavior,
 	resolveParallelBehaviors,
 	buildChainInstructions,
+	progressFileDirForRun,
 	writeInitialProgressFile,
 	createParallelDirs,
 	suppressProgressForReadOnlyTask,
@@ -31,6 +32,7 @@ import {
 	type SequentialStep,
 	type ParallelStep,
 	type ParallelTaskResult,
+	type ProgressReportMode,
 	type ResolvedStepBehavior,
 	type ResolvedTemplates,
 } from "../../shared/settings.ts";
@@ -106,6 +108,8 @@ interface ParallelChainRunInput {
 	stepIndex: number;
 	availableModels: ModelInfo[];
 	chainDir: string;
+	progressDir: string;
+	progressReportMode: ProgressReportMode;
 	prev: string;
 	originalTask: string;
 	ctx: ExtensionContext;
@@ -118,6 +122,7 @@ interface ParallelChainRunInput {
 	shareEnabled: boolean;
 	artifactConfig: ArtifactConfig;
 	artifactsDir: string;
+	supervisorRunDir: string;
 	signal?: AbortSignal;
 	onUpdate?: (r: AgentToolResult<Details>) => void;
 	onControlEvent?: (event: ControlEvent) => void;
@@ -175,9 +180,10 @@ function buildChainExecutionErrorResult(
 }
 
 function ensureParallelProgressFile(
-	chainDir: string,
+	progressDir: string,
 	progressCreated: boolean,
 	parallelBehaviors: ResolvedStepBehavior[],
+	progressReportMode: ProgressReportMode,
 ): boolean {
 	if (
 		progressCreated ||
@@ -185,7 +191,7 @@ function ensureParallelProgressFile(
 	) {
 		return progressCreated;
 	}
-	writeInitialProgressFile(chainDir);
+	if (progressReportMode === "file") writeInitialProgressFile(progressDir);
 	return true;
 }
 
@@ -243,6 +249,8 @@ async function runParallelChainTasks(
 				input.chainDir,
 				false,
 				templateHasPrevious ? undefined : input.prev,
+				input.progressReportMode,
+				input.progressDir,
 			);
 
 			let taskStr = renderChainTemplate(taskTemplate, {
@@ -340,6 +348,11 @@ async function runParallelChainTasks(
 						input.globalTaskIndex + taskIndex,
 					),
 					orchestratorIntercomTarget: input.orchestratorIntercomTarget,
+					supervisor: {
+						runDir: input.supervisorRunDir,
+						agentName: task.agent,
+						index: input.globalTaskIndex + taskIndex,
+					},
 					modelOverride: effectiveModel,
 					availableModels: input.availableModels,
 					preferredModelProvider: input.ctx.model?.provider,
@@ -419,6 +432,7 @@ interface ChainExecutionParams {
 	sessionDirForIndex: (idx?: number) => string | undefined;
 	sessionFileForIndex?: (idx?: number) => string | undefined;
 	artifactsDir: string;
+	supervisorRunDir: string;
 	artifactConfig: ArtifactConfig;
 	includeProgress?: boolean;
 	clarify?: boolean;
@@ -443,6 +457,7 @@ interface ChainExecutionParams {
 	};
 	chainSkills?: string[];
 	chainDir?: string;
+	progressReportMode: ProgressReportMode;
 	maxSubagentDepth: number;
 	worktreeSetupHook?: string;
 	worktreeSetupHookTimeoutMs?: number;
@@ -512,6 +527,7 @@ export async function executeChain(
 				: (firstStep as SequentialStep).task!);
 
 	const chainDir = createChainDir(runId, chainDirBase);
+	const progressDir = progressFileDirForRun(chainDir);
 	const chainValidationError = validateChainOutputNames(chainSteps);
 	if (chainValidationError) {
 		removeChainDir(chainDir);
@@ -787,9 +803,10 @@ export async function executeChain(
 						});
 				}
 				progressCreated = ensureParallelProgressFile(
-					chainDir,
+					progressDir,
 					progressCreated,
 					parallelBehaviors,
+					params.progressReportMode,
 				);
 				createParallelDirs(
 					chainDir,
@@ -806,6 +823,8 @@ export async function executeChain(
 					stepIndex,
 					availableModels,
 					chainDir,
+					progressDir,
+					progressReportMode: params.progressReportMode,
 					prev,
 					originalTask,
 					ctx,
@@ -818,6 +837,7 @@ export async function executeChain(
 					shareEnabled,
 					artifactConfig,
 					artifactsDir,
+					supervisorRunDir: params.supervisorRunDir,
 					signal,
 					onUpdate,
 					results,
@@ -1017,6 +1037,8 @@ export async function executeChain(
 				chainDir,
 				isFirstProgress,
 				templateHasPrevious ? undefined : prev,
+				params.progressReportMode,
+				progressDir,
 			);
 
 			const stepTaskRendered = renderChainTemplate(stepTemplate, {
@@ -1114,6 +1136,11 @@ export async function executeChain(
 					globalTaskIndex,
 				),
 				orchestratorIntercomTarget,
+				supervisor: {
+					runDir: params.supervisorRunDir,
+					agentName: seqStep.agent,
+					index: globalTaskIndex,
+				},
 				modelOverride: effectiveModel,
 				availableModels,
 				preferredModelProvider: ctx.model?.provider,

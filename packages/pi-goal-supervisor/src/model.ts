@@ -102,7 +102,7 @@ export async function judgeWithCurrentModel(
 	}
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	try {
-		const mod = (await import("@mariozechner/pi-ai")) as CompleteModule;
+		const mod = (await import("@earendil-works/pi-ai/compat")) as CompleteModule;
 		const result = await Promise.race([
 			mod.complete(
 				ctx.model,

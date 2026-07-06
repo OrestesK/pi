@@ -7,6 +7,7 @@ import path from "node:path";
 import { loadTs } from "../support/load-ts.mjs";
 
 const { runSync } = await loadTs("../../src/runs/foreground/execution.ts");
+const { appendSupervisorMessage } = await loadTs("../../src/shared/supervisor-inbox.ts");
 const { compactForegroundDetails } = await loadTs("../../src/shared/utils.ts");
 
 function makeFakePi(lines) {
@@ -112,6 +113,65 @@ test("contact_supervisor need_decision emits immediate needs_attention", async (
 		);
 	} finally {
 		process.env.PATH = oldPath;
+	}
+});
+
+test("pending supervisor messages fail an otherwise successful child completion", async () => {
+	const fakePiDir = makeFakePi([
+		{
+			type: "message_end",
+			message: {
+				role: "assistant",
+				content: [{ type: "text", text: "done" }],
+				stopReason: "stop",
+			},
+		},
+	]);
+	const oldPath = process.env.PATH;
+	process.env.PATH = `${fakePiDir}${path.delimiter}${oldPath ?? ""}`;
+	const supervisorRunDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-subagents-supervisor-completion-"));
+	try {
+		await appendSupervisorMessage(supervisorRunDir, {
+			toIndex: 0,
+			agent: "delegate",
+			text: "Do not finish until this is acknowledged",
+		}, { id: () => "sm-pending", now: () => 1000 });
+
+		const result = await runSync(
+			fakePiDir,
+			[
+				{
+					name: "delegate",
+					description: "Delegate",
+					source: "builtin",
+					filePath: "builtin/delegate.md",
+					systemPrompt: "Delegate.",
+					systemPromptMode: "replace",
+					inheritProjectContext: true,
+					inheritSkills: false,
+					tools: ["read", "ack_supervisor_message"],
+				},
+			],
+			"delegate",
+			"Return success",
+			{
+				runId: "run-supervisor-pending",
+				index: 0,
+				artifactsDir: path.join(fakePiDir, "artifacts"),
+				supervisor: {
+					runDir: supervisorRunDir,
+					agentName: "delegate",
+					index: 0,
+				},
+			},
+		);
+
+		assert.equal(result.exitCode, 1);
+		assert.match(result.error, /pending supervisor message/);
+		assert.match(result.error, /sm-pending/);
+	} finally {
+		process.env.PATH = oldPath;
+		fs.rmSync(supervisorRunDir, { recursive: true, force: true });
 	}
 });
 

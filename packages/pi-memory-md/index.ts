@@ -3,7 +3,7 @@ import { setImmediate as waitForNextTick } from "node:timers/promises";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { getHookActions, runHookTrigger } from "./hooks.js";
 import {
 	buildMemoryContextAsync,

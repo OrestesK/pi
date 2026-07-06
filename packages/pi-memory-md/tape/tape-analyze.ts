@@ -2,7 +2,7 @@ import path from "node:path";
 import type {
 	SessionEntry,
 	SessionMessageEntry,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { toTimestamp } from "../utils.js";
 
 const HANDOFF_BOOST = 30;

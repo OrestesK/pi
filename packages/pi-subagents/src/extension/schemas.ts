@@ -112,7 +112,7 @@ const TaskItem = Type.Object({
 	outputMode: Type.Optional(OutputModeOverride),
 	reads: Type.Optional(ReadsOverride),
 	progress: Type.Optional(
-		Type.Boolean({ description: "Enable progress.md tracking for this task" }),
+		Type.Boolean({ description: "Enable progress reporting for this task. The configured progress.reportMode chooses supervisor updates or file-backed progress." }),
 	),
 	model: Type.Optional(
 		Type.String({
@@ -148,7 +148,7 @@ const ParallelTaskSchema = Type.Object({
 	outputMode: Type.Optional(OutputModeOverride),
 	reads: Type.Optional(ReadsOverride),
 	progress: Type.Optional(
-		Type.Boolean({ description: "Enable progress.md tracking in {chain_dir}" }),
+		Type.Boolean({ description: "Enable progress reporting. The configured progress.reportMode chooses supervisor updates or file-backed progress." }),
 	),
 	skill: Type.Optional(SkillOverride),
 	model: Type.Optional(
@@ -194,7 +194,7 @@ const ChainItem = Type.Object(
 		reads: Type.Optional(ReadsOverride),
 		progress: Type.Optional(
 			Type.Boolean({
-				description: "Enable progress.md tracking in {chain_dir}",
+				description: "Enable progress reporting. The configured progress.reportMode chooses supervisor updates or file-backed progress.",
 			}),
 		),
 		skill: Type.Optional(SkillOverride),
@@ -319,38 +319,38 @@ export const SubagentParams = Type.Object({
 	action: Type.Optional(
 		Type.String({
 			enum: [...SUBAGENT_ACTIONS],
-			description: "Management/control action. Omit for execution mode.",
+			description: "Management/control action. Omit for execution mode. Use action='message' to queue live supervisor input for a running child.",
 		}),
 	),
 	id: Type.Optional(
 		Type.String({
 			description:
-				"Run id or prefix for action='status', action='interrupt', or action='resume'.",
+				"Run id or prefix for action='status', action='interrupt', action='resume', or action='message'. action='message' requires id, runId, or dir; it never targets the most recent run implicitly.",
 		}),
 	),
 	runId: Type.Optional(
 		Type.String({
 			description:
-				"Target run ID for action='interrupt' or action='resume'. Defaults to the most recently active controllable run for interrupt. Prefer id for new calls.",
+				"Target run ID for action='interrupt', action='resume', or action='message'. interrupt can default to the most recently active controllable run; message cannot. Prefer id for new calls.",
 		}),
 	),
 	dir: Type.Optional(
 		Type.String({
 			description:
-				"Async run directory for action='status' or action='resume'.",
+				"Run directory for action='status', action='resume', or action='message'. For message this must be a live/running foreground or async supervisor run directory.",
 		}),
 	),
 	index: Type.Optional(
 		Type.Integer({
 			minimum: 0,
 			description:
-				"Zero-based child index for actions that target a specific child.",
+				"Zero-based child index for actions that target a specific child. Required for action='message' when a run has multiple children.",
 		}),
 	),
 	message: Type.Optional(
 		Type.String({
 			description:
-				"Follow-up message for action='resume'. Use index to choose a child from multi-child runs.",
+				"Message text for action='resume' or action='message'. resume follows up with/revives a child; message queues supervisor input for a live/running child, delivered at the next LLM boundary and requiring ack_supervisor_message.",
 		}),
 	),
 	// Chain identifier for management (can't reuse 'chain' — that's the execution array)

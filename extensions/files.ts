@@ -28,9 +28,9 @@ import type {
   ExtensionContext,
   SessionEntry,
   // @ts-expect-error Pi runtime resolves SDK imports outside this config repo.
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 // @ts-expect-error Pi runtime resolves SDK imports outside this config repo.
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
+import { DynamicBorder } from "@earendil-works/pi-coding-agent";
 import {
   Container,
   fuzzyFilter,
@@ -42,7 +42,7 @@ import {
   Text,
   type TUI,
   // @ts-expect-error Pi runtime resolves TUI imports outside this config repo.
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 declare const process: {
   platform: string;

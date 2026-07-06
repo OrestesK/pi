@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { AgentToolResult as CoreAgentToolResult } from "@mariozechner/pi-agent-core";
+import type { AgentToolResult as CoreAgentToolResult } from "@earendil-works/pi-agent-core";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import type { AgentConfig, AgentScope } from "../../agents/agents.ts";
 import { getArtifactsDir } from "../../shared/artifacts.ts";
 import { listTeamDecisions } from "../../shared/team-decisions.ts";
@@ -14,6 +14,11 @@ import {
 	findLiveSteeringReviewerPulseFailures,
 } from "../../shared/live-steering.ts";
 import { listTeamMessages } from "../../shared/team-mailbox.ts";
+import {
+	appendSupervisorMessage,
+	listSupervisorMessages,
+	summarizeSupervisorMessages,
+} from "../../shared/supervisor-inbox.ts";
 import {
 	ChainClarifyComponent,
 	type ChainClarifyResult,
@@ -35,6 +40,8 @@ import { aggregateParallelOutputs } from "../shared/parallel-utils.ts";
 import { recordRun } from "../shared/run-history.ts";
 import {
 	buildChainInstructions,
+	progressFileDirForRun,
+	resolveProgressReportMode,
 	writeInitialProgressFile,
 	getStepAgents,
 	isParallelStep,
@@ -43,6 +50,7 @@ import {
 	taskDisallowsFileUpdates,
 	type ChainStep,
 	type ParallelTaskItem,
+	type ProgressReportMode,
 	type ResolvedStepBehavior,
 	type SequentialStep,
 	type StepOverrides,
@@ -103,6 +111,7 @@ import {
 import {
 	buildRevivedAsyncTask,
 	resolveAsyncResumeTarget,
+	resolveAsyncRunLocation,
 } from "../background/async-resume.ts";
 import { inspectSubagentStatus } from "../background/run-status.ts";
 import { applyForceTopLevelAsyncOverrideForExecution } from "../background/top-level-async.ts";
@@ -133,7 +142,9 @@ import {
 	type SingleResult,
 	type SubagentRunMode,
 	type SubagentState,
+	ASYNC_DIR,
 	DEFAULT_ARTIFACT_CONFIG,
+	RESULTS_DIR,
 	SUBAGENT_ACTIONS,
 	SUBAGENT_CONTROL_EVENT,
 	SUBAGENT_CONTROL_INTERCOM_EVENT,
@@ -234,10 +245,12 @@ interface ExecutionContextData {
 	sessionFileForIndex: (idx?: number) => string | undefined;
 	artifactConfig: ArtifactConfig;
 	artifactsDir: string;
+	supervisorRunDir: string;
 	backgroundRequestedWhileClarifying: boolean;
 	effectiveAsync: boolean;
 	controlConfig: ResolvedControlConfig;
 	intercomBridge: IntercomBridgeState;
+	progressReportMode: ProgressReportMode;
 	routeLabel?: string;
 }
 
@@ -300,11 +313,35 @@ function formatForegroundActivity(
 	return [`active ${seconds}s ago`, ...facts].join(" | ");
 }
 
-function foregroundStatusResult(
-	control: SubagentState["foregroundControls"] extends Map<string, infer T>
-		? T
-		: never,
-): AgentToolResult<Details> {
+type ForegroundControlState = SubagentState["foregroundControls"] extends Map<string, infer T>
+	? T
+	: never;
+
+async function appendSupervisorStatusLines(
+	lines: string[],
+	runDir: string | undefined,
+	children: Array<{ agent: string; index: number }> | undefined,
+	requestedIndex: number | undefined,
+): Promise<void> {
+	if (!runDir || !children?.length) return;
+	const selected = requestedIndex === undefined
+		? children
+		: children.filter((child) => child.index === requestedIndex);
+	if (requestedIndex !== undefined && selected.length === 0) {
+		lines.push(`Supervisor: no child at index ${requestedIndex}`);
+		return;
+	}
+	for (const child of selected) {
+		const messages = await listSupervisorMessages(runDir, child.index);
+		const summary = summarizeSupervisorMessages(messages);
+		if (summary) lines.push(`Supervisor child ${child.index} (${child.agent}): ${summary}`);
+	}
+}
+
+async function foregroundStatusResult(
+	control: ForegroundControlState,
+	requestedIndex?: number,
+): Promise<AgentToolResult<Details>> {
 	const activity = formatForegroundActivity(control);
 	const lines = [
 		`Run: ${control.runId}`,
@@ -315,6 +352,7 @@ function foregroundStatusResult(
 			: undefined,
 		activity ? `Activity: ${activity}` : undefined,
 	].filter((line): line is string => Boolean(line));
+	await appendSupervisorStatusLines(lines, control.supervisorRunDir, control.supervisorChildren, requestedIndex);
 	return {
 		content: [{ type: "text", text: lines.join("\n") }],
 		details: { mode: "management", results: [] },
@@ -523,6 +561,153 @@ function resolveResumeTarget(
 	if (foregroundError) throw foregroundError;
 	if (asyncError) throw asyncError;
 	throw new Error("Run not found. Provide id or runId.");
+}
+
+function requireMessageActionText(params: SubagentParamsLike): string {
+	const text = params.message?.trim();
+	if (!text) throw new Error("action='message' requires message.");
+	return text;
+}
+
+function resolveMessageChild(
+	runId: string,
+	children: Array<{ agent: string; index: number }>,
+	requestedIndex: number | undefined,
+): { agent: string; index: number } {
+	if (children.length === 0) throw new Error(`Run '${runId}' has no message-capable children.`);
+	if (children.length > 1 && requestedIndex === undefined) {
+		throw new Error(`Run '${runId}' has ${children.length} children. Provide index to choose one.`);
+	}
+	const index = requestedIndex ?? 0;
+	if (!Number.isInteger(index)) throw new Error(`Run '${runId}' index must be an integer.`);
+	const child = children.find((candidate) => candidate.index === index);
+	if (!child) throw new Error(`Run '${runId}' has no child at index ${index}.`);
+	return child;
+}
+
+function resolveForegroundMessageTarget(
+	params: SubagentParamsLike,
+	state: SubagentState,
+): { runId: string; runDir: string; agent: string; index: number } | undefined {
+	if (params.dir) return undefined;
+	const requested = (params.id ?? params.runId)?.trim();
+	if (!requested) return undefined;
+	const direct = state.foregroundControls.get(requested);
+	const matches = direct
+		? [direct]
+		: [...state.foregroundControls.values()].filter((control) =>
+				control.runId.startsWith(requested),
+			);
+	if (matches.length === 0) return undefined;
+	if (matches.length > 1) {
+		throw new Error(`Ambiguous foreground run id prefix '${requested}' matched: ${matches.map((control) => control.runId).join(", ")}. Provide a longer id.`);
+	}
+	const control = matches[0]!;
+	if (!control.supervisorRunDir) throw new Error(`Foreground run '${control.runId}' does not expose a supervisor inbox.`);
+	const child = resolveMessageChild(control.runId, control.supervisorChildren ?? [], params.index);
+	return { runId: control.runId, runDir: control.supervisorRunDir, agent: child.agent, index: child.index };
+}
+
+function asyncJobMessageChildren(job: SubagentState["asyncJobs"] extends Map<string, infer T> ? T : never): Array<{ agent: string; index: number }> {
+	if (job.steps?.length) {
+		return job.steps.map((step, fallbackIndex) => ({ agent: step.agent, index: step.index ?? fallbackIndex }));
+	}
+	return (job.agents ?? []).map((agent, index) => ({ agent, index }));
+}
+
+function assertAsyncStatusMessageable(runId: string, state: string): void {
+	if (state !== "queued" && state !== "running") {
+		throw new Error(`Async run '${runId}' is ${state}; use action='resume' for completed or paused runs.`);
+	}
+}
+
+function resolveAsyncMessageTarget(
+	params: SubagentParamsLike,
+	state: SubagentState,
+): { runId: string; runDir: string; agent: string; index: number } | undefined {
+	let location;
+	try {
+		location = resolveAsyncRunLocation(params, ASYNC_DIR, RESULTS_DIR);
+	} catch (error) {
+		throw error;
+	}
+	if (!location.asyncDir && !location.resultPath) return undefined;
+	const runId = location.resolvedId ?? (location.asyncDir ? path.basename(location.asyncDir) : undefined) ?? params.id ?? params.runId ?? "unknown";
+	if (!location.asyncDir) {
+		throw new Error(`Async run '${runId}' is complete; use action='resume' for completed runs.`);
+	}
+	const status = readStatus(location.asyncDir);
+	if (status) {
+		assertAsyncStatusMessageable(status.runId || runId, status.state);
+		const children = (status.steps ?? []).map((step, index) => ({ agent: step.agent, index }));
+		const child = resolveMessageChild(status.runId || runId, children, params.index);
+		const stepStatus = status.steps?.[child.index]?.status;
+		if (stepStatus && stepStatus !== "pending" && stepStatus !== "running") {
+			throw new Error(`Async run '${status.runId || runId}' child ${child.index} is ${stepStatus}; use action='resume' for completed children.`);
+		}
+		return { runId: status.runId || runId, runDir: location.asyncDir, agent: child.agent, index: child.index };
+	}
+	const job = state.asyncJobs.get(runId);
+	if (!job) throw new Error(`Async run '${runId}' status is not available yet. Retry action='status' before sending a supervisor message.`);
+	if (job.status !== "queued" && job.status !== "running") {
+		throw new Error(`Async run '${runId}' is ${job.status}; use action='resume' for completed or paused runs.`);
+	}
+	const child = resolveMessageChild(runId, asyncJobMessageChildren(job), params.index);
+	return { runId, runDir: location.asyncDir, agent: child.agent, index: child.index };
+}
+
+async function sendSupervisorMessage(
+	params: SubagentParamsLike,
+	state: SubagentState,
+): Promise<AgentToolResult<Details>> {
+	let text: string;
+	try {
+		text = requireMessageActionText(params);
+	} catch (error) {
+		return {
+			content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
+			isError: true,
+			details: { mode: "management", results: [] },
+		};
+	}
+	if (!params.id && !params.runId && !params.dir) {
+		return {
+			content: [{ type: "text", text: "action='message' requires id, runId, or dir. It does not target the most recent run implicitly." }],
+			isError: true,
+			details: { mode: "management", results: [] },
+		};
+	}
+	let target: { runId: string; runDir: string; agent: string; index: number } | undefined;
+	try {
+		target = resolveForegroundMessageTarget(params, state) ?? resolveAsyncMessageTarget(params, state);
+		if (!target) throw new Error("Run not found. Provide a running foreground/async run id or async dir.");
+		const message = await appendSupervisorMessage(target.runDir, {
+			toIndex: target.index,
+			agent: target.agent,
+			text,
+		});
+		return {
+			content: [
+				{
+					type: "text",
+					text: [
+						"Supervisor message queued.",
+						`Run: ${target.runId}`,
+						`Child: ${target.index} (${target.agent})`,
+						`Message: ${message.id}`,
+						"Delivery: next child LLM boundary; current model/tool execution is not interrupted.",
+					].join("\n"),
+				},
+			],
+			details: { mode: "management", results: [] },
+		};
+	} catch (error) {
+		return {
+			content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
+			isError: true,
+			details: { mode: "management", results: [] },
+		};
+	}
 }
 
 function getAsyncInterruptTarget(
@@ -1215,6 +1400,31 @@ function toExecutionErrorResult(
 	);
 }
 
+function collectSupervisorChildren(params: SubagentParamsLike): Array<{ agent: string; index: number }> {
+	if (params.tasks?.length) {
+		return params.tasks.map((task, index) => ({ agent: task.agent, index }));
+	}
+	if (params.chain?.length) {
+		const children: Array<{ agent: string; index: number }> = [];
+		let flatIndex = 0;
+		for (const step of params.chain) {
+			if (isParallelStep(step)) {
+				for (const task of step.parallel) {
+					children.push({ agent: task.agent, index: flatIndex });
+					flatIndex++;
+				}
+				continue;
+			}
+			if ("agent" in step && typeof step.agent === "string") {
+				children.push({ agent: step.agent, index: flatIndex });
+				flatIndex++;
+			}
+		}
+		return children;
+	}
+	return params.agent ? [{ agent: params.agent, index: 0 }] : [];
+}
+
 function collectChainSessionFiles(
 	chain: ChainStep[],
 	sessionFileForIndex: (idx?: number) => string | undefined,
@@ -1427,6 +1637,7 @@ function runAsyncPath(
 			shareEnabled,
 			sessionRoot,
 			chainSkills: [],
+			progressReportMode: data.progressReportMode,
 			sessionFilesByFlatIndex: params.tasks.map((_, index) =>
 				sessionFileForIndex(index),
 			),
@@ -1459,6 +1670,7 @@ function runAsyncPath(
 			shareEnabled,
 			sessionRoot,
 			chainSkills,
+			progressReportMode: data.progressReportMode,
 			sessionFilesByFlatIndex: collectChainSessionFiles(
 				chain,
 				sessionFileForIndex,
@@ -1579,6 +1791,7 @@ async function runChainPath(
 		sessionFileForIndex,
 		artifactsDir,
 		artifactConfig,
+		supervisorRunDir: data.supervisorRunDir,
 		includeProgress: params.includeProgress,
 		clarify: params.clarify,
 		onUpdate,
@@ -1593,6 +1806,7 @@ async function runChainPath(
 		foregroundControl,
 		chainSkills,
 		chainDir: params.chainDir,
+		progressReportMode: data.progressReportMode,
 		maxSubagentDepth: currentMaxSubagentDepth,
 		worktreeSetupHook: deps.config.worktreeSetupHook,
 		worktreeSetupHookTimeoutMs: deps.config.worktreeSetupHookTimeoutMs,
@@ -1647,6 +1861,7 @@ async function runChainPath(
 			shareEnabled,
 			sessionRoot,
 			chainSkills: chainResult.requestedAsync.chainSkills,
+			progressReportMode: data.progressReportMode,
 			sessionFilesByFlatIndex: collectChainSessionFiles(
 				asyncChain,
 				sessionFileForIndex,
@@ -1711,6 +1926,7 @@ interface ForegroundParallelRunInput {
 	shareEnabled: boolean;
 	artifactConfig: ArtifactConfig;
 	artifactsDir: string;
+	supervisorRunDir: string;
 	maxOutput?: MaxOutputConfig;
 	paramsCwd: string;
 	maxSubagentDepths: number[];
@@ -1718,6 +1934,8 @@ interface ForegroundParallelRunInput {
 	modelOverrides: (string | undefined)[];
 	behaviors: Array<ReturnType<typeof resolveStepBehavior>>;
 	firstProgressIndex: number;
+	progressReportMode: ProgressReportMode;
+	progressDir: string;
 	controlConfig: ResolvedControlConfig;
 	onControlEvent?: (event: ControlEvent) => void;
 	onOrchestratorNotice?: (notice: { key: string; runId: string; source: "foreground"; noticeText: string }) => void;
@@ -1949,6 +2167,8 @@ async function runForegroundParallelTasks(
 							{ ...behavior, output: false, progress: false },
 							taskCwd,
 							false,
+							undefined,
+							input.progressReportMode,
 						)
 					: { prefix: "", suffix: "" };
 				const progressInstructions = behavior
@@ -1956,6 +2176,9 @@ async function runForegroundParallelTasks(
 							{ ...behavior, output: false, reads: false },
 							input.paramsCwd,
 							index === input.firstProgressIndex,
+							undefined,
+							input.progressReportMode,
+							input.progressDir,
 						)
 					: { prefix: "", suffix: "" };
 				const outputPath = resolveSingleOutputPath(
@@ -2019,6 +2242,11 @@ async function runForegroundParallelTasks(
 								role: task.liveSteeringRole,
 							}
 						: undefined,
+					supervisor: {
+						runDir: input.supervisorRunDir,
+						agentName: task.agent,
+						index,
+					},
 					modelOverride: input.modelOverrides[index],
 					availableModels: input.availableModels,
 					preferredModelProvider: input.ctx.model?.provider,
@@ -2359,6 +2587,7 @@ async function runParallelPath(
 				shareEnabled,
 				sessionRoot,
 				chainSkills: [],
+				progressReportMode: data.progressReportMode,
 				sessionFilesByFlatIndex: tasks.map((_, index) =>
 					sessionFileForIndex(index),
 				),
@@ -2437,7 +2666,8 @@ async function runParallelPath(
 		}
 
 		const parallelProgressPrecreated = firstProgressIndex !== -1;
-		if (parallelProgressPrecreated) writeInitialProgressFile(effectiveCwd);
+		const progressDir = progressFileDirForRun(sessionRoot);
+		if (parallelProgressPrecreated && data.progressReportMode === "file") writeInitialProgressFile(progressDir);
 
 		if (params.context === "fork") {
 			for (let i = 0; i < taskTexts.length; i++) {
@@ -2458,12 +2688,15 @@ async function runParallelPath(
 			shareEnabled,
 			artifactConfig,
 			artifactsDir,
+			supervisorRunDir: data.supervisorRunDir,
 			maxOutput: params.maxOutput,
 			paramsCwd: effectiveCwd,
 			availableModels,
 			modelOverrides,
 			behaviors,
 			firstProgressIndex: parallelProgressPrecreated ? -1 : firstProgressIndex,
+			progressReportMode: data.progressReportMode,
+			progressDir,
 			controlConfig,
 			onControlEvent,
 			onOrchestratorNotice: (notice) => deps.pi.events.emit(SUBAGENT_ORCHESTRATOR_NOTICE_EVENT, notice),
@@ -2838,6 +3071,11 @@ async function runSinglePath(
 		orchestratorIntercomTarget: data.intercomBridge.active
 			? data.intercomBridge.orchestratorTarget
 			: undefined,
+		supervisor: {
+			runDir: data.supervisorRunDir,
+			agentName: params.agent!,
+			index: 0,
+		},
 		index: 0,
 		modelOverride,
 		availableModels,
@@ -3034,8 +3272,8 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					deps.state,
 					paramsWithResolvedCwd.id ?? paramsWithResolvedCwd.runId,
 				);
-				if (foreground) return foregroundStatusResult(foreground);
-				return inspectSubagentStatus({
+				if (foreground) return foregroundStatusResult(foreground, paramsWithResolvedCwd.index);
+				return await inspectSubagentStatus({
 					action: "status",
 					id: paramsWithResolvedCwd.id,
 					runId: paramsWithResolvedCwd.runId,
@@ -3049,6 +3287,9 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					ctx,
 					deps,
 				});
+			}
+			if (paramsWithResolvedCwd.action === "message") {
+				return sendSupervisorMessage(paramsWithResolvedCwd, deps.state);
 			}
 			if (paramsWithResolvedCwd.action === "interrupt") {
 				const targetRunId =
@@ -3256,6 +3497,8 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 				),
 			);
 		}
+		const supervisorRunDir = path.join(sessionRoot, "supervisor-messages", runId);
+		const supervisorChildren = collectSupervisorChildren(effectiveParams);
 		const sessionDirForIndex = (idx?: number) =>
 			path.join(sessionRoot, `run-${idx ?? 0}`);
 		const childSessionFileForIndex = (idx?: number) =>
@@ -3267,6 +3510,7 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					onUpdate(withForkContext(r, effectiveParams.context))
 			: undefined;
 
+		const progressReportMode = resolveProgressReportMode(deps.config.progress);
 		const execData: ExecutionContextData = {
 			params: effectiveParams,
 			effectiveCwd,
@@ -3281,10 +3525,12 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 			sessionFileForIndex: childSessionFileForIndex,
 			artifactConfig,
 			artifactsDir,
+			supervisorRunDir,
 			backgroundRequestedWhileClarifying,
 			effectiveAsync,
 			controlConfig,
 			intercomBridge,
+			progressReportMode,
 			routeLabel: workflowExpansion.routeLabel,
 		};
 
@@ -3303,6 +3549,8 @@ export function createSubagentExecutor(deps: ExecutorDeps): {
 					currentAgent: undefined,
 					currentIndex: undefined,
 					currentActivityState: undefined,
+					supervisorRunDir,
+					supervisorChildren,
 					interrupt: undefined,
 				};
 		if (foregroundControl) {

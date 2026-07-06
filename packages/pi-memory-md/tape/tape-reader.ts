@@ -4,8 +4,8 @@ import { StringDecoder } from "node:string_decoder";
 import type {
 	SessionEntry,
 	SessionHeader,
-} from "@mariozechner/pi-coding-agent";
-import { getAgentDir } from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { toTimestamp } from "../utils.js";
 
 const DEFAULT_CACHE_SIZE = 100;

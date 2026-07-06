@@ -2,7 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
-import type { Message } from "@mariozechner/pi-ai";
+import type { Message } from "@earendil-works/pi-ai";
 import { writeAtomicJson } from "../../shared/atomic-json.ts";
 import { appendJsonl, getArtifactPaths } from "../../shared/artifacts.ts";
 import {
@@ -91,6 +91,7 @@ import {
 	type WorktreeSetup,
 } from "../shared/worktree.ts";
 import { writeInitialProgressFile } from "../../shared/settings.ts";
+import { listPendingSupervisorMessages } from "../../shared/supervisor-inbox.ts";
 
 interface SubagentRunConfig {
 	id: string;
@@ -658,6 +659,7 @@ interface SingleStepContext {
 	flatIndex: number;
 	flatStepCount: number;
 	outputFile: string;
+	asyncDir: string;
 	piPackageRoot?: string;
 	piArgv1?: string;
 	registerInterrupt?: (interrupt: (() => void) | undefined) => void;
@@ -759,6 +761,11 @@ async function runSingleStep(
 			runId: ctx.id,
 			childAgentName: step.agent,
 			childIndex: ctx.flatIndex,
+			supervisor: {
+				runDir: ctx.asyncDir,
+				agentName: step.agent,
+				index: ctx.flatIndex,
+			},
 			structuredOutput: step.structuredOutput,
 		});
 		const run = await runPiStreaming(
@@ -847,6 +854,16 @@ async function runSingleStep(
 				structuredOutput: structured.value,
 				structuredOutputPath: step.structuredOutput.outputPath,
 				structuredOutputSchemaPath: step.structuredOutput.schemaPath,
+			};
+		}
+	}
+	if (finalResult && finalResult.exitCode === 0 && !finalResult.error) {
+		const pendingSupervisorMessages = await listPendingSupervisorMessages(ctx.asyncDir, ctx.flatIndex);
+		if (pendingSupervisorMessages.length > 0) {
+			finalResult = {
+				...finalResult,
+				exitCode: 1,
+				error: `Subagent completed with pending supervisor message${pendingSupervisorMessages.length === 1 ? "" : "s"}: ${pendingSupervisorMessages.map((message) => message.id).join(", ")}.`,
 			};
 		}
 	}
@@ -1760,6 +1777,7 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 							flatIndex: fi,
 							flatStepCount: flatSteps.length,
 							outputFile: path.join(asyncDir, `output-${fi}.log`),
+							asyncDir,
 							piPackageRoot: config.piPackageRoot,
 							piArgv1: config.piArgv1,
 							childIntercomTarget: config.childIntercomTargets?.[fi],
@@ -1939,6 +1957,7 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 				flatIndex,
 				flatStepCount: flatSteps.length,
 				outputFile: path.join(asyncDir, `output-${flatIndex}.log`),
+				asyncDir,
 				piPackageRoot: config.piPackageRoot,
 				piArgv1: config.piArgv1,
 				childIntercomTarget: config.childIntercomTargets?.[flatIndex],

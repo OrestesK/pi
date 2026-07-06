@@ -7,7 +7,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { AgentConfig } from "../../agents/agents.ts";
 import { applyThinkingSuffix } from "../shared/pi-args.ts";
 import { formatAcceptancePrompt, resolveEffectiveAcceptance } from "../shared/acceptance-contract.ts";
@@ -19,12 +19,14 @@ import {
 } from "../shared/single-output.ts";
 import {
 	buildChainInstructions,
+	progressFileDirForRun,
 	isDynamicFanoutStep,
 	isParallelStep,
 	resolveStepBehavior,
 	suppressProgressForReadOnlyTask,
 	writeInitialProgressFile,
 	type ChainStep,
+	type ProgressReportMode,
 	type ResolvedStepBehavior,
 	type SequentialStep,
 	type StepOverrides,
@@ -117,6 +119,7 @@ interface AsyncChainParams {
 	shareEnabled: boolean;
 	sessionRoot?: string;
 	chainSkills?: string[];
+	progressReportMode: ProgressReportMode;
 	sessionFilesByFlatIndex?: (string | undefined)[];
 	maxSubagentDepth: number;
 	worktreeSetupHook?: string;
@@ -388,6 +391,8 @@ export function executeAsyncChain(
 			{ ...behavior, output: false, progress: false },
 			instructionCwd,
 			false,
+			undefined,
+			params.progressReportMode,
 		);
 		const isFirstProgressAgent =
 			behavior.progress && !progressPrecreated && !progressInstructionCreated;
@@ -396,6 +401,9 @@ export function executeAsyncChain(
 			{ ...behavior, output: false, reads: false },
 			runnerCwd,
 			isFirstProgressAgent,
+			undefined,
+			params.progressReportMode,
+			progressFileDirForRun(asyncDir),
 		);
 		const outputPath = resolveSingleOutputPath(
 			behavior.output,
@@ -488,7 +496,7 @@ export function executeAsyncChain(
 					(behavior) => behavior.progress,
 				);
 				if (progressPrecreated) {
-					if (!s.worktree) writeInitialProgressFile(runnerCwd);
+					if (params.progressReportMode === "file") writeInitialProgressFile(progressFileDirForRun(asyncDir));
 					progressInstructionCreated = true;
 				}
 				return {
