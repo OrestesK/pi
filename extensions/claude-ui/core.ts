@@ -59,6 +59,10 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
+import {
+  parseToolResultVirtualizerReceipt,
+  type ParsedToolResultVirtualizerReceipt,
+} from "../../packages/pi-tool-result-virtualizer/src/index.js";
 
 type RenderFn = (width: number) => string[];
 type WorkingState = "inactive" | "working" | "streaming";
@@ -1571,7 +1575,8 @@ type SpawnHookContributor = {
 
 const BASH_SPAWN_HOOK_REQUEST_EVENT = "ad:bash:spawn-hook:request";
 const COLLAPSED_PREVIEW_LINES = 4;
-const BASH_SCRIPT_PREVIEW_EDGE_LINES = 2;
+const BASH_SCRIPT_PREVIEW_EDGE_LINES = 5;
+const BASH_OUTPUT_PREVIEW_EDGE_LINES = 5;
 const READ_PREVIEW_LINES = 6;
 const COLLAPSED_EDIT_DIFF_LINES = 80;
 const COLLAPSED_WRITE_DIFF_LINES = 40;
@@ -3903,6 +3908,15 @@ function wrappedToolResult(
       treeLine(theme, pendingToolLabel(toolName, title, context.args), "..."),
     );
   }
+
+  const output = extractToolText(result);
+  const failure = failureVirtualizerResult(output, result.details);
+  if (failure) {
+    return setText(
+      context.lastComponent,
+      virtualizerFailureBlock(title, failure, theme, context.isError),
+    );
+  }
   if (context.isError) {
     return setText(
       context.lastComponent,
@@ -3910,15 +3924,15 @@ function wrappedToolResult(
     );
   }
 
-  const output = extractToolText(result);
+  const stored = storedVirtualizerResult(output, result.details);
   const summary = treeLine(
     theme,
     title,
-    resultDetailSummary(toolName, result, output),
+    stored ? `${plural(stored.lineCount ?? countLines(output), "line")} · stored` : resultDetailSummary(toolName, result, output),
   );
   return setText(
     context.lastComponent,
-    `${summary}${toolPreviewBlock(toolName, output, theme, options.expanded)}`,
+    `${summary}${stored ? virtualizerStoredPreviewBlock(stored, theme) : toolPreviewBlock(toolName, output, theme, options.expanded)}`,
   );
 }
 
@@ -4102,24 +4116,302 @@ function formatLsCall(args: unknown, theme: Theme, pending = false): string {
   );
 }
 
-function compactBashScriptPreview(lines: string[]): string {
-  const previewLines = lines.length <= BASH_SCRIPT_PREVIEW_EDGE_LINES * 2
-    ? lines
-    : [
-        ...lines.slice(0, BASH_SCRIPT_PREVIEW_EDGE_LINES),
-        "…",
-        ...lines.slice(-BASH_SCRIPT_PREVIEW_EDGE_LINES),
-      ];
-  return previewLines.map((line) => compactOneLine(line, 50)).join(" · ");
+type ToolResultVirtualizerMetadata = {
+  sourceId?: string;
+  toolName?: string;
+  lineCount?: number;
+  contentReplaced?: boolean;
+  hasOriginalDetails?: boolean;
+  originalDetailsByteCount?: number;
+};
+
+type ToolResultVirtualizerFailureMetadata = {
+  toolName?: string;
+  byteCount?: number;
+  lineCount?: number;
+  contentWithheld?: boolean;
+};
+
+type StoredVirtualizerResult = {
+  sourceId?: string;
+  lineCount?: number;
+  previewLines: string[];
+};
+
+type FailureVirtualizerResult = {
+  toolName?: string;
+  lineCount?: number;
+  failureLines: string[];
+};
+
+type StoredDetailsVirtualizerResult = {
+  sourceId?: string;
+  originalDetailsByteCount?: number;
+};
+
+function toolResultVirtualizerMetadata(
+  details: unknown,
+): ToolResultVirtualizerMetadata | undefined {
+  if (!isRecord(details)) return undefined;
+  const metadata = details.toolResultVirtualizer;
+  if (!isRecord(metadata)) return undefined;
+
+  const result: ToolResultVirtualizerMetadata = {};
+  if (typeof metadata.sourceId === "string" && metadata.sourceId.length > 0)
+    result.sourceId = metadata.sourceId;
+  if (typeof metadata.toolName === "string" && metadata.toolName.length > 0)
+    result.toolName = metadata.toolName;
+  if (typeof metadata.lineCount === "number" && Number.isFinite(metadata.lineCount))
+    result.lineCount = Math.max(0, Math.floor(metadata.lineCount));
+  if (typeof metadata.contentReplaced === "boolean")
+    result.contentReplaced = metadata.contentReplaced;
+  if (typeof metadata.hasOriginalDetails === "boolean")
+    result.hasOriginalDetails = metadata.hasOriginalDetails;
+  if (
+    typeof metadata.originalDetailsByteCount === "number" &&
+    Number.isFinite(metadata.originalDetailsByteCount)
+  )
+    result.originalDetailsByteCount = Math.max(0, Math.floor(metadata.originalDetailsByteCount));
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function toolResultVirtualizerFailureMetadata(
+  details: unknown,
+): ToolResultVirtualizerFailureMetadata | undefined {
+  if (!isRecord(details)) return undefined;
+  const metadata = details.toolResultVirtualizerFailure;
+  if (!isRecord(metadata)) return undefined;
+
+  const result: ToolResultVirtualizerFailureMetadata = {};
+  if (typeof metadata.toolName === "string" && metadata.toolName.length > 0)
+    result.toolName = metadata.toolName;
+  if (typeof metadata.byteCount === "number" && Number.isFinite(metadata.byteCount))
+    result.byteCount = Math.max(0, Math.floor(metadata.byteCount));
+  if (typeof metadata.lineCount === "number" && Number.isFinite(metadata.lineCount))
+    result.lineCount = Math.max(0, Math.floor(metadata.lineCount));
+  if (typeof metadata.contentWithheld === "boolean")
+    result.contentWithheld = metadata.contentWithheld;
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function parsedStoredVirtualizerReceipt(
+  output: string,
+): Extract<ParsedToolResultVirtualizerReceipt, { kind: "stored" }> | undefined {
+  const parsed = parseToolResultVirtualizerReceipt(output);
+  return parsed?.kind === "stored" ? parsed : undefined;
+}
+
+function parsedFailureVirtualizerReceipt(
+  output: string,
+): Extract<ParsedToolResultVirtualizerReceipt, { kind: "failure" }> | undefined {
+  const parsed = parseToolResultVirtualizerReceipt(output);
+  return parsed?.kind === "failure" ? parsed : undefined;
+}
+
+function storedVirtualizerResult(output: string, details: unknown): StoredVirtualizerResult | undefined {
+  const metadata = toolResultVirtualizerMetadata(details);
+  const receipt = parsedStoredVirtualizerReceipt(output);
+  if (metadata?.contentReplaced !== true && receipt === undefined) return undefined;
+  return {
+    sourceId: metadata?.sourceId ?? receipt?.sourceId,
+    lineCount: metadata?.lineCount ?? receipt?.lineCount,
+    previewLines: receipt?.previewLines ?? [],
+  };
+}
+
+function failureVirtualizerResult(output: string, details: unknown): FailureVirtualizerResult | undefined {
+  const metadata = toolResultVirtualizerFailureMetadata(details);
+  const receipt = parsedFailureVirtualizerReceipt(output);
+  if (metadata === undefined && receipt === undefined) return undefined;
+
+  const fallbackLines = [
+    metadata?.lineCount !== undefined
+      ? `Original content withheld: ${plural(metadata.lineCount, "line")} withheld`
+      : "Original content withheld",
+    "No source id was created. Retry the original tool call after fixing the local tool-result virtualizer store.",
+  ];
+
+  return {
+    toolName: metadata?.toolName ?? receipt?.toolName,
+    lineCount: metadata?.lineCount ?? receipt?.lineCount,
+    failureLines: receipt?.failureLines.length ? receipt.failureLines : fallbackLines,
+  };
+}
+
+function storedDetailsVirtualizerResult(details: unknown): StoredDetailsVirtualizerResult | undefined {
+  const metadata = toolResultVirtualizerMetadata(details);
+  if (metadata?.hasOriginalDetails !== true) return undefined;
+  return {
+    sourceId: metadata.sourceId,
+    originalDetailsByteCount: metadata.originalDetailsByteCount,
+  };
+}
+
+function virtualizerStoredPreviewBlock(stored: StoredVirtualizerResult, theme: Theme): string {
+  const lines = [
+    stored.sourceId
+      ? `stored source: ${stored.sourceId} · use tool_result_get/export`
+      : "stored output",
+    ...(stored.previewLines.length > 0
+      ? stored.previewLines
+      : stored.lineCount !== undefined
+        ? [`… ${plural(stored.lineCount, "hidden stored line")}`]
+        : []),
+  ];
+  return detailLinesBlock(lines, theme);
+}
+
+function virtualizerFailureBlock(
+  title: string,
+  failure: FailureVirtualizerResult,
+  theme: Theme,
+  isError: boolean,
+): string {
+  const withheld = failure.lineCount !== undefined
+    ? `${plural(failure.lineCount, "line")} withheld`
+    : "content withheld";
+  const details = `${title} storage failed · ${withheld}`;
+  const summary = isError
+    ? `${muted(theme, `${RESULT_INDENT}└ `)}${theme.fg("error", "Failed")}${muted(theme, ` · ${details}`)}`
+    : treeLine(theme, title, `storage failed · ${withheld}`);
+  return `${summary}${detailLinesBlock(failure.failureLines, theme)}`;
+}
+
+function detailsStoredWarning(stored: StoredDetailsVirtualizerResult): string {
+  const parts = [
+    stored.sourceId
+      ? `details source: ${stored.sourceId} · use tool_result_export_details`
+      : "details stored in tool-result virtualizer",
+    stored.originalDetailsByteCount !== undefined
+      ? `${stored.originalDetailsByteCount} bytes`
+      : undefined,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function edgePreviewLines(
+  lines: string[],
+  edgeLines: number,
+  totalLineCount = lines.length,
+  hiddenLineLabel = "hidden line",
+): string[] {
+  const total = Math.max(lines.length, Math.max(0, Math.floor(totalLineCount)));
+  if (total <= edgeLines * 2) return lines;
+
+  const hidden = Math.max(0, total - edgeLines * 2);
+  const hiddenLine = `… ${plural(hidden, hiddenLineLabel)}`;
+  if (lines.length <= edgeLines * 2) {
+    const splitIndex = Math.min(edgeLines, lines.length);
+    return [
+      ...lines.slice(0, splitIndex),
+      hiddenLine,
+      ...lines.slice(splitIndex),
+    ];
+  }
+
+  return [
+    ...lines.slice(0, edgeLines),
+    hiddenLine,
+    ...lines.slice(-edgeLines),
+  ];
+}
+
+function detailLinesBlock(
+  lines: string[],
+  theme: Theme,
+  maxWidth = 120,
+): string {
+  if (lines.length === 0) return "";
+  return `\n${lines
+    .map((line) =>
+      muted(theme, `${DETAIL_INDENT}│ ${truncateVisible(line, maxWidth)}`),
+    )
+    .join("\n")}`;
+}
+
+function edgePreviewBlock(
+  lines: string[],
+  theme: Theme,
+  edgeLines: number,
+  maxWidth = 120,
+  totalLineCount = lines.length,
+  hiddenLineLabel = "hidden line",
+): string {
+  return detailLinesBlock(
+    edgePreviewLines(lines, edgeLines, totalLineCount, hiddenLineLabel),
+    theme,
+    maxWidth,
+  );
+}
+
+function callBlock(
+  theme: Theme,
+  title: string,
+  body: string,
+  lines: string[],
+  pending = false,
+): string {
+  const marker = pending ? "◦" : "●";
+  return `${theme.fg("accent", marker)} ${label(theme, title)}${muted(
+    theme,
+    "(",
+  )}${body}${muted(theme, ")")}${edgePreviewBlock(
+    lines,
+    theme,
+    BASH_SCRIPT_PREVIEW_EDGE_LINES,
+    120,
+    lines.length,
+    "hidden script line",
+  )}`;
+}
+
+function bashOutputLineCount(output: string, details: unknown): number {
+  const storedLineCount = storedVirtualizerResult(output, details)?.lineCount;
+  if (storedLineCount !== undefined) return storedLineCount;
+  return output.trim() === "(no output)" ? 0 : countLines(output);
+}
+
+function bashOutputStored(output: string, details: unknown): boolean {
+  return storedVirtualizerResult(output, details) !== undefined;
+}
+
+function bashOutputPreviewBlock(
+  output: string,
+  details: unknown,
+  theme: Theme,
+  expanded: boolean,
+): string {
+  const stored = storedVirtualizerResult(output, details);
+  if (stored) {
+    if (stored.previewLines.length > 0 || !expanded)
+      return virtualizerStoredPreviewBlock(stored, theme);
+    return `${virtualizerStoredPreviewBlock(stored, theme)}${previewBlock(output, theme, true, EXPANDED_PREVIEW_LINES)}`;
+  }
+
+  return expanded
+    ? previewBlock(output, theme, true, EXPANDED_PREVIEW_LINES)
+    : edgePreviewBlock(
+        contentLines(output),
+        theme,
+        BASH_OUTPUT_PREVIEW_EDGE_LINES,
+      );
 }
 
 function formatBashCall(args: unknown, theme: Theme, pending = false): string {
   const command = argString(args, "command", "");
   const lines = contentLines(command);
-  const body = lines.length > 1
-    ? `${lines.length}-line script · ${compactBashScriptPreview(lines)}`
-    : compactOneLine(command, 100);
-  return callLine(theme, "Bash", pathText(theme, body), pending);
+  if (lines.length > 1) {
+    return callBlock(
+      theme,
+      "Bash",
+      pathText(theme, `${lines.length}-line script`),
+      lines,
+      pending,
+    );
+  }
+  return callLine(theme, "Bash", pathText(theme, compactOneLine(command, 100)), pending);
 }
 
 function formatEditCall(args: unknown, theme: Theme, pending = false): string {
@@ -4144,11 +4436,6 @@ function formatWriteCall(args: unknown, theme: Theme, pending = false): string {
   );
 }
 
-function storedToolResultLineCount(output: string): number | undefined {
-  const match = output.match(/\bsize:\s*[^;\n]*?,\s*(\d+)\s+lines\b/i);
-  return match ? Number(match[1]) : undefined;
-}
-
 function renderReadResult(
   result: AgentToolResult<ReadToolDetails | undefined>,
   options: ToolRenderOptions,
@@ -4158,18 +4445,25 @@ function renderReadResult(
   if (options.isPartial) {
     return setText(context.lastComponent, treeLine(theme, "Reading", "..."));
   }
+
+  const details = result.details;
+  const filePath = detailString(details, "path") ?? argString(context.args, "path", "", true);
+  const output = textContent(result);
+  const failure = failureVirtualizerResult(output, details);
+  if (failure) {
+    return setText(
+      context.lastComponent,
+      virtualizerFailureBlock("Read", failure, theme, context.isError),
+    );
+  }
   if (context.isError) {
     return setText(
       context.lastComponent,
       errorResultBlock(result, theme, firstTextLine(result), options.expanded),
     );
   }
-
-  const details = result.details;
-  const filePath = detailString(details, "path") ?? argString(context.args, "path", "", true);
-  const output = textContent(result);
-  const lineCount = detailNumber(details, "totalLines") ?? storedToolResultLineCount(output) ?? countLines(output);
-  const stored = output.startsWith("[tool-result-virtualizer]");
+  const stored = storedVirtualizerResult(output, details);
+  const lineCount = detailNumber(details, "totalLines") ?? stored?.lineCount ?? countLines(output);
   const suffix = `${details?.truncation?.truncated ? " · truncated" : ""}${stored ? " · stored" : ""}`;
   const skillMatch = filePath.match(/\/skills\/([^/]+)\/SKILL\.md$/);
   if (skillMatch) {
@@ -4183,7 +4477,7 @@ function renderReadResult(
   const expanded = options.expanded || toolExecutionExpandedById.get(context.toolCallId) === true;
   return setText(
     context.lastComponent,
-    `${summary}${previewBlock(output, theme, expanded, EXPANDED_PREVIEW_LINES, 120, READ_PREVIEW_LINES)}`,
+    `${summary}${stored ? virtualizerStoredPreviewBlock(stored, theme) : previewBlock(output, theme, expanded, EXPANDED_PREVIEW_LINES, 120, READ_PREVIEW_LINES)}`,
   );
 }
 
@@ -4196,6 +4490,16 @@ function renderGrepResult(
   if (options.isPartial) {
     return setText(context.lastComponent, treeLine(theme, "Searching", "..."));
   }
+
+  const output = textContent(result);
+  const details = result.details;
+  const failure = failureVirtualizerResult(output, details);
+  if (failure) {
+    return setText(
+      context.lastComponent,
+      virtualizerFailureBlock("Grep", failure, theme, context.isError),
+    );
+  }
   if (context.isError) {
     return setText(
       context.lastComponent,
@@ -4203,9 +4507,8 @@ function renderGrepResult(
     );
   }
 
-  const output = textContent(result);
-  const details = result.details;
-  const outputLineCount = lineCountFromOutput(output, ["No matches found"]);
+  const stored = storedVirtualizerResult(output, details);
+  const outputLineCount = stored?.lineCount ?? lineCountFromOutput(output, ["No matches found"]);
   const matchCount = detailNumber(details, "matchCount");
   const contextLines = argNumber(context.args, "context");
   const extra = [
@@ -4221,13 +4524,14 @@ function renderGrepResult(
       : undefined,
     details?.truncation?.truncated ? "truncated" : undefined,
     details?.linesTruncated ? "long lines truncated" : undefined,
+    stored ? "stored" : undefined,
   ]
     .filter(Boolean)
     .join(" · ");
   const summary = treeLine(theme, "Grep", extra);
   return setText(
     context.lastComponent,
-    `${summary}${grepPreviewBlock(
+    `${summary}${stored ? virtualizerStoredPreviewBlock(stored, theme) : grepPreviewBlock(
       output,
       theme,
       options.expanded,
@@ -4246,6 +4550,16 @@ function renderFindResult(
   if (options.isPartial) {
     return setText(context.lastComponent, treeLine(theme, "Finding", "..."));
   }
+
+  const output = textContent(result);
+  const details = result.details;
+  const failure = failureVirtualizerResult(output, details);
+  if (failure) {
+    return setText(
+      context.lastComponent,
+      virtualizerFailureBlock("Find", failure, theme, context.isError),
+    );
+  }
   if (context.isError) {
     return setText(
       context.lastComponent,
@@ -4253,13 +4567,13 @@ function renderFindResult(
     );
   }
 
-  const output = textContent(result);
-  const details = result.details;
+  const stored = storedVirtualizerResult(output, details);
   const extra = [
     details?.resultLimitReached
       ? `limit ${details.resultLimitReached}`
       : undefined,
     details?.truncation?.truncated ? "truncated" : undefined,
+    stored ? "stored" : undefined,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -4267,7 +4581,7 @@ function renderFindResult(
     theme,
     "Find",
     `${plural(
-      lineCountFromOutput(output, ["No files found matching pattern"]),
+      stored?.lineCount ?? lineCountFromOutput(output, ["No files found matching pattern"]),
       "result",
     )}${extra ? ` · ${extra}` : ""}`,
   );
@@ -4276,7 +4590,7 @@ function renderFindResult(
     : output;
   return setText(
     context.lastComponent,
-    `${summary}${previewBlock(previewOutput, theme, options.expanded, 20)}`,
+    `${summary}${stored ? virtualizerStoredPreviewBlock(stored, theme) : previewBlock(previewOutput, theme, options.expanded, 20)}`,
   );
 }
 
@@ -4289,6 +4603,16 @@ function renderLsResult(
   if (options.isPartial) {
     return setText(context.lastComponent, treeLine(theme, "Listing", "..."));
   }
+
+  const output = textContent(result);
+  const details = result.details;
+  const failure = failureVirtualizerResult(output, details);
+  if (failure) {
+    return setText(
+      context.lastComponent,
+      virtualizerFailureBlock("List", failure, theme, context.isError),
+    );
+  }
   if (context.isError) {
     return setText(
       context.lastComponent,
@@ -4296,26 +4620,26 @@ function renderLsResult(
     );
   }
 
-  const output = textContent(result);
-  const details = result.details;
+  const stored = storedVirtualizerResult(output, details);
   const extra = [
     details?.entryLimitReached
       ? `limit ${details.entryLimitReached}`
       : undefined,
     details?.truncation?.truncated ? "truncated" : undefined,
+    stored ? "stored" : undefined,
   ]
     .filter(Boolean)
     .join(" · ");
   const summary = treeLine(
     theme,
     "List",
-    `${plural(lineCountFromOutput(output, ["(empty directory)"]), "entry", "entries")}${
+    `${plural(stored?.lineCount ?? lineCountFromOutput(output, ["(empty directory)"]), "entry", "entries")}${
       extra ? ` · ${extra}` : ""
     }`,
   );
   return setText(
     context.lastComponent,
-    `${summary}${previewBlock(output, theme, options.expanded, 20)}`,
+    `${summary}${stored ? virtualizerStoredPreviewBlock(stored, theme) : previewBlock(output, theme, options.expanded, 20)}`,
   );
 }
 
@@ -4325,28 +4649,54 @@ function renderBashResult(
   theme: Theme,
   context: ToolRenderContextLike,
 ): Text {
+  const output = textContent(result);
+  const failure = failureVirtualizerResult(output, result.details);
+  if (failure) {
+    return setText(
+      context.lastComponent,
+      virtualizerFailureBlock("Bash", failure, theme, context.isError),
+    );
+  }
+  const hasOutput = output.trim().length > 0;
+  const lineCount = bashOutputLineCount(output, result.details);
+  const stored = bashOutputStored(output, result.details);
+
   if (options.isPartial) {
-    return setText(context.lastComponent, treeLine(theme, "Running", "..."));
+    const summary = `${muted(theme, `${RESULT_INDENT}└ `)}${label(
+      theme,
+      "Running",
+    )}${muted(
+      theme,
+      hasOutput
+        ? ` · ${plural(lineCount, "line")}${stored ? " · stored" : ""}`
+        : " ...",
+    )}`;
+    return setText(
+      context.lastComponent,
+      `${summary}${bashOutputPreviewBlock(output, result.details, theme, options.expanded)}`,
+    );
   }
 
-  const output = textContent(result);
-  const lineCount = output.trim() === "(no output)" ? 0 : countLines(output);
   const exitCode = detailNumber(result.details, "exitCode");
   const status = context.isError
     ? theme.fg("error", "Failed")
     : label(theme, "Done");
   const details = context.isError
-    ? [exitCode !== undefined ? `exit ${exitCode}` : undefined, plural(lineCount, "line")]
+    ? [
+        exitCode !== undefined ? `exit ${exitCode}` : undefined,
+        plural(lineCount, "line"),
+        stored ? "stored" : undefined,
+      ]
         .filter(Boolean)
         .join(" · ")
-    : plural(lineCount, "line");
+    : `${plural(lineCount, "line")}${stored ? " · stored" : ""}`;
   const summary = `${muted(theme, `${RESULT_INDENT}└ `)}${status}${muted(
     theme,
     ` · ${details}`,
   )}`;
   return setText(
     context.lastComponent,
-    `${summary}${previewBlock(output, theme, options.expanded, 20)}`,
+    `${summary}${bashOutputPreviewBlock(output, result.details, theme, options.expanded)}`,
   );
 }
 
@@ -4391,11 +4741,16 @@ function renderEditResult(
 
   const diff = result.details?.diff ?? "";
   const { additions, removals } = countDiffLines(diff);
+  const detailsStored = storedDetailsVirtualizerResult(result.details);
   const summaryTitle =
     additions > 0 || removals > 0
       ? `Added ${additions}, removed ${removals}`
       : "Updated";
-  const summary = treeLine(theme, summaryTitle, "");
+  const summary = treeLine(
+    theme,
+    detailsStored ? `${summaryTitle} · details stored` : summaryTitle,
+    "",
+  );
   return setDiffResult(
     context.lastComponent,
     summary,
@@ -4403,6 +4758,7 @@ function renderEditResult(
     theme,
     options.expanded,
     COLLAPSED_EDIT_DIFF_LINES,
+    detailsStored ? detailsStoredWarning(detailsStored) : undefined,
   );
 }
 

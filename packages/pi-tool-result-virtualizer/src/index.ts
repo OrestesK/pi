@@ -5,6 +5,9 @@ import { ToolResultStore } from "./store.ts";
 import { buildToolResultTools } from "./tools.ts";
 import { virtualizeToolResult, type ToolResultEventLike } from "./virtualize.ts";
 
+export { parseToolResultVirtualizerReceipt } from "./receipt.ts";
+export type { ParsedToolResultVirtualizerReceipt } from "./receipt.ts";
+
 export default function piToolResultVirtualizer(pi: ExtensionApiLike) {
 	const store = new ToolResultStore(defaultStoreRoot());
 

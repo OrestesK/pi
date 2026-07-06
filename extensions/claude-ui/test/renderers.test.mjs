@@ -40,6 +40,51 @@ const context = (args = {}, extra = {}) => ({
   ...extra,
 });
 const options = (extra = {}) => ({ expanded: false, isPartial: false, ...extra });
+const virtualizedReceipt = (toolName = "read") => [
+  `[tool-result-virtualizer] Large ${toolName} result stored locally`,
+  "Source: tr_mock",
+  "Capture: event.content; size: 50.0 KiB, 1800 lines; sha256: abc",
+  "Preview only — not complete evidence. Do not make claims about hidden content from this receipt alone.",
+  "",
+  "## Cropped preview",
+  "Preview only — not complete evidence. Use the recommended summary path or exact retrieval/export before making claims about hidden content.",
+  "Sampled 30 of 1800 lines; omitted 1770 hidden lines.",
+  "### Head lines 1-10",
+  ...Array.from({ length: 10 }, (_, index) => `${index + 1}: head ${index + 1}`),
+  "[omitted 885 lines between samples]",
+  "### Middle lines 896-905",
+  ...Array.from({ length: 10 }, (_, index) => `${896 + index}: middle ${896 + index}`),
+  "[omitted 885 lines between samples]",
+  "### Tail lines 1791-1800",
+  ...Array.from({ length: 10 }, (_, index) => `${1791 + index}: tail ${1791 + index}`),
+  "",
+  "## Choose before relying on hidden content",
+  "Recommended summary path: call tool_result_summary_contract sourceId:\"tr_mock\" prompt:\"<focused question>\".",
+].join("\n");
+const virtualizerDetails = (extra = {}) => ({
+  toolResultVirtualizer: {
+    sourceId: "tr_mock",
+    toolName: "read",
+    lineCount: 1800,
+    contentReplaced: true,
+    ...extra,
+  },
+});
+const virtualizerFailureDetails = (extra = {}) => ({
+  toolResultVirtualizerFailure: {
+    toolName: "read",
+    byteCount: 51200,
+    lineCount: 1800,
+    contentWithheld: true,
+    receiptBytes: 160,
+    ...extra,
+  },
+});
+const virtualizedFailureReceipt = (toolName = "read") => [
+  `[tool-result-virtualizer] Large ${toolName} result failed before local storage completed`,
+  "Original content withheld: 50.0 KiB, 1800 lines",
+  "No source id was created. Retry the original tool call after fixing the local tool-result virtualizer store.",
+].join("\n");
 const escaped = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 function assertRenderedWithinWidth(component, widths = [40, 80, 160]) {
@@ -442,6 +487,40 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
     assertRenderedWithinWidth(component);
   }
 
+  const virtualizedWrappedComponent = ui.wrappedToolResult(
+    "code_search",
+    textResult(virtualizedReceipt("code_search"), virtualizerDetails({ toolName: "code_search" })),
+    options(),
+    theme,
+    context({}, { toolCallId: "code-search-virtualized" }),
+    "Code Search",
+  );
+  const virtualizedWrappedRendered = render(virtualizedWrappedComponent, 120);
+  assert.match(virtualizedWrappedRendered, /Code Search 1800 lines · stored/);
+  assert.match(virtualizedWrappedRendered, /stored source: tr_mock · use tool_result_get\/export/);
+  assert.match(virtualizedWrappedRendered, /Sampled 30 of 1800 lines; omitted 1770 hidden lines\./);
+  assert.match(virtualizedWrappedRendered, /Middle lines 896-905/);
+  assert.match(virtualizedWrappedRendered, /│ 905: middle 905/);
+  assert.doesNotMatch(virtualizedWrappedRendered, /tool-result-virtualizer/);
+  assert.doesNotMatch(virtualizedWrappedRendered, /Preview only/);
+  assert.doesNotMatch(virtualizedWrappedRendered, /Choose before relying/);
+  assertRenderedWithinWidth(virtualizedWrappedComponent);
+
+  const failureWrappedComponent = ui.wrappedToolResult(
+    "code_search",
+    textResult(virtualizedFailureReceipt("code_search"), virtualizerFailureDetails({ toolName: "code_search" })),
+    options(),
+    theme,
+    context({}, { toolCallId: "code-search-virtualizer-failure" }),
+    "Code Search",
+  );
+  const failureWrappedRendered = render(failureWrappedComponent, 120);
+  assert.match(failureWrappedRendered, /Code Search storage failed · 1800 lines withheld/);
+  assert.match(failureWrappedRendered, /Original content withheld: 50\.0 KiB, 1800 lines/);
+  assert.match(failureWrappedRendered, /No source id was created/);
+  assert.doesNotMatch(failureWrappedRendered, /stored source/);
+  assertRenderedWithinWidth(failureWrappedComponent);
+
   const collapsedGet = render(
     ui.wrappedToolResult(
       "tool_result_get",
@@ -652,15 +731,22 @@ test("local built-in tool call/result renderers cover temp-safe branches", () =>
   assert.match(ui.formatBashCall({ command: "printf ok" }, theme), /printf ok/);
   assert.equal(
     ui.formatBashCall({ command: "printf one\nprintf two" }, theme),
-    "● Bash(2-line script · printf one · printf two)",
+    "● Bash(2-line script)\n    │ printf one\n    │ printf two",
   );
-  assert.equal(
-    ui.formatBashCall({ command: "printf one\nprintf two\nprintf three\nprintf four\nprintf five" }, theme),
-    "● Bash(5-line script · printf one · printf two · … · printf four · printf five)",
-  );
-  assert.equal(
-    ui.formatBashCall({ command: "printf one\nprintf two\nprintf three\nprintf four\nprintf five" }, theme, true),
-    "◦ Bash(5-line script · printf one · printf two · … · printf four · printf five)",
+  const longBashScript = Array.from(
+    { length: 12 },
+    (_, index) => `printf ${index + 1}`,
+  ).join("\n");
+  const longBashCall = ui.formatBashCall({ command: longBashScript }, theme);
+  assert.match(longBashCall, /● Bash\(12-line script\)/);
+  assert.match(longBashCall, /│ printf 1/);
+  assert.match(longBashCall, /│ printf 5/);
+  assert.match(longBashCall, /… 2 hidden script lines/);
+  assert.match(longBashCall, /│ printf 12/);
+  assert.doesNotMatch(longBashCall, /│ printf 6/);
+  assert.match(
+    ui.formatBashCall({ command: longBashScript }, theme, true),
+    /◦ Bash\(12-line script\)/,
   );
   assert.match(ui.formatEditCall({ path: "/tmp/file.txt" }, theme), /Update/);
   assert.match(ui.formatWriteCall({ path: "/tmp/file.txt", content: "a\nb" }, theme), /Write/);
@@ -709,6 +795,22 @@ test("local built-in tool call/result renderers cover temp-safe branches", () =>
   assert.doesNotMatch(virtualizedSkillReadRendered, /tool-result-virtualizer/);
   assertRenderedWithinWidth(virtualizedSkillReadComponent);
 
+  const virtualizedReadComponent = ui.renderReadResult(
+    textResult(virtualizedReceipt("read"), virtualizerDetails({ toolName: "read" })),
+    options(),
+    theme,
+    context({ path: "/tmp/large.txt" }, { toolCallId: "read-virtualized" }),
+  );
+  const virtualizedReadRendered = render(virtualizedReadComponent, 120);
+  assert.match(virtualizedReadRendered, /Read 1800 lines · stored/);
+  assert.match(virtualizedReadRendered, /stored source: tr_mock · use tool_result_get\/export/);
+  assert.match(virtualizedReadRendered, /Middle lines 896-905/);
+  assert.match(virtualizedReadRendered, /│ 905: middle 905/);
+  assert.doesNotMatch(virtualizedReadRendered, /tool-result-virtualizer/);
+  assert.doesNotMatch(virtualizedReadRendered, /Preview only/);
+  assert.doesNotMatch(virtualizedReadRendered, /Choose before relying/);
+  assertRenderedWithinWidth(virtualizedReadComponent);
+
   const grepComponent = ui.renderGrepResult(
     textResult("file.ts-1-before\nfile.ts:2:match\nfile.ts-3-after", { matchCount: 1 }),
     options(),
@@ -728,6 +830,57 @@ test("local built-in tool call/result renderers cover temp-safe branches", () =>
   assert.match(render(grepFallbackComponent, 120), /Grep 1 output line/);
   assertRenderedWithinWidth(grepFallbackComponent);
 
+  const virtualizedGrepComponent = ui.renderGrepResult(
+    textResult(virtualizedReceipt("grep"), virtualizerDetails({ toolName: "grep" })),
+    options(),
+    theme,
+    context({ pattern: "needle", path: "." }, { toolCallId: "grep-virtualized" }),
+  );
+  const virtualizedGrepRendered = render(virtualizedGrepComponent, 120);
+  assert.match(virtualizedGrepRendered, /Grep 1800 output lines · stored/);
+  assert.match(virtualizedGrepRendered, /stored source: tr_mock · use tool_result_get\/export/);
+  assert.match(virtualizedGrepRendered, /Middle lines 896-905/);
+  assert.doesNotMatch(virtualizedGrepRendered, /tool-result-virtualizer/);
+  assertRenderedWithinWidth(virtualizedGrepComponent);
+
+  const virtualizedFindComponent = ui.renderFindResult(
+    textResult(virtualizedReceipt("find"), virtualizerDetails({ toolName: "find" })),
+    options(),
+    theme,
+    context({ pattern: "*" }, { toolCallId: "find-virtualized" }),
+  );
+  const virtualizedFindRendered = render(virtualizedFindComponent, 120);
+  assert.match(virtualizedFindRendered, /Find 1800 results · stored/);
+  assert.match(virtualizedFindRendered, /Sampled 30 of 1800 lines/);
+  assert.match(virtualizedFindRendered, /Tail lines 1791-1800/);
+  assert.doesNotMatch(virtualizedFindRendered, /tool-result-virtualizer/);
+  assertRenderedWithinWidth(virtualizedFindComponent);
+
+  const virtualizedLsComponent = ui.renderLsResult(
+    textResult(virtualizedReceipt("ls"), virtualizerDetails({ toolName: "ls" })),
+    options(),
+    theme,
+    context({ path: "." }, { toolCallId: "ls-virtualized" }),
+  );
+  const virtualizedLsRendered = render(virtualizedLsComponent, 120);
+  assert.match(virtualizedLsRendered, /List 1800 entries · stored/);
+  assert.match(virtualizedLsRendered, /Head lines 1-10/);
+  assert.match(virtualizedLsRendered, /Middle lines 896-905/);
+  assert.doesNotMatch(virtualizedLsRendered, /tool-result-virtualizer/);
+  assertRenderedWithinWidth(virtualizedLsComponent);
+
+  const failureGrepComponent = ui.renderGrepResult(
+    textResult(virtualizedFailureReceipt("grep"), virtualizerFailureDetails({ toolName: "grep" })),
+    options(),
+    theme,
+    context({ pattern: "needle", path: "." }, { toolCallId: "grep-virtualizer-failure", isError: true }),
+  );
+  const failureGrepRendered = render(failureGrepComponent, 120);
+  assert.match(failureGrepRendered, /Failed · Grep storage failed · 1800 lines withheld/);
+  assert.match(failureGrepRendered, /No source id was created/);
+  assert.doesNotMatch(failureGrepRendered, /stored source/);
+  assertRenderedWithinWidth(failureGrepComponent);
+
   const bashComponent = ui.renderBashResult(
     textResult("ok", { exitCode: 0 }),
     options(),
@@ -737,6 +890,129 @@ test("local built-in tool call/result renderers cover temp-safe branches", () =>
   assert.match(render(bashComponent), /Done/);
   assert.match(render(bashComponent), /1 line/);
   assertRenderedWithinWidth(bashComponent);
+
+  const longBashOutput = Array.from(
+    { length: 12 },
+    (_, index) => `output ${index + 1}`,
+  ).join("\n");
+  const runningBashComponent = ui.renderBashResult(
+    textResult(longBashOutput),
+    options({ isPartial: true }),
+    theme,
+    context({ command: "printf many" }, { toolCallId: "bash-running" }),
+  );
+  const runningBashRendered = render(runningBashComponent, 120);
+  assert.match(runningBashRendered, /Running · 12 lines/);
+  assert.match(runningBashRendered, /│ output 1/);
+  assert.match(runningBashRendered, /│ output 5/);
+  assert.match(runningBashRendered, /… 2 hidden lines/);
+  assert.match(runningBashRendered, /│ output 12/);
+  assert.doesNotMatch(runningBashRendered, /│ output 6/);
+  assertRenderedWithinWidth(runningBashComponent);
+
+  const finishedLongBashComponent = ui.renderBashResult(
+    textResult(longBashOutput, { exitCode: 0 }),
+    options(),
+    theme,
+    context({ command: "printf many" }, { toolCallId: "bash-finished-long" }),
+  );
+  const finishedLongBashRendered = render(finishedLongBashComponent, 120);
+  assert.match(finishedLongBashRendered, /Done · 12 lines/);
+  assert.match(finishedLongBashRendered, /│ output 1/);
+  assert.match(finishedLongBashRendered, /│ output 5/);
+  assert.match(finishedLongBashRendered, /… 2 hidden lines/);
+  assert.match(finishedLongBashRendered, /│ output 12/);
+  assert.doesNotMatch(finishedLongBashRendered, /│ output 6/);
+  assertRenderedWithinWidth(finishedLongBashComponent);
+
+  const virtualizedBashReceipt = [
+    "[tool-result-virtualizer] Large bash result stored locally",
+    "Source: tr_bash_mock",
+    "Capture: details.fullOutputPath; size: 50.0 KiB, 1800 lines; sha256: abc",
+    "",
+    "## Cropped preview",
+    "Preview only — not complete evidence. Use the recommended summary path or exact retrieval/export before making claims about hidden content.",
+    "Sampled 30 of 1800 lines; omitted 1770 hidden lines.",
+    "### Head lines 1-10",
+    ...Array.from({ length: 10 }, (_, index) => `${index + 1}: head ${index + 1}`),
+    "[omitted 885 lines between samples]",
+    "### Middle lines 896-905",
+    ...Array.from({ length: 10 }, (_, index) => `${896 + index}: middle ${896 + index}`),
+    "[omitted 885 lines between samples]",
+    "### Tail lines 1791-1800",
+    ...Array.from({ length: 10 }, (_, index) => `${1791 + index}: tail ${1791 + index}`),
+    "",
+    "## Choose before relying on hidden content",
+  ].join("\n");
+  const virtualizedBashComponent = ui.renderBashResult(
+    textResult(virtualizedBashReceipt, {
+      toolResultVirtualizer: {
+        sourceId: "tr_bash_mock",
+        lineCount: 1800,
+        contentReplaced: true,
+      },
+    }),
+    options(),
+    theme,
+    context({ command: "produce large output" }, { toolCallId: "bash-virtualized" }),
+  );
+  const virtualizedBashRendered = render(virtualizedBashComponent, 120);
+  assert.match(virtualizedBashRendered, /Done · 1800 lines · stored/);
+  assert.match(virtualizedBashRendered, /stored source: tr_bash_mock · use tool_result_get\/export/);
+  assert.match(virtualizedBashRendered, /Sampled 30 of 1800 lines; omitted 1770 hidden lines\./);
+  assert.match(virtualizedBashRendered, /Head lines 1-10/);
+  assert.match(virtualizedBashRendered, /│ 1: head 1/);
+  assert.match(virtualizedBashRendered, /│ 10: head 10/);
+  assert.match(virtualizedBashRendered, /\[omitted 885 lines between samples\]/);
+  assert.match(virtualizedBashRendered, /Middle lines 896-905/);
+  assert.match(virtualizedBashRendered, /│ 896: middle 896/);
+  assert.match(virtualizedBashRendered, /│ 905: middle 905/);
+  assert.match(virtualizedBashRendered, /Tail lines 1791-1800/);
+  assert.match(virtualizedBashRendered, /│ 1791: tail 1791/);
+  assert.match(virtualizedBashRendered, /│ 1800: tail 1800/);
+  assert.doesNotMatch(virtualizedBashRendered, /tool-result-virtualizer/);
+  assert.doesNotMatch(virtualizedBashRendered, /Preview only/);
+  assert.doesNotMatch(virtualizedBashRendered, /Choose before relying/);
+  assertRenderedWithinWidth(virtualizedBashComponent);
+
+  const runningVirtualizedBashComponent = ui.renderBashResult(
+    textResult(virtualizedBashReceipt, {
+      toolResultVirtualizer: {
+        sourceId: "tr_bash_mock",
+        lineCount: 1800,
+        contentReplaced: true,
+      },
+    }),
+    options({ isPartial: true }),
+    theme,
+    context({ command: "produce large output" }, { toolCallId: "bash-virtualized-running" }),
+  );
+  const runningVirtualizedBashRendered = render(runningVirtualizedBashComponent, 120);
+  assert.match(runningVirtualizedBashRendered, /Running · 1800 lines · stored/);
+  assert.match(runningVirtualizedBashRendered, /Middle lines 896-905/);
+  assert.match(runningVirtualizedBashRendered, /│ 905: middle 905/);
+  assert.match(runningVirtualizedBashRendered, /Tail lines 1791-1800/);
+  assertRenderedWithinWidth(runningVirtualizedBashComponent);
+
+  const failedVirtualizedBashComponent = ui.renderBashResult(
+    textResult(virtualizedBashReceipt, {
+      exitCode: 17,
+      toolResultVirtualizer: {
+        sourceId: "tr_bash_mock",
+        lineCount: 1800,
+        contentReplaced: true,
+      },
+    }),
+    options(),
+    theme,
+    context({ command: "produce large output" }, { toolCallId: "bash-virtualized-failed", isError: true }),
+  );
+  const failedVirtualizedBashRendered = render(failedVirtualizedBashComponent, 120);
+  assert.match(failedVirtualizedBashRendered, /Failed · exit 17 · 1800 lines · stored/);
+  assert.match(failedVirtualizedBashRendered, /Head lines 1-10/);
+  assert.match(failedVirtualizedBashRendered, /Middle lines 896-905/);
+  assert.match(failedVirtualizedBashRendered, /Tail lines 1791-1800/);
+  assertRenderedWithinWidth(failedVirtualizedBashComponent);
 
   const failedBashComponent = ui.renderBashResult(
     textResult("stderr line 1\nstderr line 2", { exitCode: 17 }),
@@ -770,6 +1046,27 @@ test("local built-in tool call/result renderers cover temp-safe branches", () =>
   assert.match(render(editComponent), /\+new/);
   assert.match(render(editComponent), /-old/);
   assertRenderedWithinWidth(editComponent);
+
+  const detailsStoredEditComponent = ui.renderEditResult(
+    textResult("Updated", {
+      diff: "[stored original detail: 4096 bytes]",
+      toolResultVirtualizer: {
+        sourceId: "tr_edit_details",
+        toolName: "edit",
+        contentReplaced: false,
+        hasOriginalDetails: true,
+        originalDetailsByteCount: 4096,
+      },
+    }),
+    options(),
+    theme,
+    context({ path: "/tmp/file.txt" }, { toolCallId: "edit-details-stored" }),
+  );
+  const detailsStoredEditRendered = render(detailsStoredEditComponent, 120);
+  assert.match(detailsStoredEditRendered, /Updated · details stored/);
+  assert.match(detailsStoredEditRendered, /details source: tr_edit_details · use tool_result_export_details/);
+  assert.match(detailsStoredEditRendered, /\[stored original detail: 4096 bytes\]/);
+  assertRenderedWithinWidth(detailsStoredEditComponent);
 });
 
 test("temp-dir local mutation simulation remains sandboxed and renderable", () => {
@@ -797,6 +1094,27 @@ test("temp-dir local mutation simulation remains sandboxed and renderable", () =
     assert.match(writeRendered, /new/);
     assert.doesNotMatch(writeRendered, /diff unavailable because previous content was not captured/);
     assertRenderedWithinWidth(writeComponent);
+
+    const writeWithVirtualizerDetailsComponent = ui.renderWriteResult(
+      textResult(`Updated ${target}`, {
+        toolResultVirtualizer: {
+          sourceId: "tr_write_details",
+          toolName: "write",
+          contentReplaced: false,
+          hasOriginalDetails: true,
+          originalDetailsByteCount: 4096,
+        },
+      }),
+      options(),
+      theme,
+      context({ path: target, content: after }, { toolCallId: "temp-write-with-virtualizer-details" }),
+    );
+    const writeWithVirtualizerDetailsRendered = render(writeWithVirtualizerDetailsComponent, 120);
+    assert.match(writeWithVirtualizerDetailsRendered, /Wrote 1 line/);
+    assert.doesNotMatch(writeWithVirtualizerDetailsRendered, /details stored/);
+    assert.doesNotMatch(writeWithVirtualizerDetailsRendered, /details source:/);
+    assert.doesNotMatch(writeWithVirtualizerDetailsRendered, /tool_result_export_details/);
+    assertRenderedWithinWidth(writeWithVirtualizerDetailsComponent);
 
     const editComponent = ui.renderEditResult(
       textResult("Updated", { diff: `--- ${target}\n+++ ${target}\n@@\n-old\n+new` }),
