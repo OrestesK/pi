@@ -17,5 +17,8 @@
   "parallel": {
     "maxTasks": 32,
     "concurrency": 16
+  },
+  "progress": {
+    "reportMode": "supervisor"
   }
 }

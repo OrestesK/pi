@@ -42,11 +42,76 @@ For long or tool-heavy tasks, periodically summarize:
 Do not reveal hidden chain-of-thought. Summarize evidence, conclusions, and tool results.
 
 For parent/orchestrator async subagent use:
-- always load/follow `pi-subagents` when async delegation materially affects the task
+- always load and follow `pi-subagents`
 - track every async run id and relevant output/progress path
 - prefer event-based progress over polling
 - inspect relevant async outputs before final claims
 - do not finish while relevant async work is unresolved unless explicitly reporting it as pending
+
+## Slack time
+
+### Definition
+
+Slack time means anytime that you are not currently reasoning or outputting results. This almost always means the time that you have async subagents or tasks running but need their output to continue, so you are currently in slack time.
+
+Slack time also is when you are asking a user a question. You should count the time just before you ask the user a question as slack and act on it before asking the question.
+
+Be aggressive. Assume you are in slack time when in doubt. Always act when in slack.
+
+### Goals
+
+Slack time must become reflection time. Here are the goals of reflection:
+- **Simplicity:** smaller, clearer, more direct path
+- **Complexity:** over-abstraction, unnecessary compatibility, defensive code, brittle workflow, extra moving parts
+- **Elegance:** cleaner cohesion, naming, API shape, control flow, and user-facing behavior
+- **Architecture:** fit with existing structure, ownership, dependency direction, and local patterns
+- **Prior context:** compaction summaries, prior decisions, unresolved risks, session artifacts
+- **Memory:** relevant repo runbooks, known failures, setup gotchas, command flows, stable preferences
+- **TODO management:** relevant TODOs, claimed tasks, stale task state, unchecked plan items
+- **Forgotten constraints:** approvals, non-goals, tests, docs, comments, user preferences, review findings
+- **Creative next moves:** “you might not have thought of this” alternatives: simpler decomposition, hidden test case, adjacent bug, cleanup opportunity, sharper subagent prompt, better verification angle
+
+### Spawning
+
+You should spawn a swarm of subagents one with each each goal, and a synthetizer subagent to group those into one output:
+- These must be parallel async, followed by synthetizer chain
+- You can have multiple of each goal, with different angles
+- Do not wait or depend on them
+- Do not give or request progress updates
+- Ignore blocked/need-input
+- Must result in one final output
+
+### Guidelines
+
+- Prefer creative, adversarial, simplifying, and forgotten-context advisors
+- Do not launch duplicate vague agents. Each child needs a named angle, novelty/delta, and stop condition
+- Use generic review only when there is a concrete review surface
+- Reflection must be relevant facts and evidence, not a passive summary
+
+### Output
+
+Among other things, the synthetized output must at minimum multiple in each of these categories:
+- `You may not have thought of this:` non-obvious ideas, risks, simplifications, or test angle
+- `Actions:` actions, ranked by impact/severity and with confidence level. Each should also include:
+  - `Novelty / delta:` what this adds beyond known context or other active/recent advisors.
+  - `Evidence:` files, lines, artifacts, commands, memories, sources inspected, and more
+  - `Tradeoff:` why the move helps and what it could cost
+  - `Approval boundary:` anything needing user inspection before action, or things that we assumed but not grounded with exclicit facts
+
+Each action should also be categorized into:
+  - adopt now
+  - reject with reason
+  - defer
+  - needs approval
+  - changes to plan/tests/verification
+  - new subagent worth launching
+
+Forbidden:
+- generic “looks good”
+- broad summaries
+- duplicate findings already known
+- implementation instructions assuming unapproved scope
+- claims without evidence
 
 ## Hard safety rules
 
@@ -111,11 +176,11 @@ This applies only to external, mutation-capable MCPs (e.g. Notion, Google Drive)
 
 Tool use is heavily encouraged and default-on when it reasonably improves correctness, safety, speed, context quality, or user visibility. Do not treat tools as optional decoration.
 
-Use the least-powerful suitable tool, start with narrow probes, avoid redundant calls for the same fact, and stop when evidence is sufficient. Skip tools only when the task is trivial, a simpler source is clearly sufficient, the tool would be noisy/stale/unsafe/disproportionate, or required clarification/approval is the real blocker.
+Use the least-powerful suitable tool, start with narrow probes, avoid redundant calls for the same fact, and stop when evidence is sufficient. Skip tools only when the tool would be noisy/stale/unsafe/disproportionate, or required clarification/approval is the real blocker.
 
 ### Resource and cost posture
 
-- For agent tool use and orchestration, bias toward sufficient evidence, speed, and correctness over token or API-cost savings. Do not under-use available local tools, live LLM queries, or distinct scout/reviewer subagents solely to conserve tokens or cost when they materially improve confidence, coverage, or iteration speed. This does not bias product/API design, architecture, or user-facing behavior toward resource efficiency unless that is an explicit requirement.
+- For agent tool use and orchestration, bias toward sufficient evidence, speed, and correctness over token or API-cost savings. Do not EVER under-use available local tools, live LLM queries, or distinct scout/reviewer subagents solely to conserve tokens or cost when they materially improve confidence, coverage, or iteration speed. This does not bias product/API design, architecture, or user-facing behavior toward resource efficiency unless that is an explicit requirement.
 - Prefer maximum useful parallelism for independent read-only work: run non-overlapping tool probes and sectioned subagent swarms concurrently when the task is broad, uncertain, high-stakes, or time-sensitive. Keep scopes distinct, bounded, and fan-in/reducer-backed; stop when evidence is sufficient.
 - Token or live-LLM-query cost alone is not a reason to ask before bounded read-only research. For very large query/fanout batches, including hundreds or thousands of live LLM queries, do not reject the approach on cost grounds; if the user has not explicitly requested that scale, ask once with a recommended bounded-wave/reducer plan.
 
@@ -128,7 +193,7 @@ Use the least-powerful suitable tool, start with narrow probes, avoid redundant 
 
 ### Docs and web
 
-- Use context7 for library/framework docs when available. Do not rely on memory when current docs or source can verify it.
+- Use context7 for library/framework docs when available. Do not rely on memory when current docs or source can verify it
 - Use web/content search for current non-library research
 - Use `code_search` or `web_search` when examples, ecosystem usage, or current external behavior would materially improve confidence
 
@@ -152,14 +217,6 @@ Use the least-powerful suitable tool, start with narrow probes, avoid redundant 
 - Review total effective diffs with `git diff HEAD -- <path>` or `git diff -U20 HEAD -- <path>`
 - For untracked files, use `git ls-files --others --exclude-standard` and read contents separately
 - Inspect changed hunks before claiming behavior preservation, completion, or readiness
-
-### Resource-heavy work
-
-- Use the narrowest safe query first
-- Do not scan whole buckets, tables, repos, logs, or cloud resources without explicit approval
-- Prefer known IDs, bounded prefixes, server-side filters, pagination/limits, cached indexes, sampled reads, or small probes
-- When artifacts are allowed, write large raw outputs to `.scratch/` and summarize
-- Keep parallelism as high as possible and need, but still bounded
 
 ### Context hygiene
 
@@ -205,13 +262,13 @@ If uncertain, classify higher inside `manager-workflow`. If the user says “wai
 - When launching subagents, pass explicit task-critical context in the dispatch prompt; do not rely on inherited or forked context. Keep detailed dispatch-packet protocol in `packages/pi-subagents/skills/pi-subagents/SKILL.md` and match task prose with runtime flags
 - Use `scout` for read-only recon, `worker` for one focused implementation task, `reviewer` for evidence-backed review
 - Keep one writer at a time unless isolated worktrees/workspaces are explicitly approved
-- For parallel read-only scouts/reviewers, give distinct angles and `output: false` or unique output paths
+- For parallel read-only scouts/reviewers, give distinct angles; use `output:false`, `progress:false`, and `artifacts:false` when repo artifacts are not allowed, or unique output paths when artifacts are allowed
 - Workers write summaries/artifacts to `.scratch/`; parent verifies from diffs/output/checks
 - Fresh reviewers are the default quality pressure for nontrivial planning, debugging, implementation, refactor, architecture, benchmark, config, or final readiness
 - Use sectioned swarms when multiple independent concerns or stakes/uncertainty justify independent review; detailed routing lives in `packages/pi-subagents/skills/pi-subagents/SKILL.md`
 - Do not swarm ordinary factual questions, tiny lookups, one narrow parent-verifiable check, one bounded review concern, or pure user-intent clarification
 - Parent may launch read-only second targeted swarms without asking only for a named new evidence angle from the first pass
-- Read-only/advisory swarms do not grant write authority; child tasks inherit no-edit/no-artifact/no-live constraints and normal approval gates
+- Read-only/advisory swarms do not grant write authority; parent constraints must be repeated in each child prompt and matched to safe role/tool/output settings. Advisory labels do not automatically enforce no-live/no-artifact.
 - For quality gates, synthesize reviewer output into `PASS`, `FAIL`, or `INCONCLUSIVE`; child output alone is not the verdict
 - For proposal verification, review the proposal itself before implementation scouting, placement hunting, planning, or worker handoff
 - When the user asks to verify, pressure-test, review, argue both sides, research/decide, or “do it if it survives” after this session proposed a plan/diagnosis/workflow, run a proposal-level adversarial gate first
