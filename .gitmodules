@@ -1,0 +1,4 @@
+[submodule "packages/pisesh"]
+	path = packages/pisesh
+	url = git@github.com:OrestesK/pisesh.git
+	branch = orestes/local
