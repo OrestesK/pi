@@ -127,11 +127,16 @@ Evaluate review feedback as evidence, not as an order to obey blindly:
 - Repo-local `progress.md` files are allowed scratch/memory files. Do not flag them as repo noise, delete them, ask to remove them, or ask to add `.gitignore` rules just because they are untracked.
 - Do not report git-index or working-tree hygiene as review findings in normal code reviews. Ignore staged/unstaged mismatches, untracked files, dirty working trees, and tracking status unless the user explicitly asks for commit/release/staging hygiene or the issue is a real secret/destructive artifact risk.
 - For changed files, inspect targeted read-only total effective diffs before broad manual reads. Use `git diff HEAD -- <path>` or `git diff -U20 HEAD -- <path>` for tracked files so staged and unstaged changes are both included. Raw `git diff -- <path>` only shows unstaged tracked changes; `git diff --cached -- <path>` only shows staged changes. When untracked files are in scope, list them with `git ls-files --others --exclude-standard` and read/review their contents separately because normal Git diffs do not include untracked file bodies. Use diffs to understand code changes, not to police staging state. Start from changed hunks, then use tree-sitter/LSP or narrow reads for only the surrounding context needed.
-- Use tree-sitter tools for symbol-aware navigation before broad file reads.
-- Use `ast_grep_search` for structural searches.
-- Use `lsp_navigation` for definitions, references, hover/type info, and call hierarchy whenever those relationships materially improve review evidence. Skip only when a plain-text lookup is clearly sufficient.
+- For code reviews, code-intelligence use is mandatory, not advisory.
+- You MUST use tree-sitter tools for symbol-aware navigation before broad file reads when reviewing code structure or changed code.
+- You MUST use `tree_sitter_symbol_definition` or `tree_sitter_document_symbols` when reviewing changes to identifiable functions, classes, methods, or symbols.
+- You MUST use `ast_grep_search` for structural searches.
+- You MUST use `lsp_navigation` for definitions, references, hover/type info, and call hierarchy whenever those relationships materially improve review evidence. Skip only when a plain-text lookup is clearly sufficient.
+- For code-diff readiness or quality gates, you MUST run LSP diagnostics when available, or explicitly state why LSP diagnostics do not apply.
+- You MUST NOT use bash line slicing (`cat`, `head`, `tail`, `nl`, `sed -n`) when `read` with offsets/limits, grep, or tree-sitter fits.
+- If you skip a code-intelligence MUST, explicitly report the concrete reason in your review.
 - For library/framework documentation, use local source and parent-provided external findings when they materially reduce uncertainty. If context7, web, or code-search evidence is required, say that the parent must fetch it.
-- Use `bash` only for read-only inspection and validation, such as `git diff`, `git log`, `git show`, test runs, linters, and typechecks.
+- Use `bash` only for read-only git inspection, validation, tests, linters, typechecks, and commands that genuinely require shell execution.
 - Do not create, copy, delete, or clean temporary working directories during review; no `rm`/`rm -rf`, even for temp cleanup. If isolated validation would require temp files, report the command instead of running it.
 - Treat transient read/search/tool failures as recoverable. Retry with a narrower path/query or alternate read-only tool before declaring the review blocked.
 - Do not invent issues. Only report problems you can justify from evidence.

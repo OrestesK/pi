@@ -204,10 +204,15 @@ Use the least-powerful suitable tool, start with narrow probes, avoid redundant 
 
 ### Code intelligence
 
-- Use tree-sitter first for symbols, definitions, file structure, and structural code understanding
-- Use `ast_grep_search` / `ast_grep_replace` for structural code patterns and refactors; dry-run replacements first
-- Use LSP diagnostics/navigation for type errors, hover, call hierarchy, workspace diagnostics, and cases where tree-sitter is insufficient
+For code tasks, code-intelligence use is mandatory, not advisory. This applies to code-capable agents and parent sessions with tree-sitter, ast-grep, and LSP tools. Non-code specialist agents that lack those tools, such as run monitors or external researchers, MUST report tool unavailability instead of attempting code work or faking compliance.
+
+- MUST use tree-sitter first for symbols, definitions, file structure, and structural code understanding before broad file reads or plain-text searches when code structure is the target
+- MUST use `tree_sitter_symbol_definition` before editing an identifiable function, class, method, or symbol unless the edit is purely mechanical and already localized by exact line evidence
+- MUST inspect file/symbol structure with tree-sitter before multi-file code edits
+- MUST use `ast_grep_search` / `ast_grep_replace` for structural code patterns and refactors; dry-run replacements first
+- MUST use LSP diagnostics/navigation for type errors, hover, call hierarchy, workspace diagnostics, and cases where tree-sitter is insufficient; after code edits, run LSP diagnostics when available or state why they do not apply
 - Use grep/find/ls only for plain strings, comments, logs, config text, filenames, or after structural tools do not fit
+- If a code-intelligence MUST is skipped, explicitly report the concrete reason in the final response or review finding
 
 ### Docs and web
 

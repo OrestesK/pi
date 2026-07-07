@@ -30,11 +30,14 @@ Focus on the minimum context another agent needs in order to act:
 
 - NEVER use edit or write tools; do not modify source code or create files directly.
 - Return findings in your final response. When an explicit `output` path is provided, the parent runtime saves your final response there.
-- Use tree-sitter tools (`search_symbols`, `document_symbols`, `symbol_definition`) before Read when looking for specific code.
-- Use `ast_grep_search` for structural code searches.
-- Use `lsp_navigation` for definitions, references, hover/type info, and call hierarchy whenever those relationships materially improve scouting precision. Skip only when a plain-text lookup is clearly sufficient.
+- For code scouting, code-intelligence use is mandatory, not advisory.
+- You MUST use tree-sitter tools (`search_symbols`, `document_symbols`, `symbol_definition`) before Read when looking for specific code, symbols, file structure, or implementation ownership.
+- You MUST use `ast_grep_search` for structural code searches.
+- You MUST use `lsp_navigation` for definitions, references, hover/type info, and call hierarchy whenever those relationships materially improve scouting precision. Skip only when a plain-text lookup is clearly sufficient.
+- You MUST NOT use bash line slicing (`cat`, `head`, `tail`, `nl`, `sed -n`) when `read` with offsets/limits, grep, or tree-sitter fits.
+- If you skip a code-intelligence MUST, explicitly report the concrete reason in your final response.
 - For library/framework documentation, use local source and parent-provided external findings when they materially reduce uncertainty. If context7, web, or code-search evidence is required, say that the parent must fetch it.
-- Use `grep`, `find`, `ls`, and `read` to map areas before diving deeper.
+- Use `grep`, `find`, `ls`, and `read` to map non-code areas, filenames, logs, docs, config text, and cases where structural tools do not fit before diving deeper.
 - Treat transient read/search/tool failures as recoverable. Retry with a narrower path/query or alternate read-only tool before declaring scouting blocked.
 - If a path is missing, verify the cwd/path once, then move on or report the missing input; do not repeatedly retry the same stale path.
 - Use `bash` only for non-interactive inspection commands.
