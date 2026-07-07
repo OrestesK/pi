@@ -174,7 +174,7 @@ Use `review-matrix-reduce` when the user asks for many/10 reviewers with differe
 When no catalog recipe fits, design a runtime shape before launch:
 
 1. Objective: what outcome the workflow must produce.
-2. Why parent-only is not the right default, or the explicit reason it is unavoidable.
+2. why parent-only is insufficient, or the explicit reason parent-only is unavoidable.
 3. Child roles and why each is distinct.
 4. Swarm vs chain decision.
 5. Required fan-in/reducer stage.
@@ -196,7 +196,7 @@ Default to sectioned swarms for these shapes:
 - broad test, edge-case, live-validation, safety, observability, UX, or resource-risk ideation;
 - nontrivial final readiness claims.
 
-Use a bounded fanout that covers the distinct independent angles; do not minimize just because a parent-only or one-child path could answer narrowly. Numeric defaults are subordinate to explicit literal counts: normal review and quality gates usually use three reviewers; large, security-sensitive, ops-heavy, architecture-heavy, or ambiguous work may use four or five; broad multi-section ideation or audits may use six to nine across named sections; 8-10 reviewers are appropriate defaults for `large-review-matrix` or `review-matrix-reduce` when roles are distinct or chained through validators/reducers; 12+ children, including counts up to 200, fit only shardable matrices with explicit slices, bounded waves, artifacts or inline evidence, and reducer/filter stages. Do not add duplicate vague agents.
+Use a bounded fanout that covers the distinct independent angles; do not minimize just because a parent-only or one-child path could answer narrowly. Choose the smallest recipe-specific fanout that still covers the independent evidence angles. Numeric defaults are subordinate to explicit literal counts: normal review and quality gates usually use three reviewers; large, security-sensitive, ops-heavy, architecture-heavy, or ambiguous work may use four or five; broad multi-section ideation or audits may use six to nine across named sections; 8-10 reviewers are appropriate defaults for `large-review-matrix` or `review-matrix-reduce` when roles are distinct or chained through validators/reducers; 12+ children, including counts up to 200, fit only shardable matrices with explicit slices, bounded waves, artifacts or inline evidence, and reducer/filter stages. Do not add duplicate vague agents.
 
 Group children by independent concern, not by count: for example correctness, tests/verification, maintainability, security/privacy, ops/resource, UX/docs, local-code scout, external researcher, edge cases, observability, or simplification. The parent classifies sections before launch, passes concrete targets into every child, waits for any group needed for the next synthesis, and then dedupes/ranks across sections.
 
@@ -428,7 +428,7 @@ removed. Normal extensions remain enabled only when the role's default tool cont
 includes approved safe read-only extension-backed tools and the sanitized task tools
 still request them. Local-code protected advisory roles may use tree-sitter symbol/search
 tools through the local `mcp:tree-sitter` direct-tool exception, `ast_grep_search`,
-`lsp_navigation`, `lsp_diagnostics`, `memory_search`, and `memory_list`; only
+`lsp_navigation`, `lsp_diagnostics`, `memory_search`, and `memory_check`; only
 `researcher` and `context-builder` may use web/code research tools. Advisory `bash`, where present, is prompt-governed for read-only
 inspection because Pi has no read-only shell permission. Use `worker` or a custom
 non-advisory agent name for mutation-capable roles.

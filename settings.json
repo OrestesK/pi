@@ -9,7 +9,12 @@
   "followUpMode": "all",
   "collapseChangelog": true,
   "enableInstallTelemetry": false,
-  "npmCommand": ["sh", "-lc", "npm --prefix \"$HOME/.npm-global\" \"$@\"", "npm"],
+  "npmCommand": [
+    "sh",
+    "-lc",
+    "npm --prefix \"$HOME/.npm-global\" \"$@\"",
+    "npm"
+  ],
   "branchSummary": {
     "skipPrompt": true
   },
@@ -54,11 +59,13 @@
     "delivery": "message-append",
     "hooks": {
       "sessionStart": [],
-      "sessionEnd": []
+      "sessionEnd": [],
+      "beforeAgentStart": ["sessionBridge"]
     },
     "tape": {
       "enabled": true,
-      "onlyGit": false
+      "onlyGit": false,
+      "thread": true
     }
   },
   "packages": [

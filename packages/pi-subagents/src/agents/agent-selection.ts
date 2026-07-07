@@ -43,7 +43,7 @@ const ADVISORY_DEFAULT_TOOLS: Record<string, string[]> = {
 		"fetch_content",
 		"get_search_content",
 		"memory_search",
-		"memory_list",
+		"memory_check",
 		"contact_supervisor",
 		"intercom",
 	],
@@ -55,7 +55,7 @@ const ADVISORY_DEFAULT_TOOLS: Record<string, string[]> = {
 		"bash",
 		...LOCAL_CODE_INSPECTION_TOOLS,
 		"memory_search",
-		"memory_list",
+		"memory_check",
 		"contact_supervisor",
 	],
 	oracle: [
@@ -66,7 +66,7 @@ const ADVISORY_DEFAULT_TOOLS: Record<string, string[]> = {
 		"bash",
 		...LOCAL_CODE_INSPECTION_TOOLS,
 		"memory_search",
-		"memory_list",
+		"memory_check",
 		"contact_supervisor",
 		"intercom",
 	],
@@ -77,7 +77,7 @@ const ADVISORY_DEFAULT_TOOLS: Record<string, string[]> = {
 		"ls",
 		...LOCAL_CODE_INSPECTION_TOOLS,
 		"memory_search",
-		"memory_list",
+		"memory_check",
 		"contact_supervisor",
 		"intercom",
 	],
@@ -88,7 +88,7 @@ const ADVISORY_DEFAULT_TOOLS: Record<string, string[]> = {
 		"fetch_content",
 		"get_search_content",
 		"memory_search",
-		"memory_list",
+		"memory_check",
 		"contact_supervisor",
 		"intercom",
 	],
@@ -100,7 +100,7 @@ const ADVISORY_DEFAULT_TOOLS: Record<string, string[]> = {
 		"bash",
 		...LOCAL_CODE_INSPECTION_TOOLS,
 		"memory_search",
-		"memory_list",
+		"memory_check",
 		"contact_supervisor",
 		"intercom",
 	],
@@ -112,7 +112,7 @@ const ADVISORY_DEFAULT_TOOLS: Record<string, string[]> = {
 		"bash",
 		...LOCAL_CODE_INSPECTION_TOOLS,
 		"memory_search",
-		"memory_list",
+		"memory_check",
 		"contact_supervisor",
 		"intercom",
 	],
@@ -140,7 +140,7 @@ const ADVISORY_ALLOWED_TOOLS = new Set([
 	"fetch_content",
 	"get_search_content",
 	"memory_search",
-	"memory_list",
+	"memory_check",
 ]);
 
 const EXTENSION_BACKED_ADVISORY_TOOLS = new Set([
@@ -149,7 +149,7 @@ const EXTENSION_BACKED_ADVISORY_TOOLS = new Set([
 	"fetch_content",
 	"get_search_content",
 	"memory_search",
-	"memory_list",
+	"memory_check",
 ]);
 
 const RESEARCH_EXTENSION_BACKED_TOOLS = new Set([
@@ -158,10 +158,10 @@ const RESEARCH_EXTENSION_BACKED_TOOLS = new Set([
 	"fetch_content",
 	"get_search_content",
 	"memory_search",
-	"memory_list",
+	"memory_check",
 ]);
 
-const MEMORY_EXTENSION_BACKED_TOOLS = new Set(["memory_search", "memory_list"]);
+const MEMORY_EXTENSION_BACKED_TOOLS = new Set(["memory_search", "memory_check"]);
 
 const ROLE_EXTENSION_BACKED_ADVISORY_TOOLS: Record<string, Set<string>> = {
 	"context-builder": RESEARCH_EXTENSION_BACKED_TOOLS,

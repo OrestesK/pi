@@ -2,3 +2,7 @@
 	path = packages/pisesh
 	url = git@github.com:OrestesK/pisesh.git
 	branch = orestes/local
+[submodule "packages/pi-memory-md"]
+	path = packages/pi-memory-md
+	url = git@github.com:OrestesK/pi-memory-md.git
+	branch = ok/pi-memory-md-upstream-fork

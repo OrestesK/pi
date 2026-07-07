@@ -306,14 +306,14 @@ If uncertain, classify higher inside `manager-workflow`. If the user says “wai
 
 ## Memory
 
-Use the configured pi-memory-md system for durable reusable knowledge. Follow `memory-management` for paths, layout, and frontmatter details.
+Use the configured pi-memory-md system for durable reusable knowledge. Prefer native memory tools for direct operations (`memory_search`, `memory_check`, `memory_write`, `memory_sync`, `memory_list`) and package skills for workflow guidance (`memory-init`, `memory-search`, `memory-sync`, `memory-write`, `memory-import`, `memory-digest`) when they fit.
 
 - Read/search memory before any nontrivial work
 - Read/search memory again when you feel uncertain, may have forgotten prior context, hit a familiar error, enter an unfamiliar repo, or are about to re-derive a command, root cause, setup step, or runbook
 - Write memory only for durable reusable knowledge: repo runbooks, command flows, root causes, gotchas, environment setup, successful verification, failed approaches, and stable user preferences. Do not write trivial, one-off, sensitive, or raw-log facts
 - Prefer configured shared-global memory for cross-repo knowledge; use project memory for narrow repo-local facts
 - `memory_write` is project-scoped; for shared-global memory, edit files directly under the configured shared-global memory root and preserve existing layout unless the user approves a reorganization
-- Search/list before writing; update an existing focused file instead of creating duplicates
+- Search/check before writing; update an existing focused file instead of creating duplicates
 - Store curated runbooks, not raw logs or secrets
 - Keep memory files concise and focused; prefer small, searchable runbooks over long transcripts or mixed-topic dumps. Split unrelated or growing topics into multiple focused memory files when needed
 - Do not duplicate authoritative rules from `AGENTS.md`; memory stores repo/debug/runbook knowledge and short pointers
@@ -322,7 +322,7 @@ Use the configured pi-memory-md system for durable reusable knowledge. Follow `m
 
 ### Memory metadata
 
-Every memory file must have frontmatter between `---` delimiters.
+Every memory file must have JSON-compatible frontmatter between `---` delimiters. The canonical core field order is `description`, `tags`, `created`, `updated`; preserve optional rich fields after those core fields.
 
 For project memory created through `memory_write`, use the tool-supported metadata fields (`description`, `tags`, and generated timestamps) and put additional durable context in the body. Use direct file edits for project memory only when full frontmatter is required and safe, such as setting `status: superseded`.
 

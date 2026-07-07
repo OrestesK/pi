@@ -43,7 +43,7 @@ const KNOWN_ADVISORY_TOOLS = new Set([
 	"fetch_content",
 	"get_search_content",
 	"memory_search",
-	"memory_list",
+	"memory_check",
 ]);
 function isPiIntercomExtensionPath(value: string): boolean {
 	const normalized = value.trim().replace(/\\/g, "/").toLowerCase();

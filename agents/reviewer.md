@@ -4,7 +4,7 @@ description: Review-only specialist for code diffs, plans, proposed solutions, c
 model: openai-codex/gpt-5.4
 fallbackModels: openai-codex/gpt-5.4-mini, openai-codex/gpt-5.5
 thinking: high
-tools: read, grep, find, ls, bash, memory_search, memory_list, contact_supervisor, intercom, tree_sitter_search_symbols, tree_sitter_document_symbols, tree_sitter_symbol_definition, tree_sitter_pattern_search, tree_sitter_codebase_overview, tree_sitter_codebase_map, mcp:tree-sitter, ast_grep_search, lsp_navigation, lsp_diagnostics
+tools: read, grep, find, ls, bash, memory_search, memory_check, contact_supervisor, intercom, tree_sitter_search_symbols, tree_sitter_document_symbols, tree_sitter_symbol_definition, tree_sitter_pattern_search, tree_sitter_codebase_overview, tree_sitter_codebase_map, mcp:tree-sitter, ast_grep_search, lsp_navigation, lsp_diagnostics
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false

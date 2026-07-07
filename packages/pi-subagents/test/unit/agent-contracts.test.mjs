@@ -106,9 +106,9 @@ for (const fileName of advisoryAgents) {
 			`${fileName} must include memory_search`,
 		);
 		assert.equal(
-			tools.includes("memory_list"),
+			tools.includes("memory_check"),
 			true,
-			`${fileName} must include memory_list`,
+			`${fileName} must include memory_check`,
 		);
 	});
 }
@@ -148,7 +148,7 @@ for (const name of advisoryAgents.map((fileName) => fileName.replace(/\.md$/, ""
 		});
 
 		assert.equal(sanitized.tools?.includes("memory_search"), true);
-		assert.equal(sanitized.tools?.includes("memory_list"), true);
+		assert.equal(sanitized.tools?.includes("memory_check"), true);
 		assert.equal(sanitized.extensions, undefined);
 	});
 }
@@ -183,7 +183,7 @@ test("same-name advisory overrides cannot regain unrestricted default tools by o
 		"bash",
 		...localCodeInspectionTools,
 		"memory_search",
-		"memory_list",
+		"memory_check",
 		"contact_supervisor",
 		"intercom",
 	]);
@@ -202,11 +202,11 @@ test("protected advisory overrides with omitted tools preserve role-specific def
 	});
 	assert.equal(reviewer.tools?.includes("web_search"), false);
 	assert.equal(reviewer.tools?.includes("memory_search"), true);
-	assert.equal(reviewer.tools?.includes("memory_list"), true);
+	assert.equal(reviewer.tools?.includes("memory_check"), true);
 	assert.equal(reviewer.extensions, undefined);
 	assert.equal(researcher.tools?.includes("web_search"), true);
 	assert.equal(researcher.tools?.includes("memory_search"), true);
-	assert.equal(researcher.tools?.includes("memory_list"), true);
+	assert.equal(researcher.tools?.includes("memory_check"), true);
 	assert.equal(researcher.extensions, undefined);
 });
 
@@ -230,7 +230,7 @@ for (const name of ["scout", "reviewer", "planner", "delegate", "oracle"]) {
 		});
 
 		assert.equal(sanitized.tools?.includes("memory_search"), true);
-		assert.equal(sanitized.tools?.includes("memory_list"), true);
+		assert.equal(sanitized.tools?.includes("memory_check"), true);
 		assert.equal(sanitized.extensions, undefined);
 	});
 

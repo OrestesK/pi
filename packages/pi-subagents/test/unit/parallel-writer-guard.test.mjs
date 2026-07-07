@@ -17,7 +17,7 @@ const worker = { name: "worker", tools: ["read", "edit", "write"] };
 const reviewer = { name: "reviewer", tools: ["read", "grep", "bash"] };
 const memoryScout = {
 	name: "memory-scout",
-	tools: ["read", "memory_search", "memory_list"],
+	tools: ["read", "memory_search", "memory_check"],
 };
 const diagnosticScout = {
 	name: "diagnostic-scout",

@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Autonomous external-evidence researcher — searches, evaluates, and synthesizes a focused research brief
-tools: read, code_search, web_search, fetch_content, get_search_content, memory_search, memory_list, contact_supervisor, intercom
+tools: read, code_search, web_search, fetch_content, get_search_content, memory_search, memory_check, contact_supervisor, intercom
 thinking: medium
 systemPromptMode: replace
 inheritProjectContext: true
