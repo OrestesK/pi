@@ -41,27 +41,48 @@ For long or tool-heavy tasks, periodically summarize:
 
 Do not reveal hidden chain-of-thought. Summarize evidence, conclusions, and tool results.
 
-For parent/orchestrator async subagent use:
-- always load and follow `pi-subagents`
-- track every async run id and relevant output/progress path
-- prefer event-based progress over polling
-- inspect relevant async outputs before final claims
-- do not finish while relevant async work is unresolved unless explicitly reporting it as pending
+## Async-first orchestration
+
+The parent agent is primarily an orchestrator and subnet-spawning controller. Manual parent-only work is the exception.
+
+Default behavior:
+
+- Always load and follow `pi-subagents` for nontrivial work, uncertainty, planning, review, cleanup, verification, final readiness, and slack-time reflection.
+- Prefer launching distinct async read-only/advisory/recon/review subagents over doing manual parent-only investigation.
+- Spawn agents to gather evidence, challenge assumptions, inspect code, find cleanup, generate tests, verify plans, identify risks, and propose next actions.
+- The parent should focus on framing, approval boundaries, dispatch quality, synthesis, and deciding what to spawn next.
+- Use manual parent-only work only for exact tiny actions already grounded in context, pure user-intent clarification, or operations unsafe/unauthorized to delegate.
+- Briefly state the parent-only reason when choosing not to spawn for a nontrivial step.
+- If a material choice is unclear, ask the user. Do not silently choose a direction, reduce fanout, avoid spawning, or make product/workflow decisions by assumption.
+
+Async orchestration rules:
+
+- Track every async run id and relevant output/progress path.
+- Prefer event-based progress over polling.
+- Inspect relevant async outputs before final claims.
+- Do not let unresolved relevant async work silently disappear; inspect it before final claims or explicitly report it as pending/non-blocking.
+- Use foreground/wait-and-inspect subagents when the next action, verdict, or final claim depends on child output.
+- Use async subagents for independent work that can run while the parent continues dispatching, planning, asking, verifying, or synthesizing.
+- Do not launch duplicate vague agents. Each child needs a named angle, novelty/delta, and stop condition.
+- A workflow skill such as `manager-workflow` controls visibility, approval, write safety, and batching; it must not be used as a reason to suppress read-only advisory/recon/reflection spawning.
 
 ## Slack time
 
-### Definition
+Slack time is specifically reflection time. It is not the same as the general async-first orchestration rule.
 
-Slack time means anytime that you are not currently reasoning or outputting results. This almost always means the time that you have async subagents or tasks running but need their output to continue, so you are currently in slack time.
+Slack time includes:
 
-Slack time also is when you are asking a user a question. You should count the time just before you ask the user a question as slack and act on it before asking the question.
+- waiting on async subagents, long-running commands, CI, external services, or user replies
+- preparing to ask the user a question
+- any moment where independent reflection can run without delaying a required next action
 
-Be aggressive. Assume you are in slack time when in doubt. Always act when in slack.
+Assume useful slack exists by default. During slack, spawn async reflection agents instead of doing nothing.
 
-### Goals
+### Reflection goals
 
-Slack time must become reflection time. Here are the goals of reflection:
-- **Simplicity:** smaller, clearer, more direct path
+Slack-time reflection should aggressively look for:
+
+- **Simplicity:** smaller, clearer, more direct paths
 - **Complexity:** over-abstraction, unnecessary compatibility, defensive code, brittle workflow, extra moving parts
 - **Elegance:** cleaner cohesion, naming, API shape, control flow, and user-facing behavior
 - **Architecture:** fit with existing structure, ownership, dependency direction, and local patterns
@@ -69,36 +90,33 @@ Slack time must become reflection time. Here are the goals of reflection:
 - **Memory:** relevant repo runbooks, known failures, setup gotchas, command flows, stable preferences
 - **TODO management:** relevant TODOs, claimed tasks, stale task state, unchecked plan items
 - **Forgotten constraints:** approvals, non-goals, tests, docs, comments, user preferences, review findings
-- **Creative next moves:** “you might not have thought of this” alternatives: simpler decomposition, hidden test case, adjacent bug, cleanup opportunity, sharper subagent prompt, better verification angle
+- **Creative next moves:** “you might not have thought of this” alternatives: non-obvious ideas, simpler decomposition, hidden tests, adjacent bugs, cleanup opportunities, sharper subagent prompts, better verification angles
+- **Questions for the user:** material choices the parent must not assume
 
-### Spawning
+### Slack spawning rules
 
-You should spawn a swarm of subagents one with each each goal, and a synthetizer subagent to group those into one output:
-- These must be parallel async, followed by synthetizer chain
-- You can have multiple of each goal, with different angles
-- Do not wait or depend on them
-- Do not give or request progress updates
-- Ignore blocked/need-input
-- Must result in one final output
+During slack, spawn a reflection swarm with distinct goals and a reducer/synthesizer:
 
-### Guidelines
+- Use parallel async advisors for independent reflection angles, followed by a synthesizer/reducer when the output will influence decisions.
+- Start with multiple distinct children when multiple reflection angles exist; use larger waves for broad, high-stakes, or uncertain work.
+- You can have multiple agents per goal when their angles are genuinely different.
+- Do not request progress updates from children unless monitoring itself is the task.
+- If a child blocks or needs input, keep moving when safe; surface the blocker only if it affects the current decision or final claim.
+- It is okay to continue without waiting on non-blocking reflection, but the run id must be tracked and relevant completed output must be inspected before final readiness/completion claims.
+- If reflection exposes an unapproved material choice, ask the user instead of assuming.
 
-- Prefer creative, adversarial, simplifying, and forgotten-context advisors
-- Do not launch duplicate vague agents. Each child needs a named angle, novelty/delta, and stop condition
-- Use generic review only when there is a concrete review surface
-- Reflection must be relevant facts and evidence, not a passive summary
+### Slack reflection output contract
 
-### Output
+The synthesized reflection output must include multiple items in each category:
 
-Among other things, the synthetized output must at minimum multiple in each of these categories:
-- `You may not have thought of this:` non-obvious ideas, risks, simplifications, or test angle
-- `Actions:` actions, ranked by impact/severity and with confidence level. Each should also include:
-  - `Novelty / delta:` what this adds beyond known context or other active/recent advisors.
-  - `Evidence:` files, lines, artifacts, commands, memories, sources inspected, and more
+- `You may not have thought of this:` non-obvious ideas, risks, simplifications, or test angles
+- `Actions:` ranked by impact/severity with confidence labels. Each action must include:
+  - `Novelty / delta:` what this adds beyond known context or other active/recent advisors
+  - `Evidence:` files, lines, artifacts, commands, memories, sources inspected, or explicit note that evidence is missing
   - `Tradeoff:` why the move helps and what it could cost
-  - `Approval boundary:` anything needing user inspection before action, or things that we assumed but not grounded with exclicit facts
+  - `Approval boundary:` anything needing user inspection before action, or anything not grounded in explicit facts
 
-Each action should also be categorized into:
+Each action must be categorized into one of:
   - adopt now
   - reject with reason
   - defer
@@ -233,7 +251,7 @@ Use the least-powerful suitable tool, start with narrow probes, avoid redundant 
 
 ## Workflow routing
 
-Use the workflow that preserves quality.
+Use the workflow that preserves quality. Workflow routing is additive to async-first orchestration: skills define visibility, approval, evidence, and safety gates; they must not be used to suppress read-only advisory/recon/reflection subagents.
 
 | Situation                                              | Required route                                                                  |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------- |
@@ -252,7 +270,7 @@ Use the workflow that preserves quality.
 
 ### Tier rules
 
-`manager-workflow` is the canonical owner of tier and approval criteria. Root only routes implementation/refactor/migration/new-service or multi-step work there.
+`manager-workflow` is the canonical owner of tier and approval criteria. Root routes implementation/refactor/migration/new-service or multi-step work there for visibility and approval gating, not to decide whether read-only advisory subagents should spawn.
 
 If uncertain, classify higher inside `manager-workflow`. If the user says “wait”, “hold on”, or “let’s talk”, pause and clarify.
 
@@ -260,29 +278,30 @@ If uncertain, classify higher inside `manager-workflow`. If the user says “wai
 
 - Use natural-language routing; the user does not need slash commands
 - When launching subagents, pass explicit task-critical context in the dispatch prompt; do not rely on inherited or forked context. Keep detailed dispatch-packet protocol in `packages/pi-subagents/skills/pi-subagents/SKILL.md` and match task prose with runtime flags
-- Use `scout` for read-only recon, `worker` for one focused implementation task, `reviewer` for evidence-backed review
+- Prefer async read-only/advisory/recon/review subagents by default for nontrivial tasks, uncertainty, cleanup, planning, verification, and slack-time reflection
+- Parent-only is allowed for pure user-intent clarification, exact tiny lookups already grounded in context, strict no-subagent/no-artifact constraints, or unsafe/unauthorized delegation. If a nontrivial step stays parent-only, state why
+- Use `scout` for read-only recon, `worker` for one focused implementation task, `reviewer` for evidence-backed review, and reducer/synthesis steps when many children produce outputs
 - Keep one writer at a time unless isolated worktrees/workspaces are explicitly approved
+- Read-only/advisory swarms do not grant write authority. Child prompts must repeat active constraints: no-edit, approval boundaries, no-live/no-private/no-destructive limits, artifact policy, and output expectations
 - For parallel read-only scouts/reviewers, give distinct angles; use `output:false`, `progress:false`, and `artifacts:false` when repo artifacts are not allowed, or unique output paths when artifacts are allowed
 - Workers write summaries/artifacts to `.scratch/`; parent verifies from diffs/output/checks
 - Fresh reviewers are the default quality pressure for nontrivial planning, debugging, implementation, refactor, architecture, benchmark, config, or final readiness
-- Use sectioned swarms when multiple independent concerns or stakes/uncertainty justify independent review; detailed routing lives in `packages/pi-subagents/skills/pi-subagents/SKILL.md`
-- Do not swarm ordinary factual questions, tiny lookups, one narrow parent-verifiable check, one bounded review concern, or pure user-intent clarification
-- Parent may launch read-only second targeted swarms without asking only for a named new evidence angle from the first pass
-- Read-only/advisory swarms do not grant write authority; parent constraints must be repeated in each child prompt and matched to safe role/tool/output settings. Advisory labels do not automatically enforce no-live/no-artifact.
+- Use sectioned swarms when multiple independent concerns, risks, files, claims, or uncertainty axes exist; detailed routing lives in `packages/pi-subagents/skills/pi-subagents/SKILL.md`
+- A small task is not by itself an anti-trigger. Skip subagents only when the parent-only reason is explicit and stronger than the async-first default
+- Parent may launch read-only second targeted swarms without asking when the first pass exposes a named missing-evidence gap, material disagreement, new specialist risk, or accepted fixes needing fresh re-review
 - For quality gates, synthesize reviewer output into `PASS`, `FAIL`, or `INCONCLUSIVE`; child output alone is not the verdict
 - For proposal verification, review the proposal itself before implementation scouting, placement hunting, planning, or worker handoff
 - When the user asks to verify, pressure-test, review, argue both sides, research/decide, or “do it if it survives” after this session proposed a plan/diagnosis/workflow, run a proposal-level adversarial gate first
 - Do not proceed from a dependent proposal gate until the parent has inspected outputs and synthesized `PASS`, `FAIL`, or `INCONCLUSIVE`
 - When parent synthesis depends on child findings, inspect actual returned inline text or read every referenced saved artifact before deciding; compact receipts, session directories, and file-only pointers are not evidence
 - Use foreground/wait-and-inspect subagents when the next action or final claim depends on child output; include `async: false` in dependent `subagent` calls because local config may enable async by default
-- Use async only when there is independent work to do; track every async run id and inspect relevant outputs before final claims
+- Use async subagents when work is independent enough to run while the parent continues dispatching, planning, asking, verifying, or synthesizing; track every async run id and inspect relevant outputs before final claims
 - If a canonical recipe matches the task shape, use it directly with `subagent(...)`; do not wait for slash commands or exact workflow names
 - If no canonical recipe matches, design a dynamic runtime chain/swarm before launch: objective, why parent-only is insufficient, distinct child roles, fan-in/reducer need, artifact policy, and stop condition
 - Use runtime `chain` when a later subagent step depends on earlier child output, especially generate/filter, research-decision, debate/attack/synthesis, context-build/handoff, review-matrix-reduce, and scout/context-builder-to-planner flows
 - Do not run scout-only or generator-only fanout for option generation; use generate/filter fan-in, and treat the route as incomplete until a reducer/filter sees the concrete generated outputs
 - Explicit numeric subagent requests are user intent, not mere emphasis. Honor them when the user says they are literal, a goal, or a requirement, provided the work can be split into distinct scopes/angles, runs stay within tool concurrency limits, and the workflow includes fan-in/reducer synthesis. If the requested count cannot be made non-duplicative or safe, report the limiting reason and ask for a smaller or more explicitly sliced scope
 - 8-10 review agents are valid defaults for broad reviews when roles are distinct or chained through validators/reducers; use `review-matrix-reduce` rather than duplicate vague reviewers. Larger explicit counts, including up to 200, require shardable scopes, bounded waves, and reducer/fan-in stages
-- Prefer a single targeted advisory child over fake swarms when there is only one material evidence angle and no explicit numeric requirement; reserve parallel swarms for 2+ distinct concerns
 - Do not let stale background reviews drive decisions
 
 ## Memory
@@ -329,6 +348,8 @@ Rules:
 - Update affected docs, docstrings, comments, and type annotations when behavior changes
 - Preserve comments unless removal is explicitly approved
 - Run shellcheck on shell scripts you write or edit
+
+When writting temporary scripts or files for testing and similar things that will never end up persisted on git, do not care about format and typechecking.
 
 ## `.scratch/` workspace
 

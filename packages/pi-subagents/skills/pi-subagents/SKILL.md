@@ -88,7 +88,7 @@ Adapt to the user's actual phrasing, including typos, shorthand, and repetition.
 - `look at all the words I usually say`, `throughout my pi usage`, `grab many many examples`, `all the times I ask`, `go through each code path`, `go through all edge cases`, `ALL flows`, `review al lcombiatoins` -> parallel context build, session-history analysis, or broad audit swarm.
 - `go on`, `don't stop`, `keep going`, `review ... and go on`, `until no more review feedback`, `iterate`, `fix review fix`, `spawn more targeted reviews` -> continue the approved loop; use review-feedback evaluation or fix-review-fix when writing is already authorized.
 
-Typos like `subagnets`, `subgantes`, `usabgnets`, `rerach`, `benchamr`, `combiatoins`, and `langauge` should not weaken the trigger when the task shape is clear. Still apply anti-triggers: tiny one-sentence wording tasks, ordinary factual questions, one narrow parent-verifiable check, pure clarification, and strict no-artifact constraints stay direct.
+Typos like `subagnets`, `subgantes`, `usabgnets`, `rerach`, `benchamr`, `combiatoins`, and `langauge` should not weaken the trigger when the task shape is clear. Apply the async-first default even when the wording is messy. Parent-only is an explicit exception for pure clarification, exact tiny tasks already grounded in context, strict no-subagent/no-artifact constraints, or unsafe/unauthorized delegation; otherwise launch at least one advisory/recon/reflection child when a distinct angle exists.
 
 ### Constraint precedence
 
@@ -100,10 +100,10 @@ Apply task constraints before swarm enthusiasm:
 
 ### Execution shape ladder
 
-Choose the smallest shape that adds material evidence:
+Choose the async-first shape that covers the distinct evidence, pressure, or reflection angles:
 
-1. Parent-only for tiny, parent-verifiable, or pure-clarification work.
-2. One targeted advisory child when exactly one missing evidence axis needs an independent read.
+1. Parent-only only when the reason is explicit: pure clarification, exact tiny task already grounded in context, strict no-subagent/no-artifact constraint, or unsafe/unauthorized delegation.
+2. One targeted advisory child when one distinct evidence, risk, cleanup, or reflection angle exists.
 3. Quick adversarial check for small scoped proposals, assumptions, diagnoses, or decisions.
 4. Full sectioned swarm or quality gate for multi-concern, high-impact, ambiguous, or final-readiness work.
 
@@ -174,7 +174,7 @@ Use `review-matrix-reduce` when the user asks for many/10 reviewers with differe
 When no catalog recipe fits, design a runtime shape before launch:
 
 1. Objective: what outcome the workflow must produce.
-2. Why parent-only is insufficient.
+2. Why parent-only is not the right default, or the explicit reason it is unavoidable.
 3. Child roles and why each is distinct.
 4. Swarm vs chain decision.
 5. Required fan-in/reducer stage.
@@ -185,7 +185,7 @@ State the chosen shape briefly when it is non-obvious. The user should not have 
 
 ### Sectioned swarm protocol
 
-Use sectioned swarms when independent agents can add distinct evidence, attack surfaces, or verification paths across two or more independent concerns, or when stakes/uncertainty justify parallel review. Do not use subagents as ritual compliance: ordinary factual questions, tiny wording/name tasks, one narrow parent-verifiable lookup, one bounded review concern, and pure user-intent clarification should stay direct.
+Use sectioned swarms when independent agents can add distinct evidence, attack surfaces, reflection, cleanup ideas, or verification paths across two or more independent concerns, or when stakes/uncertainty justify parallel review. Do not use duplicate vague agents as ritual compliance, but do not treat smallness as an automatic anti-trigger: ordinary factual questions, tiny wording/name tasks, one narrow parent-verifiable lookup, one bounded review concern, and pure user-intent clarification stay direct only when the parent-only reason is explicit and stronger than the async-first default.
 
 Default to sectioned swarms for these shapes:
 
@@ -196,7 +196,7 @@ Default to sectioned swarms for these shapes:
 - broad test, edge-case, live-validation, safety, observability, UX, or resource-risk ideation;
 - nontrivial final readiness claims.
 
-Use the smallest recipe-specific fanout that still adds material evidence unless the user gives an explicit numeric requirement. Numeric defaults are subordinate to explicit literal counts: normal review and quality gates usually use three reviewers; large, security-sensitive, ops-heavy, architecture-heavy, or ambiguous work may use four or five; broad multi-section ideation or audits may use six to nine across named sections; 8-10 reviewers are appropriate defaults for `large-review-matrix` or `review-matrix-reduce` when roles are distinct or chained through validators/reducers; 12+ children, including counts up to 200, fit only shardable matrices with explicit slices, bounded waves, artifacts or inline evidence, and reducer/filter stages. Do not add duplicate vague agents.
+Use a bounded fanout that covers the distinct independent angles; do not minimize just because a parent-only or one-child path could answer narrowly. Numeric defaults are subordinate to explicit literal counts: normal review and quality gates usually use three reviewers; large, security-sensitive, ops-heavy, architecture-heavy, or ambiguous work may use four or five; broad multi-section ideation or audits may use six to nine across named sections; 8-10 reviewers are appropriate defaults for `large-review-matrix` or `review-matrix-reduce` when roles are distinct or chained through validators/reducers; 12+ children, including counts up to 200, fit only shardable matrices with explicit slices, bounded waves, artifacts or inline evidence, and reducer/filter stages. Do not add duplicate vague agents.
 
 Group children by independent concern, not by count: for example correctness, tests/verification, maintainability, security/privacy, ops/resource, UX/docs, local-code scout, external researcher, edge cases, observability, or simplification. The parent classifies sections before launch, passes concrete targets into every child, waits for any group needed for the next synthesis, and then dedupes/ranks across sections.
 
@@ -204,7 +204,7 @@ The parent may launch read-only second targeted swarms without asking when the f
 
 Read-only/advisory swarms do not grant write authority. Edits require explicit user approval or an already-authorized write workflow. Child tasks inherit the strictest active task constraints: review-only, no-edit, no-artifact, and no-live-probe constraints remain in force unless that scope was already explicitly authorized. Strict no-artifact means no subagents; repo-scoped no-artifact means `artifacts: false`, child `output: false`, child `progress: false`, and no chain output paths. Private MCP reads/mutations, live/cloud/database/destructive actions, production-affecting checks, and behavior/architecture/security/data/scope decisions still require the normal approval gates. Missing private/external targets block before subagents: if the user asks for Slack/Notion/Google Docs/private thread review without an exact target and explicit read approval, ask or request pasted content directly instead of launching a swarm to decide that. Parallel writer requests also block before child launch when edits, isolation, or worktrees are not authorized; block directly and do not launch reviewers, workers, delegates, or scouts just to confirm the obvious authorization failure. `Launch sectioned workers to edit` under no-edit or missing isolation is blocked directly, not converted into read-only reviewer/delegate fanout. Do not downgrade an unauthorized `worker`/`edit` request into child fanout. Do not fan out private MCP, cloud, database, or live-system access by default; the parent should do approved narrow reads and pass sanitized findings down.
 
-Use foreground or wait-and-inspect when the next answer, verdict, or final claim depends on child output. For dependent recipe calls, set `async: false` explicitly because local config may enable `asyncByDefault`; builtin workflows already do this. Use async only when there is real independent work; record the run id and inspect artifacts/status before relying on results. Treat `file-only` artifacts and compact completion receipts as pointers, not evidence, until the parent reads them. The parent may synthesize `PASS` / `FAIL` / `INCONCLUSIVE` only after inspecting all relevant fresh child outputs; unresolved material async work, stale outputs, or unreconciled contradictions force `INCONCLUSIVE` until resolved.
+Use foreground or wait-and-inspect when the next answer, verdict, or final claim depends on child output. For dependent recipe calls, set `async: false` explicitly because local config may enable `asyncByDefault`; builtin workflows already do this. Use async by default for independent advisory/recon/reflection work that can run while the parent continues dispatching, planning, asking, verifying, or synthesizing; record the run id and inspect artifacts/status before relying on results. Treat `file-only` artifacts and compact completion receipts as pointers, not evidence, until the parent reads them. The parent may synthesize `PASS` / `FAIL` / `INCONCLUSIVE` only after inspecting all relevant fresh child outputs; unresolved material async work, stale outputs, or unreconciled contradictions force `INCONCLUSIVE` until resolved.
 
 Evidence visibility controls the output policy:
 
@@ -227,7 +227,7 @@ Natural-language routing examples:
 
 | User says or implies                                                                                        | Parent should usually run                                                                                                                                                                                      |
 | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| “review this”, “check this”, “does this look right?”                                                        | `review` skill first; escalate to `/parallel-review` with fresh reviewers when independent review adds value                                                                                                   |
+| “review this”, “check this”, “does this look right?”                                                        | `review` skill first; use `/parallel-review` with fresh reviewers by default unless an explicit parent-only reason is stronger                                                                                  |
 | “10 review agents”, “different goals”                                                                     | `large-review-matrix` when the target is broad and roles are independent; use distinct first-pass reviewer sections and parent synthesis                                                                          |
 | “validate what the other agents found”, “review the reviewers”, material reviewer disagreement              | runtime `review-matrix-reduce`: first-pass reviewers, validators/reducer, then parent synthesis                                                                                                                   |
 | “before finalizing”, “is this good enough?”, “quality gate this”                                            | `/quality-gate` pattern; review and synthesis only, ending with a parent `PASS` / `FAIL` / `INCONCLUSIVE` verdict                                                                                              |
@@ -242,7 +242,7 @@ Natural-language routing examples:
 | “prepare a handoff”, “study this library/reference and make a worker brief”                                 | `/parallel-handoff-plan` pattern                                                                                                                                                                               |
 | “clean this up”, “remove slop”, “make it less verbose”                                                      | `/parallel-cleanup` pattern; ask before edits unless cleanup/fix was already authorized                                                                                                                        |
 
-These are routing examples, not keyword triggers. Classify by task shape, risk, available evidence, and whether independent context will improve quality. If several mappings fit, choose the smallest workflow that still gives material independent evidence; for high-impact or ambiguous work, use adversarial fanout when it materially improves evidence. Do not bypass the canonical task skill just because a subagent recipe is available: review requests enter through `review`, vague/product/design ideas enter through `brainstorming`, and implementation work enters through `manager-workflow`.
+These are routing examples, not keyword triggers. Classify by task shape, risk, available evidence, and distinct independent angles. If several mappings fit, choose the async-first workflow that covers independent evidence, pressure, cleanup, or reflection; for high-impact or ambiguous work, use adversarial fanout by default. Do not bypass the canonical task skill just because a subagent recipe is available: review requests enter through `review`, vague/product/design ideas enter through `brainstorming`, and implementation work enters through `manager-workflow`. Those skills control quality and approval gates, not whether read-only advisory subagents may spawn.
 
 The prompt templates in `prompts/` encode workflows the parent agent can run on demand. If the user provides a URL, issue, PR, plan, local file, screenshot, or freeform target, treat that target as the primary scope: read or fetch it before launching children, then include it explicitly in every child task. Do not depend on the parent conversation history when the recipe calls for fresh context.
 

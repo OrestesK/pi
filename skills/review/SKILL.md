@@ -9,12 +9,12 @@ Review is evidence gathering, not rubber-stamping.
 
 ## Subagent Escalation for Normal Review Requests
 
-For nontrivial review requests, high-quality review requests, implemented work, plans/diffs with meaningful risk, or user language such as “review this”, “check this”, “does this look right?”, “quality gate”, “before finalizing”, “fix review fix review”, or “review with many angles”, load/apply the `pi-subagents` skill and use fresh-context reviewer fanout when it would add material independent evidence. Do not require the user to name `/parallel-review` or `/quality-gate`.
+For nontrivial review requests, high-quality review requests, implemented work, plans/diffs with meaningful risk, or user language such as “review this”, “check this”, “does this look right?”, “quality gate”, “before finalizing”, “fix review fix review”, or “review with many angles”, load/apply the `pi-subagents` skill and use fresh-context reviewer fanout by default. Do not require the user to name `/parallel-review` or `/quality-gate`.
 
 Default routing:
 
-- Simple local review or tiny Tier 1 change: perform this review skill directly unless a specific risk makes independent review materially useful.
-- Nontrivial diff/plan/answer review: use `pi-subagents` `/parallel-review` pattern with distinct reviewer angles when independent review materially improves evidence.
+- Simple local review or tiny Tier 1 change: parent-only review is allowed only when the reason is explicit and stronger than the async-first default.
+- Nontrivial diff/plan/answer review: use `pi-subagents` `/parallel-review` pattern with distinct reviewer angles by default.
 - Pre-final claim that something is good enough: use `pi-subagents` `/quality-gate` pattern; review and synthesis only, ending with a parent-synthesized `PASS` / `FAIL` / `INCONCLUSIVE` verdict.
 - Parent proposal verification: when the user asks to verify, pressure-test, argue against, research/decide, or “do it if it survives” after this parent proposed a plan/architecture/workflow/diagnosis, review the proposal itself before implementation scouting or worker/planner dispatch. Synthesize `PASS` / `FAIL` / `INCONCLUSIVE` first.
 - Review feedback loop when the user explicitly authorizes fixes: one writer/fix pass at a time, then fresh reviewers.

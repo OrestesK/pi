@@ -48,6 +48,7 @@
   - `DEBUG`: lifecycle details
   - `INFO`: state changes
   - `WARNING`: real problems
+  - Pydantic and its features are preferred
 
 ### TypeScript
 

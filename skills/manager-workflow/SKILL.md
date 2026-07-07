@@ -15,7 +15,7 @@ For non-trivial work, the expanded workflow is:
 Clarify/Brainstorm → Plan → Approve → Execute → Verify → Review → Finish/Handoff
 ```
 
-Use the added workflow skills as needed, but do not let them override this planning gate. If uncertain, pause and ask instead of continuing with assumptions.
+Use the added workflow skills as needed, but do not let them override this planning gate. The planning gate blocks edits, material choices, and unsafe execution; it does not block read-only advisory/recon/reflection subagents. If uncertain, spawn read-only advisors first, then ask the user instead of continuing with assumptions.
 
 ### Planning Gate
 
@@ -99,10 +99,10 @@ Load or apply these skills when their trigger fits:
 | New behavior or logic change                                | `test-driven-development`                                                                                         |
 | Adding/changing tests, test helpers, fixtures, mocks, or test-review feedback | `writing-tests`; use `test-driven-development` too when changing behavior or fixing bugs |
 | Bug, test failure, crash, flaky behavior, unexpected output | `systematic-debugging` first; use TDD for the fix after root cause is supported                                   |
-| Code/spec/plan review or review feedback evaluation         | `review`; escalate to `pi-subagents` review patterns when parallel/adversarial/fresh review would improve quality |
+| Code/spec/plan review or review feedback evaluation         | `review`; use `pi-subagents` reviewer fanout by default unless an explicit parent-only reason is stronger |
 | Before done/fixed/passing claims                            | `verification-before-completion`                                                                                  |
 
-Do not stack heavy workflow on tiny Tier 1 edits.
+Do not stack blocking workflow on tiny Tier 1 edits. Async advisory/recon/reflection subagents remain the default for hidden-risk checks, cleanup angles, and slack-time reflection when they can run without delaying the edit.
 
 ## Subagent Recipe Routing
 
@@ -110,11 +110,12 @@ Do not stack heavy workflow on tiny Tier 1 edits.
 
 Implementation-specific routing rules:
 
-- Load `pi-subagents` when independent context, adversarial pressure, or parallel evidence would materially improve implementation planning, review, research, handoff, or cleanup.
-- Enter review requests through `review`, vague product/design requests through `brainstorming`, and implementation work through this skill before applying any subagent recipe.
+- `manager-workflow` owns visibility, tiering, approval, write safety, and execution batching. It does not decide whether read-only advisory/recon/reflection subagents should spawn.
+- Load `pi-subagents` by default for nontrivial work, uncertainty, planning, review, research, handoff, cleanup, final-readiness pressure, or any waiting/slack period. Do not require proof that subagents are necessary; require an explicit reason to stay parent-only.
+- Enter review requests through `review`, vague product/design requests through `brainstorming`, and implementation work through this skill before applying any write-capable subagent recipe.
 - Apply fixes from review feedback only when the user explicitly authorizes writing; use one writer/fix pass at a time, then fresh review.
 - If the user asks to verify or pressure-test a parent proposal before implementation, complete and inspect the proposal gate before scouting implementation locations or dispatching workers.
-- For tiny Tier 1 edits, skip extra subagent process unless a concrete risk makes independent evidence materially useful.
+- For tiny Tier 1 edits, parent-only execution is allowed only when the reason is explicit: exact tiny change, already-grounded context, no material uncertainty, and no distinct non-mutating advisory/reflection angle.
 
 ## Delegation Rules
 
@@ -178,7 +179,7 @@ For approved plan execution with subagents:
 
 ### Research Phase
 
-- For nontrivial, ambiguous, high-impact, or externally grounded work, use quality-first fanout when independent evidence materially improves the plan.
+- For nontrivial, ambiguous, high-impact, externally grounded, or multi-step work, use quality-first fanout by default. Treat fanout as the normal planning substrate, not an exceptional escalation.
 - Route ordinary user language to the matching `pi-subagents` recipe; the user does not need to name a slash command. Keep detailed recipe examples in the `pi-subagents` skill so this workflow does not become a second routing authority.
 - Dispatch scout agents for codebase exploration.
 - Scouts can run in parallel (e.g., 5 scouts analyzing different modules) when their scopes are distinct.
@@ -198,8 +199,8 @@ For approved plan execution with subagents:
 
 ### Review Phase
 
-- Dispatch reviewer agents after implementation unless the change is truly Tier 1/trivial or the user requested no review.
-- Prefer a fresh-context parallel review gate for nontrivial work when independent review materially improves evidence: correctness/regressions, tests/verification, and simplicity/maintainability. Add security, ops/resource, UX, or architecture reviewers when relevant.
+- Dispatch reviewer agents after implementation by default. Skip review only when the change is truly Tier 1/trivial, the user requested no review, or there is an explicit parent-only reason.
+- Prefer a fresh-context parallel review gate for nontrivial work: correctness/regressions, tests/verification, and simplicity/maintainability. Add security, ops/resource, UX, or architecture reviewers when relevant.
 - Use `/parallel-review` or `/quality-gate` patterns directly through `subagent(...)` when they fit.
 - Use `/quick-adversarial-check` before committing to a diagnosis, architecture direction, or user-facing claim that has meaningful uncertainty.
 - Reviewer checks against the plan and coding standards.
