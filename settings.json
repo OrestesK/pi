@@ -60,7 +60,9 @@
     "hooks": {
       "sessionStart": [],
       "sessionEnd": [],
-      "beforeAgentStart": ["sessionBridge"]
+      "beforeAgentStart": [
+        "sessionBridge"
+      ]
     },
     "tape": {
       "enabled": true,

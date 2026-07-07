@@ -1,0 +1,90 @@
+{
+  "review_id": "<workflow-process-review-id>",
+  "reviewed_at": "2026-07-07",
+  "reviewer": "<reviewer-id-or-model>",
+  "review_mode": "single_run",
+  "workflow_verdict": "unknown",
+  "scope": {
+    "suite_id": "<suite-id>",
+    "run_ids": ["<run-id>"],
+    "session_refs": ["<session-jsonl-or-summary-ref>"],
+    "candidate_scope": "all"
+  },
+  "evidence_sources": {
+    "run_manifests": [],
+    "run_reports": [],
+    "session_summaries": [],
+    "subagent_runs": [],
+    "tool_logs": [],
+    "todo_refs": [],
+    "memory_refs": [],
+    "artifact_trees": [],
+    "not_inspected": []
+  },
+  "workflow_summary": {
+    "stage_timeline": [],
+    "tools_used": {},
+    "subagents_spawned": [],
+    "chains_used": [],
+    "async_runs": [],
+    "todos_used": [],
+    "memory_updates": [],
+    "tape_anchors": [],
+    "context_or_report_files_written": [],
+    "invalidated_or_retried_steps": []
+  },
+  "dimension_ratings": {
+    "goal_focus": { "score": null, "rating": "unknown", "evidence": [] },
+    "planning_and_approval": { "score": null, "rating": "unknown", "evidence": [] },
+    "tool_fit": { "score": null, "rating": "unknown", "evidence": [] },
+    "subagent_strategy": { "score": null, "rating": "unknown", "evidence": [] },
+    "concurrency_control": { "score": null, "rating": "unknown", "evidence": [] },
+    "evidence_discipline": { "score": null, "rating": "unknown", "evidence": [] },
+    "artifact_hygiene": { "score": null, "rating": "unknown", "evidence": [] },
+    "context_economy": { "score": null, "rating": "unknown", "evidence": [] },
+    "safety_privacy": { "score": null, "rating": "unknown", "evidence": [] },
+    "recovery_verification": { "score": null, "rating": "unknown", "evidence": [] }
+  },
+  "process_efficiency_score": {
+    "score_0_to_100": null,
+    "confidence": "unknown",
+    "score_basis": "weighted dimensions; independent of candidate code/output score"
+  },
+  "necessary_work": [],
+  "avoidable_work_or_overhead": [],
+  "process_vetoes": [],
+  "harness_issues": [],
+  "comparison": {
+    "included": false,
+    "compared_runs_or_configs": [],
+    "normalization_notes": [],
+    "per_run_or_config": [
+      {
+        "id": "<run-or-config-id>",
+        "task_or_scope": "<task-id-or-scope>",
+        "difficulty_or_scope_notes": "",
+        "workflow_summary": {
+          "tools_used": {},
+          "subagents_spawned": [],
+          "chains_used": [],
+          "async_runs": [],
+          "todos_used": [],
+          "memory_updates": [],
+          "context_or_report_files_written": [],
+          "invalidated_or_retried_steps": []
+        },
+        "dimension_scores": {},
+        "process_efficiency_score_0_to_100": null,
+        "process_vetoes": [],
+        "harness_issues": [],
+        "evidence": []
+      }
+    ],
+    "winner": null,
+    "deltas": []
+  },
+  "recommendations": [],
+  "missing_evidence": [],
+  "approval_privacy_caveats": [],
+  "notes": ""
+}

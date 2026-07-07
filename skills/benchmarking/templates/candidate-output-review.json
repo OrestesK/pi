@@ -1,0 +1,55 @@
+{
+  "task_id": "example-repo-2026-07-06-task-001",
+  "reviewer": "<reviewer-id-or-model>",
+  "reviewed_at": "2026-07-06",
+  "review_mode": "blinded_pairwise",
+  "input_packet_id": "<candidate-review-packet-id>",
+  "rubric_version": "benchmark-output-review-v1",
+  "reviewer_prompt_version": "candidate-output-review-prompt-v1",
+  "reviewer_model_id": null,
+  "blinding": {
+    "blinding_record_id": "<opaque-id-visible-to-reviewer>",
+    "assignment_record_path": null,
+    "anonymization_map_path": null,
+    "order_swapped_review_id": null
+  },
+  "candidate_artifact_refs": {
+    "X": "<candidate-x-artifact-id-or-path>",
+    "Y": "<candidate-y-artifact-id-or-path-or-null-for-single-output>"
+  },
+  "winner": "tie",
+  "single_output_verdict": null,
+  "confidence": "medium",
+  "absolute_readiness": {
+    "X": "minor_changes",
+    "Y": "minor_changes"
+  },
+  "dimension_assessments": {
+    "correctness": { "X": "acceptable", "Y": "acceptable", "notes": "" },
+    "completeness": { "X": "acceptable", "Y": "acceptable", "notes": "" },
+    "regression_risk": { "X": "acceptable", "Y": "acceptable", "notes": "" },
+    "maintainability": { "X": "acceptable", "Y": "acceptable", "notes": "" },
+    "scope_control": { "X": "acceptable", "Y": "acceptable", "notes": "" },
+    "tests_verification": { "X": "acceptable", "Y": "acceptable", "notes": "" },
+    "safety_security": { "X": "acceptable", "Y": "acceptable", "notes": "" },
+    "pr_readiness": { "X": "acceptable", "Y": "acceptable", "notes": "" }
+  },
+  "dimension_label_scale": ["excellent", "acceptable", "weak", "reject", "not_applicable", "unknown"],
+  "main_reasons": [],
+  "risks": [],
+  "vetoes": [],
+  "evidence": [
+    {
+      "claim": "",
+      "candidate": "X",
+      "artifact": "",
+      "location": ""
+    }
+  ],
+  "missing_evidence": [],
+  "process_review": {
+    "included": false,
+    "notes": ""
+  },
+  "notes": ""
+}

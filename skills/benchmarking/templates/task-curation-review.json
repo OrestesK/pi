@@ -1,0 +1,36 @@
+{
+  "task_id": "example-repo-2026-07-06-task-001",
+  "reviewer": "<reviewer-id-or-model>",
+  "reviewed_at": "2026-07-06",
+  "verdict": "revise",
+  "confidence": "medium",
+  "task_type": "bugfix",
+  "difficulty": "medium",
+  "primary_evaluation_mode": "review_only",
+  "mechanics": {
+    "manifest_complete": false,
+    "public_private_split_valid": false,
+    "leakage_detected": false,
+    "base_state_identified": true,
+    "rubric_version_present": true,
+    "artifact_paths_present": true
+  },
+  "risk_ratings": {
+    "leakage_risk": "low",
+    "flake_risk": "unknown",
+    "ambiguity_risk": "medium",
+    "contamination_risk": "unknown",
+    "privacy_risk": "low"
+  },
+  "strengths": [],
+  "required_fixes": [],
+  "rejection_reasons": [],
+  "evidence": [
+    {
+      "claim": "",
+      "artifact": "",
+      "location": ""
+    }
+  ],
+  "notes": ""
+}

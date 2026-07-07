@@ -1,0 +1,126 @@
+id: "example-repo-2026-07-06-task-001"
+version: "0.1.0"
+status: "draft" # draft | accepted | retired | invalid
+
+suite:
+  id: "agent-config-regression-suite"
+  root: "<pi-config-dir>/benchmarks/suites/agent-config-regression-suite"
+  task_root: "tasks/example-repo-2026-07-06-task-001"
+  path_policy: "paths are relative to suite.root unless explicitly marked external"
+
+source:
+  type: "issue_pr" # issue_pr | commit_rollback | ci_fail_pass | mutation | backlog | review_only | adversarial
+  repo: "owner/repo"
+  base_commit: "<commit-sha-or-image-digest>"
+  source_issue: null
+  source_pr: null
+  source_commit: null
+  provenance_notes: "How this task was derived without leaking the solution."
+
+visibility:
+  public_artifacts:
+    - "public/task.md"
+    - "public/setup-notes.md"
+  private_artifacts:
+    - "private/evaluator-brief.md"
+    - "private/reference-outcome.md"
+    - "private/anti-solutions.md"
+  private_artifacts_not_for_candidate_review:
+    - "private/gold.patch"
+    - "private/hidden-tests/"
+    - "private/task-origin.md"
+    - "private/generation-rationale.md"
+
+environment:
+  base_state: "repo checkout, container image, or sandbox description"
+  setup_command: null
+  public_check_command: null
+  hidden_check_command: null
+  candidate_workspace_policy: "workspace contains only candidate-facing files; candidate must not inspect parent directories, private artifacts, hidden tests, task manifests, evaluator briefs, or repo-level status outside the workspace"
+  allowed_edit_globs:
+    - "src/**/*.py"
+  readonly_artifacts:
+    - "tests/**"
+    - "public/**"
+    - "private/**"
+    - "task-manifest.yaml"
+    - "run-manifest.yaml"
+    - "reports/**"
+  generated_artifact_policy: "avoid generated artifacts in candidate workspaces where practical; record cleanup separately from source/test diffs"
+  network: "disabled" # disabled | allowlist | unrestricted
+  allowed_tools: []
+  budget:
+    wall_time_minutes: 60
+    max_turns: null
+    max_tool_calls: null
+
+scoring:
+  primary_mode: "review_only" # deterministic | review_only | hybrid
+  deterministic_evidence:
+    public_tests: "optional"
+    hidden_tests: "none"
+    static_checks: []
+  review:
+    rubric_version: "benchmark-output-review-v1"
+    reviewer_prompt_version: "candidate-output-review-prompt-v1"
+    task_curator_prompt_version: "curation-review-prompt-v1"
+    candidate_review_mode: "blinded_pairwise" # blinded_pairwise | single_output | audit
+    output_template: "templates/candidate-output-review.json"
+    allow_gold_patch_in_normal_review: false
+    require_neither_acceptable_option: true
+
+run_metadata_requirements:
+  capture_config_hash: true
+  capture_model_id: true
+  capture_agent_version: true
+  capture_prompt_version: true
+  capture_tool_versions: true
+  capture_transcript_path: true
+  capture_patch_path: true
+  capture_final_answer_path: true
+  capture_test_log_paths: "if_available"
+
+blinding:
+  required_for_pairwise_review: true
+  anonymized_labels:
+    - "X"
+    - "Y"
+  assignment_record_path: "private/blinding/xy-assignment.json"
+  anonymization_map_path: "private/blinding/anonymization-map.json"
+  assignment_seed: null
+  hide_candidate_identities_from_normal_review: true
+
+mechanics:
+  manifest_schema_checked: false
+  public_private_split_checked: false
+  leakage_check_completed: false
+  candidate_anonymization_required: true
+  xy_randomization_record_required: true
+  artifact_paths_required: true
+  candidate_provenance_required: true
+  config_model_prompt_versions_required: true
+  rubric_and_reviewer_prompt_versions_required: true
+  accepted_packet_immutable_after_candidate_exposure: true
+  scorer_inputs_copied_from_accepted_packet: true
+  candidate_workspace_isolation_checked: false
+  public_task_declares_allowed_edits: false
+  public_tests_declared_readonly: false
+  concurrent_candidate_workspaces_isolated: false
+  candidate_task_or_scorer_edits_recorded_as_process_evidence: true
+  code_result_and_process_result_reported_separately: true
+
+metadata:
+  task_type: "bugfix" # bugfix | feature | refactor | migration | ci_debug | test_quality | review_only | safety | restraint | tool_use | docs_api
+  difficulty: "medium" # smoke | medium | hard | long_horizon
+  expected_human_time: "15m-1h"
+  domains: []
+  risks: []
+  tags: []
+  contamination_status: "private" # private | public | known_contaminated | unknown
+
+maintenance:
+  created_by: "<curator-or-agent-id>"
+  created_at: "2026-07-06"
+  validated_at: null
+  retired_at: null
+  notes: ""
