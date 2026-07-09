@@ -41,6 +41,8 @@
 
 ## Language conventions
 
+For obviously temporary or quick testing files (not permanent tests), you do not need to follow these rules.
+
 ### Python
 
 - Imports at top of file. Only exception: circular dependency resolution
