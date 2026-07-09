@@ -1,6 +1,6 @@
 {
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.5",
+  "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "xhigh",
   "theme": "gruvbox-custom",
   "quietStartup": true,
@@ -42,8 +42,8 @@
     "autoTrigger": true,
     "triggerContextPercent": 0.6,
     "slipstreamKeepRecentTokens": 50000,
-    "summaryModel": "openai-codex/gpt-5.5",
-    "judgeModel": "openai-codex/gpt-5.5",
+    "summaryModel": "openai-codex/gpt-5.6-terra",
+    "judgeModel": "openai-codex/gpt-5.6-sol",
     "judgeThreshold": 7,
     "repairAttempts": 3,
     "rejectedSummaryMode": "ask",
@@ -105,9 +105,11 @@
     "npm:pi-openai-service-tier"
   ],
   "subagents": {
+    "defaultModel": "openai-codex/gpt-5.6-terra",
     "disableBuiltins": false
   },
   "autocompleteMaxVisible": 10,
   "doubleEscapeAction": "tree",
+  "treeFilterMode": "no-tools",
   "httpIdleTimeoutMs": 3600000
 }

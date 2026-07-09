@@ -1,8 +1,8 @@
 ---
 name: scout
 description: Fast codebase recon that returns compressed context for handoff
-model: openai-codex/gpt-5.4-mini
-fallbackModels: openai-codex/gpt-5.4
+model: openai-codex/gpt-5.6-luna
+fallbackModels: openai-codex/gpt-5.6-terra
 thinking: low
 tools: read, grep, find, ls, bash, memory_search, memory_check, contact_supervisor, tree_sitter_search_symbols, tree_sitter_document_symbols, tree_sitter_symbol_definition, tree_sitter_pattern_search, tree_sitter_codebase_overview, tree_sitter_codebase_map, mcp:tree-sitter, ast_grep_search, lsp_navigation, lsp_diagnostics
 systemPromptMode: replace

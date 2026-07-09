@@ -1,10 +1,10 @@
 ---
 name: run-monitor
 description: Read-only long-running tmux/log/evidence run monitor that emits concise status events for the parent
-model: openai-codex/gpt-5.4-mini
-fallbackModels: openai-codex/gpt-5.4, openai-codex/gpt-5.5
+model: openai-codex/gpt-5.6-luna
+fallbackModels: openai-codex/gpt-5.6-terra
 thinking: low
-tools: read, grep, find, ls, bash, contact_supervisor, intercom, ack_supervisor_message
+tools: read, grep, find, ls, bash, subagent, contact_supervisor, intercom, ack_supervisor_message
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false

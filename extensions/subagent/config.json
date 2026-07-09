@@ -2,21 +2,33 @@
   "asyncByDefault": true,
   "forceTopLevelAsync": false,
   "defaultSessionDir": "~/.pi/agent/sessions/subagent",
-  "maxSubagentDepth": 2,
+  "maxSubagentDepth": 32,
+  "maxSubagentSpawnsPerSession": 20000,
+  "globalConcurrencyLimit": 128,
+  "chain": {
+    "dynamicFanout": {
+      "maxItems": 20000
+    }
+  },
+  "scheduledRuns": {
+    "enabled": true,
+    "maxPending": 20000,
+    "maxLatenessMs": 1209600000
+  },
   "control": {
     "enabled": true,
     "needsAttentionAfterMs": 60000,
     "activeNoticeAfterMs": 120000,
     "failedToolAttemptsBeforeAttention": 3,
     "notifyOn": ["active_long_running", "needs_attention"],
-    "notifyChannels": ["event", "async", "intercom"]
+    "notifyChannels": ["event", "async"]
   },
   "intercomBridge": {
     "mode": "always"
   },
   "parallel": {
-    "maxTasks": 32,
-    "concurrency": 16
+    "maxTasks": 20000,
+    "concurrency": 128
   },
   "progress": {
     "reportMode": "supervisor"
