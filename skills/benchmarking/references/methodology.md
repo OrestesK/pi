@@ -29,15 +29,21 @@ Use this reference to choose a benchmark design and keep task creation, curation
 
 3. **Candidate execution**
    - Run candidate agents/configs against the frozen packet.
-   - Capture patches, logs, final answers, transcripts, config hashes, model IDs, tool versions, and timestamps.
+   - Declare the runner mode in `templates/run-manifest.yaml`: `direct_worker`, `direct_parallel_workers`, `goal_workflow`, or `custom_runner`.
+   - Capture patches, logs, final answers, transcripts, config hashes, model IDs, tool versions, timestamps, and observed resource metrics.
 
-4. **Candidate-output review**
+4. **Frozen scoring / replay snapshot**
+   - Score from accepted packet material copied into clean scorer workspaces.
+   - Distinguish live external workspaces, frozen candidate snapshots, frozen scorer inputs, scorer workspaces, replay entrypoints, residue manifests, and host-local recovery refs in `templates/run-manifest.yaml`.
+
+5. **Candidate-output review**
    - Review frozen task packet plus anonymized candidate artifacts.
    - Use judgment, not brittle deterministic rules, unless a deterministic scorer is explicitly part of the packet.
+   - For high-rigor review, follow `references/reviewer-topology.md`: canonical packet, reviewer assignment, leaf-review fanout, reducer/adjudicator, optional targeted second wave.
 
-5. **Reporting**
-   - Aggregate paired outcomes.
-   - Report uncertainty, ties, neither-acceptable counts, and category breakdowns.
+6. **Reporting**
+   - Aggregate paired outcomes and reducer/adjudicator outputs.
+   - Report uncertainty, ties, neither-acceptable counts, category breakdowns, agreement/adjudication metrics, and observed resource metrics.
 
 ## Deterministic tests vs deterministic mechanics
 

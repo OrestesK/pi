@@ -1,6 +1,6 @@
 # Reporting and statistics
 
-Use this reference to summarize benchmark runs and compare configurations without overstating noisy results.
+Use this reference to summarize benchmark runs and compare configurations without overstating noisy results. Use `templates/benchmark-report.json` when structured report output is useful.
 
 ## Primary outputs
 
@@ -19,7 +19,9 @@ A benchmark report should include:
 - paired win/loss/tie/neither counts;
 - absolute readiness counts;
 - safety vetoes;
-- judge/reviewer agreement where available;
+- judge/reviewer agreement and adjudication metrics where available;
+- observed resource metrics: wall time, active runtime, tokens, estimated cost, tool calls, subagent counts, and second-wave count when available;
+- label metrics when labels or expected findings exist;
 - task-level table;
 - category-level analysis;
 - decision and confidence.
@@ -93,6 +95,51 @@ Always look for subgroup effects:
 
 A config can improve one category while regressing another. Report both.
 
+## Panel and label metrics
+
+For high-fanout review panels, report:
+
+- topology profile: `single_review`, `quality_gate_3`, `matrix_10`, `panel_20`, or custom;
+- reviewer count by role;
+- finding clusters;
+- agreement rate by finding cluster or label;
+- validator overturn rate;
+- unresolved disagreement count;
+- second-wave trigger count;
+- final adjudicator confidence.
+
+When labels or expected findings exist, report:
+
+- true positives;
+- false positives;
+- false negatives;
+- precision;
+- recall;
+- F1;
+- severity-weighted precision/recall/F1 when predeclared;
+- support per label;
+- abstentions or unknowns.
+
+Do not compute precision/recall/F1 for unlabeled judgment-only tasks. Use agreement/adjudication metrics instead.
+
+## Observed resource metrics
+
+Resource use is descriptive by default. Record units and provenance.
+
+Recommended fields:
+
+- wall-clock time;
+- active runtime;
+- wait or queue time;
+- tool calls total and by tool;
+- subagent count by role;
+- token counts;
+- estimated cost;
+- reviewer count;
+- second-wave count.
+
+Only treat resource metrics as a score or veto when the benchmark predeclares resource efficiency as a primary objective.
+
 ## Process and harness flags
 
 Do not collapse every run problem into code failure.
@@ -120,6 +167,8 @@ Invalid reasons:
 - benchmark bug that prevents fair scoring.
 
 Do not mark a task invalid just because a candidate edited public tests or an acceptance wrapper rejected malformed final JSON, if frozen scorer inputs and candidate artifacts still allow fair scoring. Record those as process or harness flags.
+
+For structured output, use `templates/benchmark-report.json` and include only metrics that apply to the benchmark. Omit label metrics for unlabeled judgment-only tasks.
 
 ## Report skeleton
 
@@ -159,6 +208,9 @@ Before running decision-grade benchmarks, predeclare:
 - blinding and X/Y assignment procedure;
 - tie and neither handling;
 - invalid-task handling;
-- whether trajectory review can affect the final verdict.
+- whether trajectory review can affect the final verdict;
+- review topology profile and reducer policy;
+- whether label metrics are applicable;
+- whether resource metrics are descriptive or part of the primary metric.
 
 If these were not predeclared, label the result exploratory or directional.

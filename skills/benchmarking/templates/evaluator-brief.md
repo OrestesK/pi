@@ -29,13 +29,26 @@ List plausible but wrong solutions reviewers should catch.
 
 - 
 
-## Evidence available to reviewers
+## Reviewer-visible excerpt
 
+Only this section should be copied into normal candidate-review packets.
+
+- Desired outcome summary:
+- Known risks and anti-solutions:
 - Public task statement:
 - Candidate diffs/outputs:
 - Public logs/tests:
-- Hidden/scorer summary, if allowed:
+- Hidden/scorer summary, if allowed and sanitized:
 - Gold/reference patch availability: audit-only | normal-review-allowed | absent
+
+Do not include task origin, generation rationale, canary strings, raw hidden-test bodies, raw local paths, or unblinding data in the reviewer-visible excerpt.
+
+## Evidence exposure policy
+
+- Normal reviewer-visible artifacts:
+- Elevated reviewer artifacts:
+- Audit-only artifacts:
+- Reducer-visible artifacts:
 
 ## Review rubric additions
 
@@ -64,6 +77,12 @@ State any intentional ambiguity and how reviewers should judge reasonable choice
 - Canary/private strings:
 - Public-material leakage risks:
 
-## Curator notes
+## Curator and audit-only notes
 
 Use only for task curation or audit mode. Do not include in normal candidate-output review when it would reveal generation rationale.
+
+- Task origin:
+- Generation rationale:
+- Gold/reference details:
+- Hidden-test body notes:
+- Raw transcript or host-local evidence refs:

@@ -1,0 +1,91 @@
+{
+  "adjudication_id": "<candidate-review-adjudication-id>",
+  "task_id": "example-repo-2026-07-06-task-001",
+  "reviewed_at": "2026-07-06",
+  "review_mode": "blinded_pairwise",
+  "topology_profile": "matrix_10",
+  "input_packet_id": "<candidate-review-packet-id>",
+  "reviewer_assignment_manifest_id": "<reviewer-assignment-manifest-id>",
+  "review_lane_review_ids": [
+    {
+      "review_stage": "leaf_review",
+      "review_role": "correctness",
+      "focus_surface": "output",
+      "allowed_evidence_scope": "normal_reviewer",
+      "review_id": "<candidate-output-review-id>"
+    }
+  ],
+  "reducer": "<reducer-id-or-model>",
+  "blinding": {
+    "blinding_record_id": "<opaque-id-visible-to-reducer>",
+    "labels_visible": [
+      "X",
+      "Y"
+    ],
+    "unblinding_visible": false
+  },
+  "overturned_claims": [],
+  "duplicate_claims": [],
+  "unsupported_claims": [],
+  "second_wave_requests": [],
+  "agreement_metrics": {
+    "reviewer_count_by_role": {},
+    "finding_cluster_count": 0,
+    "agreement_rate": null,
+    "validator_overturn_rate": null,
+    "unresolved_disagreement_count": 0,
+    "second_wave_trigger_count": 0,
+    "final_adjudicator_confidence": "medium"
+  },
+  "final_verdict": {
+    "winner": null,
+    "single_output_verdict": null,
+    "absolute_readiness": {
+      "X": null,
+      "Y": null
+    },
+    "confidence": "medium",
+    "decision": "inconclusive",
+    "main_reasons": [],
+    "risks": [],
+    "missing_evidence": []
+  },
+  "notes": "",
+  "findings": [
+    {
+      "id": "F-001",
+      "subject": "candidate:X",
+      "label": "correctness",
+      "severity": "moderate",
+      "confidence": "medium",
+      "claim": "",
+      "evidence_refs": [],
+      "counterevidence_refs": [],
+      "impact": "",
+      "disposition": "supported"
+    }
+  ],
+  "finding_cluster_metadata": {
+    "F-001": {
+      "cluster_id": "C-001",
+      "supporting_review_ids": [],
+      "contradicting_review_ids": [],
+      "second_wave_requested": false,
+      "adjudication_notes": ""
+    }
+  },
+  "reducer_visibility": {
+    "allowed_evidence_scope": "reducer",
+    "elevated_reducer": false,
+    "raw_candidate_artifacts_allowed": false,
+    "elevation_reason": null
+  },
+  "label_metrics": {
+    "applicable": false,
+    "label_set_version": null,
+    "per_label": [],
+    "micro": null,
+    "macro": null,
+    "omit_when_not_applicable": true
+  }
+}

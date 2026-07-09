@@ -1,0 +1,78 @@
+id: "<run-id>"
+suite_id: "<suite-id>"
+status: "draft" # draft | running | scored | reviewed | invalid
+mode: "exploratory" # exploratory | directional | decision_grade
+runner_mode: "direct_worker" # direct_worker | direct_parallel_workers | goal_workflow | custom_runner
+runner_rationale: ""
+resource_metrics_are_constraints: false
+workspace_root: "<external-or-suite-relative-workspace-root>"
+accepted_task_packet: "tasks/<task-id>"
+path_policy: "paths are relative to suite root unless prefixed with suite:, task:, benchmarking:, session:, host_local:, or external:"
+
+candidates:
+  candidate-a:
+    label: "A"
+    workspace_ref: "host_local:<path-or-logical-ref>"
+    frozen_snapshot_ref: "runs/<run-id>/candidates/candidate-a/workspace-final"
+    final_answer_ref: "runs/<run-id>/candidates/candidate-a/final-answer.md"
+    final_answer_exists: false
+    final_answer_reconstructed_from_session: false
+    final_answer_reconstruction_source_ref: null
+    patch_ref: null
+    transcript_ref: "session:<logical-session-id>"
+    config_hash: null
+    model_id: null
+    agent_version: null
+    prompt_version: null
+
+frozen_artifacts:
+  scorer_inputs_ref: "runs/<run-id>/reports/<score-id>/scorer-inputs"
+  scorer_workspace_ref: "runs/<run-id>/reports/<score-id>/workspace"
+  replay_entrypoint_ref: null
+  residue_manifest_ref: null
+  sanitization_status: "unknown" # unknown | sanitized | host_local_only
+
+scoring:
+  primary_mode: "hybrid" # deterministic | review_only | hybrid
+  deterministic_results: []
+  candidate_test_or_scorer_edits_ref: null
+  score_result_refs: []
+
+review:
+  topology_profile: "single_review" # single_review | quality_gate_3 | matrix_10 | panel_20 | custom
+  reviewer_topology_reference: "benchmarking:references/reviewer-topology.md"
+  reviewer_assignment_manifest_ref: null
+  review_lane_refs:
+    - review_stage: "leaf_review"
+      review_role: "correctness"
+      focus_surface: "output"
+      allowed_evidence_scope: "normal_reviewer"
+      review_ref: null
+  reducer_required: false
+  adjudication_ref: null
+  second_wave_refs: []
+  blinding_record_ref: null
+  anonymization_map_ref: "task:private/blinding/anonymization-map.json"
+
+observed_metrics:
+  wall_clock_ms: null
+  active_runtime_ms: null
+  wait_or_queue_ms: null
+  tool_calls_total: null
+  tool_calls_by_tool: {}
+  subagent_count_by_role: {}
+  tokens_in: null
+  tokens_out: null
+  estimated_cost_usd: null
+
+process:
+  code_result_and_process_result_reported_separately: true
+  candidate_task_or_scorer_edits_recorded_as_process_evidence: true
+  private_material_excluded_from_candidate_workspaces: true
+  candidate_workspaces_frozen_to_run_artifacts: false
+  declared_final_outputs_verified: false
+  validation_cache_policy: "unknown" # unknown | no_cache | redirected_cache | contaminated
+  raw_host_paths_publishable: false
+
+invalid_reason: null
+notes: []

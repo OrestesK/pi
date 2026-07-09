@@ -6,7 +6,7 @@ suite:
   id: "agent-config-regression-suite"
   root: "<pi-config-dir>/benchmarks/suites/agent-config-regression-suite"
   task_root: "tasks/example-repo-2026-07-06-task-001"
-  path_policy: "paths are relative to suite.root unless explicitly marked external"
+  path_policy: "paths are relative to suite.root unless prefixed with suite:, task:, benchmarking:, session:, host_local:, or external:"
 
 source:
   type: "issue_pr" # issue_pr | commit_rollback | ci_fail_pass | mutation | backlog | review_only | adversarial
@@ -19,17 +19,37 @@ source:
 
 visibility:
   public_artifacts:
-    - "public/task.md"
-    - "public/setup-notes.md"
+    - "task:public/task.md"
+    - "task:public/setup-notes.md"
   private_artifacts:
-    - "private/evaluator-brief.md"
-    - "private/reference-outcome.md"
-    - "private/anti-solutions.md"
+    - "task:private/evaluator-brief.md"
+    - "task:private/reference-outcome.md"
+    - "task:private/anti-solutions.md"
   private_artifacts_not_for_candidate_review:
-    - "private/gold.patch"
-    - "private/hidden-tests/"
-    - "private/task-origin.md"
-    - "private/generation-rationale.md"
+    - "task:private/gold.patch"
+    - "task:private/hidden-tests/"
+    - "task:private/task-origin.md"
+    - "task:private/generation-rationale.md"
+  reviewer_exposure_policy:
+    normal_reviewer:
+      - "task:public/task.md"
+      - "reviewer-visible evaluator excerpt"
+      - "blinded candidate artifacts"
+      - "frozen public/scorer summaries when allowed"
+    elevated_reviewer:
+      - "sanitized hidden/scorer summary if allowed"
+      - "bounded process excerpts if process review is requested"
+    audit_only:
+      - "task:private/gold.patch"
+      - "task:private/hidden-tests/"
+      - "task:private/task-origin.md"
+      - "task:private/generation-rationale.md"
+      - "raw transcripts or host-local recovery refs"
+    reducer:
+      - "reviewer JSON outputs"
+      - "rubric and prompt versions"
+      - "packet ids and blinded labels"
+      - "agreement/adjudication metrics"
 
 environment:
   base_state: "repo checkout, container image, or sandbox description"
@@ -65,9 +85,37 @@ scoring:
     reviewer_prompt_version: "candidate-output-review-prompt-v1"
     task_curator_prompt_version: "curation-review-prompt-v1"
     candidate_review_mode: "blinded_pairwise" # blinded_pairwise | single_output | audit
-    output_template: "templates/candidate-output-review.json"
+    output_template: "benchmarking:templates/candidate-output-review.json"
+    topology_profile: "single_review" # single_review | quality_gate_3 | matrix_10 | panel_20 | custom
+    reviewer_topology_reference: "benchmarking:references/reviewer-topology.md"
+    review_lanes:
+      - review_stage: "leaf_review"
+        review_role: "correctness"
+        focus_surface: "output"
+        allowed_evidence_scope: "normal_reviewer"
+    reducer_required: false
+    reducer_template: "benchmarking:templates/candidate-review-adjudication.json"
+    second_wave_policy: "targeted_named_gaps_only"
+    order_swap_required: false
     allow_gold_patch_in_normal_review: false
     require_neither_acceptable_option: true
+
+labeling:
+  applicable: false
+  label_set_version: null
+  evaluation_unit: "finding" # task | candidate | finding
+  ground_truth_labels: []
+  required_labels: []
+  abstain_label: "unknown"
+
+observed_metrics_policy:
+  resource_metrics_are_constraints: false
+  collect_wall_clock_ms: true
+  collect_active_runtime_ms: "if_available"
+  collect_tool_calls_by_tool: true
+  collect_subagent_count_by_role: true
+  collect_token_counts: "if_available"
+  collect_estimated_cost: "if_available"
 
 run_metadata_requirements:
   capture_config_hash: true
@@ -79,14 +127,17 @@ run_metadata_requirements:
   capture_patch_path: true
   capture_final_answer_path: true
   capture_test_log_paths: "if_available"
+  capture_observed_metrics: true
+  capture_runner_mode: true
+  capture_replay_refs: true
 
 blinding:
   required_for_pairwise_review: true
   anonymized_labels:
     - "X"
     - "Y"
-  assignment_record_path: "private/blinding/xy-assignment.json"
-  anonymization_map_path: "private/blinding/anonymization-map.json"
+  assignment_record_path: "task:private/blinding/xy-assignment.json"
+  anonymization_map_path: "task:private/blinding/anonymization-map.json"
   assignment_seed: null
   hide_candidate_identities_from_normal_review: true
 

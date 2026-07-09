@@ -21,6 +21,8 @@ Review these artifacts when available:
 
 Return structured JSON following `templates/task-curation-review.json`, plus a concise explanation.
 
+For high-stakes curation, use `references/reviewer-topology.md` with a small curation panel and reducer. Keep curation before candidate exposure.
+
 Verdict options:
 
 - `accept` — task can enter the benchmark.
@@ -80,6 +82,18 @@ Reject or revise when public material reveals:
 - Are secrets, tokens, private URLs, customer data, and sensitive paths removed or marked private?
 - Are destructive or external operations explicitly scoped?
 - Is publication status clear: private/internal or sanitized/public?
+- Is the normal candidate-review packet safe for broad blinded reviewer fanout?
+- Are audit-only artifacts separated from reviewer-visible excerpts?
+
+### Reviewer packet safety
+
+For tasks expected to use candidate-output reviewers, verify:
+
+- reviewer-visible evaluator excerpts exclude gold patches, hidden-test bodies, task origin, generation rationale, and unblinding data;
+- normal reviewer packets can be assembled with opaque artifact ids and sanitized bounded excerpts;
+- elevated/audit-only evidence is explicitly marked;
+- reducer-visible material is limited to reviewer outputs and metadata unless an elevated reducer is declared;
+- labels or expected findings are versioned when precision/recall/F1 will be reported.
 
 ## Difficulty labels
 

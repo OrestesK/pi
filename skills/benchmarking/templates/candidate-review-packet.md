@@ -1,11 +1,18 @@
 # Candidate review packet: <task id>
 
 Reviewer mode: blinded_pairwise | single_output | audit
+Review stage: leaf_review | validator | audit
+Review role: <review_lane role, e.g. correctness | false_positive | severity_calibration>
+Focus surface: output | process | harness | privacy | labels | report
+Allowed evidence scope: normal_reviewer | elevated_reviewer | audit_only
 Rubric version: <version>
 Reviewer prompt version: <version>
 Review packet id: <id>
+Reviewer assignment manifest id: <id-or-null>
 Blinding record id: <opaque-id>; stored outside this packet; do not include paths or identities here.
 Candidate provenance record ids: stored outside this blinded packet; do not include config names, model names, run order, or unblinding paths here.
+
+Use opaque artifact ids and sanitized bounded excerpts in normal-review packets. Do not include raw host paths, unblinding paths, gold patches, hidden-test bodies, task origin, or generation rationale unless this is explicitly `audit` mode.
 
 ## Task statement
 
@@ -26,7 +33,7 @@ Use this section for pairwise review or as the single candidate in single-output
 - Candidate artifact id:
 - Diff/output:
 - Final answer:
-- Transcript/process artifact, if process review is requested:
+- Transcript/process artifact id or sanitized excerpt, if process review is requested:
 - Public test/log summary from frozen task/scorer inputs:
 - Hidden/scorer summary from frozen task/scorer inputs, if allowed:
 - Candidate edits to task/scorer files, if any, as process evidence only:
@@ -46,7 +53,7 @@ Use this section only for pairwise review. Delete or mark `not_applicable` for s
 - Candidate artifact id:
 - Diff/output:
 - Final answer:
-- Transcript/process artifact, if process review is requested:
+- Transcript/process artifact id or sanitized excerpt, if process review is requested:
 - Public test/log summary from frozen task/scorer inputs:
 - Hidden/scorer summary from frozen task/scorer inputs, if allowed:
 - Candidate edits to task/scorer files, if any, as process evidence only:
@@ -69,6 +76,17 @@ Use this section only for pairwise review. Delete or mark `not_applicable` for s
 8. Cite evidence for every major claim.
 9. Flag missing evidence instead of guessing.
 10. If asked for process review, do it separately after output review.
+11. If this is a leaf review in a panel, stay inside the assigned lane and do not perform reducer/adjudicator work.
+12. Reducers should normally use `templates/candidate-review-adjudication.json`, not this raw candidate packet. Use this packet for reducer work only when an explicitly elevated reducer needs bounded raw evidence.
+
+## Role-specific questions
+
+- <question 1>
+- <question 2>
+
+## Stop condition
+
+Stop after answering the role-specific questions with evidence-backed findings. Do not broaden into unrelated review lanes.
 
 ## Default rubric
 

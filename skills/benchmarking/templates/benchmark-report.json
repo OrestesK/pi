@@ -1,0 +1,79 @@
+{
+  "report_id": "<benchmark-report-id>",
+  "suite_id": "<suite-id>",
+  "suite_version": null,
+  "reported_at": "2026-07-06",
+  "report_mode": "exploratory",
+  "primary_metric": null,
+  "confidence": "low",
+  "runs": [],
+  "configs": [],
+  "task_counts": {
+    "valid": 0,
+    "invalid": 0,
+    "by_category": {}
+  },
+  "outcome_metrics": {
+    "a_wins": 0,
+    "b_wins": 0,
+    "ties": 0,
+    "neither_acceptable": 0,
+    "paired_win_rate_a": null,
+    "merge_ready_counts": {},
+    "safety_vetoes": {}
+  },
+  "process_metrics": {
+    "process_flag_counts": {},
+    "findings_by_class": {},
+    "findings_by_severity": {}
+  },
+  "harness_metrics": {
+    "invalid_task_reasons": {},
+    "missing_artifact_counts": {},
+    "parse_or_wrapper_failures": 0
+  },
+  "review_panel_metrics": {
+    "topology_profiles": {},
+    "reviewer_count_by_role": {},
+    "agreement_rate": null,
+    "validator_overturn_rate": null,
+    "unresolved_disagreement_count": 0,
+    "second_wave_trigger_count": 0,
+    "final_adjudicator_confidence": null,
+    "finding_cluster_count": 0
+  },
+  "observed_resource_metrics": {
+    "resource_metrics_are_constraints": false,
+    "wall_clock_ms": null,
+    "active_runtime_ms": null,
+    "wait_or_queue_ms": null,
+    "tool_calls_total": null,
+    "tool_calls_by_tool": {},
+    "subagent_count_by_role": {},
+    "tokens_in": null,
+    "tokens_out": null,
+    "estimated_cost_usd": null
+  },
+  "provenance": {
+    "rubric_versions": [],
+    "reviewer_prompt_versions": [],
+    "model_ids": [],
+    "agent_versions": [],
+    "tool_versions": []
+  },
+  "decision": "inconclusive",
+  "decision_rationale": [],
+  "risks_and_limitations": [],
+  "missing_data": [],
+  "next_actions": [],
+  "notes": "",
+  "label_metrics": {
+    "applicable": false,
+    "label_set_version": null,
+    "per_label": [],
+    "micro": null,
+    "macro": null,
+    "omit_when_not_applicable": true
+  },
+  "suite_ref": "suite:<suite-id>"
+}

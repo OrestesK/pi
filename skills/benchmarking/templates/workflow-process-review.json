@@ -6,9 +6,30 @@
   "workflow_verdict": "unknown",
   "scope": {
     "suite_id": "<suite-id>",
-    "run_ids": ["<run-id>"],
-    "session_refs": ["<session-jsonl-or-summary-ref>"],
+    "run_ids": [
+      "<run-id>"
+    ],
+    "session_refs": [
+      "session:<id-or-logical-ref>"
+    ],
     "candidate_scope": "all"
+  },
+  "review_panel": {
+    "topology_profile": "single_review",
+    "reviewer_topology_reference": "benchmarking:references/reviewer-topology.md",
+    "reviewer_assignment_manifest_ref": null,
+    "review_lane_refs": [
+      {
+        "review_stage": "leaf_review",
+        "review_role": "process_mechanics",
+        "focus_surface": "process",
+        "allowed_evidence_scope": "normal_reviewer",
+        "review_ref": null
+      }
+    ],
+    "reducer_required": false,
+    "adjudication_ref": null,
+    "second_wave_refs": []
   },
   "evidence_sources": {
     "run_manifests": [],
@@ -16,8 +37,6 @@
     "session_summaries": [],
     "subagent_runs": [],
     "tool_logs": [],
-    "todo_refs": [],
-    "memory_refs": [],
     "artifact_trees": [],
     "not_inspected": []
   },
@@ -29,27 +48,120 @@
     "async_runs": [],
     "todos_used": [],
     "memory_updates": [],
-    "tape_anchors": [],
     "context_or_report_files_written": [],
-    "invalidated_or_retried_steps": []
+    "invalidated_or_retried_steps": [],
+    "validation_checks": [],
+    "final_output_artifacts": [],
+    "generated_residue": []
   },
-  "dimension_ratings": {
-    "goal_focus": { "score": null, "rating": "unknown", "evidence": [] },
-    "planning_and_approval": { "score": null, "rating": "unknown", "evidence": [] },
-    "tool_fit": { "score": null, "rating": "unknown", "evidence": [] },
-    "subagent_strategy": { "score": null, "rating": "unknown", "evidence": [] },
-    "concurrency_control": { "score": null, "rating": "unknown", "evidence": [] },
-    "evidence_discipline": { "score": null, "rating": "unknown", "evidence": [] },
-    "artifact_hygiene": { "score": null, "rating": "unknown", "evidence": [] },
-    "context_economy": { "score": null, "rating": "unknown", "evidence": [] },
-    "safety_privacy": { "score": null, "rating": "unknown", "evidence": [] },
-    "recovery_verification": { "score": null, "rating": "unknown", "evidence": [] }
-  },
+  "dimension_ratings": [
+    {
+      "dimension": "goal_focus",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "planning_and_approval",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "benchmark_mechanics",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "tool_fit",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "code_intelligence_use",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "subagent_strategy",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "concurrency_control",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "evidence_discipline",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "artifact_hygiene",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "context_economy",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "safety_privacy",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "recovery_and_invalidation",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "verification",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    },
+    {
+      "dimension": "reporting_clarity",
+      "score": null,
+      "rating": "unknown",
+      "evidence": []
+    }
+  ],
   "process_efficiency_score": {
     "score_0_to_100": null,
     "confidence": "unknown",
     "score_basis": "weighted dimensions; independent of candidate code/output score"
   },
+  "findings": [
+    {
+      "id": "F-001",
+      "subject": "run",
+      "label": "tool_fit",
+      "severity": "moderate",
+      "confidence": "unknown",
+      "claim": "",
+      "evidence_refs": [],
+      "counterevidence_refs": [],
+      "impact": "",
+      "disposition": "supported",
+      "affected_surface": "process_only",
+      "missing_evidence": [],
+      "recommendation": ""
+    }
+  ],
   "necessary_work": [],
   "avoidable_work_or_overhead": [],
   "process_vetoes": [],
@@ -58,28 +170,6 @@
     "included": false,
     "compared_runs_or_configs": [],
     "normalization_notes": [],
-    "per_run_or_config": [
-      {
-        "id": "<run-or-config-id>",
-        "task_or_scope": "<task-id-or-scope>",
-        "difficulty_or_scope_notes": "",
-        "workflow_summary": {
-          "tools_used": {},
-          "subagents_spawned": [],
-          "chains_used": [],
-          "async_runs": [],
-          "todos_used": [],
-          "memory_updates": [],
-          "context_or_report_files_written": [],
-          "invalidated_or_retried_steps": []
-        },
-        "dimension_scores": {},
-        "process_efficiency_score_0_to_100": null,
-        "process_vetoes": [],
-        "harness_issues": [],
-        "evidence": []
-      }
-    ],
     "winner": null,
     "deltas": []
   },
