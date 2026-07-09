@@ -72,8 +72,9 @@ Slack time is specifically reflection time. It is not the same as the general as
 
 Slack time includes:
 
+- any time you will call the WAIT tool to wait for async subagent, you are in slack and should do slack work instead of waiting
 - waiting on async subagents, long-running commands, CI, external services, or user replies
-- preparing to ask the user a question
+- asking the user a blocking question
 - any moment where independent reflection can run without delaying a required next action
 
 Assume useful slack exists by default. During slack, spawn async reflection agents instead of doing nothing.
@@ -158,6 +159,7 @@ Forbidden:
 
 - All READ git commands are ALLOWED by default
   - Examples: `git log`, `git diff`, `git status`, `git blame`, `git show`, etc
+- Read-only git commands are normal for repo work; do not add a separate "is this a git repo" precheck before ordinary git diff/status/log. In delegated or temporary workspaces, if a read-only git command fails because the cwd is not a git repo, treat that as a terminal signal for git inspection in that workspace and continue with direct task artifacts, file reads, listings, or provided patches
 - All MUTATION git commands are NOT ALLOWED by default
   - Examples: `add`, `commit`, `push`, `checkout`, `reset`, `stash`, `rebase`, `merge`, branch deletion, restack, etc
 - GitHub PR metadata and comment MUTATION through `gh` is ALLOWED
@@ -181,11 +183,14 @@ This applies only to external, mutation-capable MCPs (e.g. Notion, Google Drive)
 - Counterargue weak premises first when relevant
 - Mark hidden risks as `RISK:` and cite evidence
 - State when objections are `Plausible but unverified:`
+- Match factual claims to the scope and strength of the evidence already visible. If the evidence is partial, make a partial claim, qualify uncertainty, or gather the smallest targeted evidence needed. Do not broaden a claim beyond what visible output or explicit tool metadata supports.
 - Try before asking when tools can answer a factual question
 - Ask before choosing behavior based on external best practice when the choice is a user preference or workflow rule
 - Ask exactly one focused question when user input is needed
 - Stop after two failed attempts at the same operation; switch strategy or ask
+- If a tool fails because of invalid arguments, schema mismatch, missing required parameters, or wrong parameter names, inspect the error, change the argument shape, and retry at most once for the same intent. Do not repeat the same invalid parameter pattern
 - Do not repeat probes unless something changed; state what changed before rerunning
+- If a referenced supplemental file is missing, verify the path once. If the task has sufficient required inputs, note the missing file and continue. Escalate only when the missing file is necessary to decide behavior, scope, safety, or implementation
 - Verify cwd, paths, logs, generated files, MCP config, and package resolution before analyzing them
 - Treat stale extension/session/tool-context errors as harness bugs: preserve artifact paths, inspect logs/session state, and report/fix the underlying lifecycle issue
 - For multiple reasonable paths, present the smallest useful decision with a recommendation and wait
@@ -195,6 +200,8 @@ This applies only to external, mutation-capable MCPs (e.g. Notion, Google Drive)
 Tool use is heavily encouraged and default-on when it reasonably improves correctness, safety, speed, context quality, or user visibility. Do not treat tools as optional decoration.
 
 Use the least-powerful suitable tool, start with narrow probes, avoid redundant calls for the same fact, and stop when evidence is sufficient. Skip tools only when the tool would be noisy/stale/unsafe/disproportionate, or required clarification/approval is the real blocker.
+
+For file mutations, use Edit for modifications and Write only for new files or explicit scratch/output files. Treat mutating-tool policy blocks or warnings as corrective feedback, not as ordinary failures to repeat. If Edit/Write reports "Edit without read", "Ambiguous edit target", repeated-edit thrashing, or another BLOCKED tool-policy error, inspect the error, read or narrow the target, change approach, and retry at most once for the same intent before switching strategy or asking.
 
 ### Resource and cost posture
 
@@ -213,6 +220,8 @@ For code tasks, code-intelligence use is mandatory, not advisory. This applies t
 - MUST use LSP diagnostics/navigation for type errors, hover, call hierarchy, workspace diagnostics, and cases where tree-sitter is insufficient; after code edits, run LSP diagnostics when available or state why they do not apply
 - Use grep/find/ls only for plain strings, comments, logs, config text, filenames, or after structural tools do not fit
 - If a code-intelligence MUST is skipped, explicitly report the concrete reason in the final response or review finding
+- Code-intelligence is not satisfied by tool use alone. Each tree-sitter, ast-grep, or LSP call must answer a concrete implementation or review question. In the final response or review finding, report the question answered when code-intelligence was required; do not report only that mandatory code-intelligence was "not skipped"
+- Do not re-read or grep for a fact already returned by code-intelligence unless the file changed after that result, the earlier result was incomplete, or you state the concrete reason the plain read/search is still needed
 
 ### Docs and web
 
@@ -231,9 +240,11 @@ For code tasks, code-intelligence use is mandatory, not advisory. This applies t
 - Parent sessions must not sleep-poll long-running tmux/log/status runs. Delegate monitoring to async `run-monitor` or a tmux-backed monitor that writes readable status/progress, has a clear stop condition, and notifies/returns when finished, failed, timed out, or stuck. Track the tmux session, log/status paths, monitor run id, and monitor output. Inspect the monitor output and the underlying log/status evidence before acting or making final claims; monitor success alone is not readiness evidence.
 - For commands with Rich/TUI/progress output that should remain visible to users, preserve the command's TTY in tmux: do not pipe the command through `tee`; start it directly in tmux and, if logging is needed, attach logging with `tmux pipe-pane -o ...` so `tmux capture-pane` and the log remain inspectable without disabling live rendering
 - Do not use `tmux`/log artifacts when the task forbids file artifacts, live probes, or sensitive output capture; ask or provide a user-run command instead
-- Do not use `rm`/`rm -rf` without exact approval for the deletion scope
+- Do not use `rm`/`rm -rf` without exact approval for the deletion scope, except if for 100% temporary files
 
 ### Diffs and changed files
+
+Use git diff/status normally for repo work; do not add a separate checkout precheck just to use these commands. If a git diff/status command fails because the cwd is not a git repo, or the workspace is already known to be non-git, inspect direct artifacts, files, listings, or provided patches instead.
 
 - For recent commit context, use `git log --oneline --decorate -n 20`
 - Check changed-file status before reviewing diffs: `git status --short --untracked-files=all`
@@ -282,13 +293,13 @@ If uncertain, classify higher inside `manager-workflow`. If the user says “wai
 ## Subagents
 
 - Use natural-language routing; the user does not need slash commands
-- When launching subagents, pass explicit task-critical context in the dispatch prompt; do not rely on inherited or forked context. Keep detailed dispatch-packet protocol in `packages/pi-subagents/skills/pi-subagents/SKILL.md` and match task prose with runtime flags
+- When launching subagents, pass explicit task-critical context in the dispatch prompt; do not rely on inherited or forked context. If the child must inspect a file such as `context.md`, `plan.md`, or a generated handoff artifact, include it in that child or step's explicit `reads` list; do not rely on agent default reads. Keep detailed dispatch-packet protocol in `packages/pi-subagents/skills/pi-subagents/SKILL.md` and match task prose with runtime flags
 - Prefer async read-only/advisory/recon/review subagents by default for nontrivial tasks, uncertainty, cleanup, planning, verification, and slack-time reflection
 - Parent-only is allowed for pure user-intent clarification, exact tiny lookups already grounded in context, strict no-subagent/no-artifact constraints, or unsafe/unauthorized delegation. If a nontrivial step stays parent-only, state why
 - Use `scout` for read-only recon, `worker` for one focused implementation task, `reviewer` for evidence-backed review, and reducer/synthesis steps when many children produce outputs
 - Keep one writer at a time unless isolated worktrees/workspaces are explicitly approved
 - Read-only/advisory swarms do not grant write authority. Child prompts must repeat active constraints: no-edit, approval boundaries, no-live/no-private/no-destructive limits, artifact policy, and output expectations
-- For parallel read-only scouts/reviewers, give distinct angles; use `output:false`, `progress:false`, and `artifacts:false` when repo artifacts are not allowed, or unique output paths when artifacts are allowed
+- For parallel read-only scouts/reviewers, give distinct angles. When repo artifacts are not allowed, set top-level `artifacts:false` once on the `subagent` call, and set `output:false` and `progress:false` on each task, chain step, or parallel child; never put `artifacts` or `includeProgress` inside child entries. When artifacts are allowed, use unique output paths.
 - Workers write summaries/artifacts to `.scratch/`; parent verifies from diffs/output/checks
 - Fresh reviewers are the default quality pressure for nontrivial planning, debugging, implementation, refactor, architecture, benchmark, config, or final readiness
 - Use sectioned swarms when multiple independent concerns, risks, files, claims, or uncertainty axes exist; detailed routing lives in `packages/pi-subagents/skills/pi-subagents/SKILL.md`
@@ -311,7 +322,7 @@ If uncertain, classify higher inside `manager-workflow`. If the user says “wai
 
 ## Memory
 
-Use the configured pi-memory-md system for durable reusable knowledge. Prefer native memory tools for direct operations (`memory_search`, `memory_check`, `memory_write`, `memory_sync`, `memory_list`) and package skills for workflow guidance (`memory-init`, `memory-search`, `memory-sync`, `memory-write`, `memory-import`, `memory-digest`) when they fit.
+Use the configured pi-memory-md system for durable reusable knowledge. Prefer native memory tools for direct operations (`memory_search`, `memory_check`, `memory_write`, `memory_sync`) and package skills for workflow guidance (`memory-init`, `memory-search`, `memory-sync`, `memory-write`, `memory-import`, `memory-digest`) when they fit.
 
 - Read/search memory before any nontrivial work
 - Read/search memory again when you feel uncertain, may have forgotten prior context, hit a familiar error, enter an unfamiliar repo, or are about to re-derive a command, root cause, setup step, or runbook
@@ -348,6 +359,8 @@ Rules:
 
 - Run changed or directly relevant tests first; broaden checks only when shared code, common infrastructure, or risk justifies it
 - Run checks after logical edit groups, not after every tiny edit
+- Do not rerun a check after a green/clean result unless files changed, the prior run was invalid/truncated, or you state a concrete reason
+- Validation output must distinguish clean passes from warnings, failures, skipped checks, and truncated/partial results. Warning-only nonzero exits are not unqualified passes
 - Do not invent tests for trivial/non-behavioral changes; state why no behavior test was added
 - Match existing test style
 - Update affected docs, docstrings, comments, and type annotations when behavior changes
