@@ -32,7 +32,7 @@ test("bash virtualization captures details.fullOutputPath, strips truncation con
 		},
 	};
 
-	const result = await virtualizeToolResult(event, store, { cwd: dir });
+	const result = await virtualizeToolResult(event, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	const receipt = result.content[0]?.type === "text" ? result.content[0].text : "";
@@ -75,7 +75,7 @@ test("empty visible text still captures bash details.fullOutputPath", async () =
 		toolCallId: "empty_visible_full_output",
 		content: [{ type: "text", text: "" }],
 		details: { fullOutputPath, truncation: { truncated: true } },
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	const metadata = result.details.toolResultVirtualizer as { sourceId: string; captureStatus: string };
@@ -97,7 +97,7 @@ test("receipt preview merges overlapping samples and caps long preview lines", a
 		toolCallId: "small_overlap",
 		content: [{ type: "text", text: "truncated" }],
 		details: { fullOutputPath, truncation: { truncated: true } },
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	const receipt = result.content[0]?.text ?? "";
@@ -113,7 +113,7 @@ test("normal single-line outputs below the researched byte threshold are not vir
 		toolName: "synthetic_medium_text",
 		toolCallId: "below_researched_threshold",
 		content: [{ type: "text", text: "M".repeat(30_000) }],
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.equal(result, undefined);
 	assert.deepEqual(await store.listSources(), []);
@@ -125,7 +125,7 @@ test("single-line outputs at the researched byte threshold are virtualized", asy
 		toolName: "synthetic_large_single_line",
 		toolCallId: "at_researched_threshold",
 		content: [{ type: "text", text: "L".repeat(50_000) }],
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	assert.match(result.content[0]?.text ?? "", /Large synthetic_large_single_line result stored locally/);
@@ -144,7 +144,7 @@ test("store failures suppress large raw output while preserving small pass-throu
 		toolCallId: "store_failure_large",
 		content: [{ type: "text", text: large }],
 		details: { truncation: { truncated: true, content: large } },
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(largeResult);
 	const text = largeResult.content[0]?.text ?? "";
@@ -160,11 +160,11 @@ test("store failures suppress large raw output while preserving small pass-throu
 		toolName: "synthetic_small_text",
 		toolCallId: "store_failure_small",
 		content: [{ type: "text", text: "small" }],
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 	assert.equal(smallResult, undefined);
 });
 
-test("read SKILL.md results pass through in full instead of becoming retrieval receipts", async () => {
+test("advertised SKILL.md reads pass through in full instead of becoming retrieval receipts", async () => {
 	const { store, dir } = await makeStore();
 	const skillPath = join(dir, ".pi", "skills", "demo", "SKILL.md");
 	const raw = markerLines("SKILL_DOC", 300);
@@ -176,7 +176,7 @@ test("read SKILL.md results pass through in full instead of becoming retrieval r
 		toolCallId: "skill_read",
 		input: { path: skillPath },
 		content: [{ type: "text", text: raw }],
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set([skillPath]) });
 
 	assert.equal(result, undefined);
 	assert.deepEqual(await store.listSources(), []);
@@ -194,7 +194,7 @@ test("arbitrary non-skill SKILL.md files still virtualize when large", async () 
 		toolCallId: "docs_skill_read",
 		input: { path: docsPath },
 		content: [{ type: "text", text: raw }],
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	assert.match(result.content[0]?.text ?? "", /Large read result stored locally/);
@@ -220,7 +220,7 @@ test("read virtualization snapshots the requested line range from input.path", a
 		},
 	};
 
-	const result = await virtualizeToolResult(event, store, { cwd: dir });
+	const result = await virtualizeToolResult(event, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	const details = result.details as Record<string, unknown>;
@@ -242,7 +242,7 @@ test("degraded fallback captures are not described as exact full raw output", as
 		toolCallId: "missing_full_output_path",
 		content: [{ type: "text", text: visibleOnly }],
 		details: { fullOutputPath: join(dir, "missing-full-output.log"), truncation: { truncated: true } },
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	const metadata = result.details.toolResultVirtualizer as { sourceId: string; captureStatus: string };
@@ -262,7 +262,7 @@ test("large normal outputs are virtualized even when they contain the receipt ma
 		toolName: "synthetic_large_text",
 		toolCallId: "marker_collision",
 		content: [{ type: "text", text: raw }],
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	const receipt = result.content[0]?.text ?? "";
@@ -281,7 +281,7 @@ test("already virtualized results are skipped only by validated virtualizer meta
 		toolCallId: "already_virtualized",
 		content: [{ type: "text", text: markerLines("SECOND_PASS_SHOULD_NOT_STORE", 300) }],
 		details: { toolResultVirtualizer: { virtualizer: "pi-tool-result-virtualizer", version: 1, sourceId: "tr_existing_source" } },
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.equal(result, undefined);
 	assert.deepEqual(await store.listSources(), []);
@@ -294,7 +294,7 @@ test("untrusted toolResultVirtualizer-shaped metadata does not bypass large-resu
 		toolCallId: "untrusted_virtualizer_metadata",
 		content: [{ type: "text", text: markerLines("UNTRUSTED_METADATA_SHOULD_STORE", 300) }],
 		details: { toolResultVirtualizer: { sourceId: "tr_collision" } },
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	assert.match(result.content[0]?.text ?? "", /Large synthetic_large_text result stored locally/);
@@ -307,7 +307,7 @@ test("non-text-only tool results are not stored", async () => {
 		toolName: "image_tool",
 		toolCallId: "image_only",
 		content: [{ type: "image", data: "base64-image-data" }],
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.equal(result, undefined);
 	assert.deepEqual(await store.listSources(), []);
@@ -320,7 +320,7 @@ test("non-text-only tool results with large details are not stored or replaced",
 		toolCallId: "image_only_large_details",
 		content: [{ type: "image", data: "base64-image-data" }],
 		details: { matches: Array.from({ length: 80 }, (_unused, index) => ({ tool: `image_detail_${index}` })) },
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.equal(result, undefined);
 	assert.deepEqual(await store.listSources(), []);
@@ -333,7 +333,7 @@ test("mixed tool results preserve non-text blocks while storing only text conten
 		toolName: "mixed_content_tool",
 		toolCallId: "mixed_content",
 		content: [{ type: "image", data: "base64-image-data" }, { type: "text", text }],
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	const content = result.content as Array<Record<string, unknown>>;
@@ -354,7 +354,7 @@ test("small tool results are left untouched", async () => {
 		details: { truncation: { truncated: false, content: "hi" } },
 	};
 
-	const result = await virtualizeToolResult(event, store, { cwd: dir });
+	const result = await virtualizeToolResult(event, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.equal(result, undefined);
 });
@@ -373,7 +373,7 @@ test("large details with small content are compacted without replacing content w
 		toolCallId: "large_details_small_content",
 		content: [{ type: "text", text: "small visible result" }],
 		details,
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	assert.equal(result.content[0]?.text, "small visible result");
@@ -398,7 +398,7 @@ test("details-only compaction preserves mixed visible content blocks", async () 
 		toolCallId: "mixed_details_content",
 		content: [{ type: "image", data: "base64-image-data" }, { type: "text", text: "small visible result" }],
 		details,
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	const content = result.content as Array<Record<string, unknown>>;
@@ -421,7 +421,7 @@ test("large scalar details are summarized while exact original details stay side
 		toolCallId: "large_scalar_details",
 		content: [{ type: "text", text: "small scalar result" }],
 		details,
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	assert.equal(result.content[0]?.text, "small scalar result");
@@ -474,7 +474,7 @@ test("coordination and retrieval tools are left untouched", async () => {
 			content: [{ type: "text", text: large }],
 			details: { truncation: { truncated: true, content: large } },
 		};
-		const result = await virtualizeToolResult(event, store, { cwd: dir });
+		const result = await virtualizeToolResult(event, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 		assert.equal(result, undefined, toolName);
 	}
 });
@@ -494,7 +494,7 @@ test("context-mode mcp wrapper results are left untouched while other mcp result
 			input,
 			content: [{ type: "text", text: large }],
 			details: { truncation: { truncated: true, content: large } },
-		}, store, { cwd: dir });
+		}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 		assert.equal(result, undefined, JSON.stringify(input));
 	}
 
@@ -503,7 +503,7 @@ test("context-mode mcp wrapper results are left untouched while other mcp result
 		toolCallId: "other_mcp",
 		input: { search: "google_docs_", includeSchemas: true },
 		content: [{ type: "text", text: markerLines("OTHER_MCP_SHOULD_STORE", 1200) }],
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 	assert.ok(otherMcpResult);
 	assert.match(otherMcpResult.content[0]?.text ?? "", /Large mcp result stored locally/);
 });
@@ -522,7 +522,7 @@ test("large original details are stored separately and compacted to scalar metad
 		toolCallId: "large_details",
 		content: [{ type: "text", text: markerLines("MCP_SCHEMA", 300) }],
 		details,
-	}, store, { cwd: dir });
+	}, store, { cwd: dir, advertisedSkillPaths: new Set<string>() });
 
 	assert.ok(result);
 	const compactDetails = result.details;

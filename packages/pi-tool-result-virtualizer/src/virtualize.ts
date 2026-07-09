@@ -1,6 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { TextContent } from "./extension-types.ts";
 import { formatSourcePreview } from "./outline.ts";
@@ -18,6 +19,7 @@ export type ToolResultEventLike = {
 
 export type VirtualizeOptions = {
 	cwd: string;
+	advertisedSkillPaths: ReadonlySet<string>;
 };
 
 export type ToolResultPatch = {
@@ -127,34 +129,31 @@ function isContextModeMcpInput(input: unknown): boolean {
 		|| (typeof input.describe === "string" && input.describe.startsWith(CONTEXT_MODE_MCP_TOOL_PREFIX));
 }
 
-function isWithinPath(filePath: string, dir: string): boolean {
-	const pathRelativeToDir = relative(dir, filePath);
-	return pathRelativeToDir === "" || (!pathRelativeToDir.startsWith("..") && !isAbsolute(pathRelativeToDir));
+function resolvePiReadPath(path: string, cwd: string): string {
+	let normalized = path.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ");
+	if (normalized.startsWith("@")) normalized = normalized.slice(1);
+	if (normalized === "~") normalized = homedir();
+	else if (normalized.startsWith("~/") || (process.platform === "win32" && normalized.startsWith("~\\"))) {
+		normalized = join(homedir(), normalized.slice(2));
+	}
+	if (normalized.startsWith("file://")) normalized = fileURLToPath(normalized);
+	return resolve(cwd, normalized);
 }
 
-function isRootOrNestedSkillFile(filePath: string, skillRoot: string): boolean {
-	const pathRelativeToRoot = relative(skillRoot, filePath);
-	if (pathRelativeToRoot.startsWith("..") || isAbsolute(pathRelativeToRoot)) return false;
-	const parts = pathRelativeToRoot.split(sep);
-	return (parts.length === 1 && parts[0] === "SKILL.md")
-		|| (parts.length === 2 && parts[0] !== undefined && !parts[0].startsWith(".") && parts[1] === "SKILL.md");
-}
-
-function skillRoots(cwd: string): string[] {
-	return [
-		resolve(cwd, ".pi", "skills"),
-		resolve(cwd, ".agents", "skills"),
-		resolve(homedir(), ".pi", "agent", "skills"),
-		resolve(homedir(), ".agents", "skills"),
-	];
-}
-
-function isSkillRead(toolName: string, input: unknown, cwd: string): boolean {
+async function isAdvertisedSkillRead(
+	toolName: string,
+	input: unknown,
+	cwd: string,
+	advertisedSkillPaths: ReadonlySet<string>,
+): Promise<boolean> {
 	if (toolName !== "read" || !isRecord(input)) return false;
 	const path = stringField(input, "path");
 	if (path === undefined) return false;
-	const resolvedPath = resolve(cwd, path);
-	return skillRoots(cwd).some((root) => isWithinPath(resolvedPath, root) && isRootOrNestedSkillFile(resolvedPath, root));
+	try {
+		return advertisedSkillPaths.has(await realpath(resolvePiReadPath(path, cwd)));
+	} catch {
+		return false;
+	}
 }
 
 function isProtectedToolName(toolName: string): boolean {
@@ -258,15 +257,20 @@ async function captureText(
 	return { text: eventText, captureStatus: "event.content" };
 }
 
-function shouldVirtualize(event: ToolResultEventLike, toolName: string, eventText: string, options: VirtualizeOptions): boolean {
-	if (isProtectedToolResult(event, toolName) || isSkillRead(toolName, event.input, options.cwd)) return false;
-	if (byteLength(eventText) >= CONTENT_BYTE_THRESHOLD) return true;
-	if (lineCount(eventText) >= CONTENT_LINE_THRESHOLD) return true;
-	if (truncationContentBytes(event.details) >= CONTENT_BYTE_THRESHOLD) return true;
-	if (!isTruncated(event.details)) return false;
-	const details = detailsRecord(event.details);
-	const input = isRecord(event.input) ? event.input : undefined;
-	return (toolName === "bash" && details?.fullOutputPath !== undefined) || (toolName === "read" && input?.path !== undefined);
+async function shouldVirtualize(event: ToolResultEventLike, toolName: string, eventText: string, options: VirtualizeOptions): Promise<boolean> {
+	if (isProtectedToolResult(event, toolName)) return false;
+	const exceedsThreshold = byteLength(eventText) >= CONTENT_BYTE_THRESHOLD
+		|| lineCount(eventText) >= CONTENT_LINE_THRESHOLD
+		|| truncationContentBytes(event.details) >= CONTENT_BYTE_THRESHOLD;
+	if (!exceedsThreshold) {
+		if (!isTruncated(event.details)) return false;
+		const details = detailsRecord(event.details);
+		const input = isRecord(event.input) ? event.input : undefined;
+		const hasRecoverableTruncation = (toolName === "bash" && details?.fullOutputPath !== undefined)
+			|| (toolName === "read" && input?.path !== undefined);
+		if (!hasRecoverableTruncation) return false;
+	}
+	return !(await isAdvertisedSkillRead(toolName, event.input, options.cwd, options.advertisedSkillPaths));
 }
 
 function compactVisibleDetails(originalDetails: unknown, contentStored: boolean, scalarOnly: boolean): Record<string, unknown> {
@@ -365,7 +369,7 @@ export async function virtualizeToolResult(
 	if (textBlocksFromContent(event.content).length === 0) return undefined;
 	const eventText = textFromContent(event.content);
 	if (isProtectedToolResult(event, toolName) || hasVirtualizerMetadata(event.details)) return undefined;
-	const shouldReplaceContent = shouldVirtualize(event, toolName, eventText, options);
+	const shouldReplaceContent = await shouldVirtualize(event, toolName, eventText, options);
 	const originalDetailsText = serializedDetails(event.details);
 	const originalDetailsBytes = originalDetailsText === undefined ? 0 : byteLength(originalDetailsText);
 	const shouldStoreOriginalDetails = originalDetailsText !== undefined && (originalDetailsBytes >= DETAILS_BYTE_THRESHOLD || truncationContentBytes(event.details) >= DETAILS_BYTE_THRESHOLD);
