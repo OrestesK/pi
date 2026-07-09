@@ -30,6 +30,19 @@ export declare function truncateJSON(value: unknown, maxBytes: number, indent?: 
 export declare function escapeXML(str: string): string;
 /**
  * Return `str` unchanged if it fits within `maxBytes`, otherwise return a
+ * byte-safe slice with `marker` appended. Useful for display-only fields where
+ * the truncation marker or notice must be included inside the byte budget.
+ *
+ * The returned string is always <= `maxBytes` bytes. When `maxBytes` is
+ * smaller than `marker`, the marker itself is byte-safely truncated.
+ *
+ * @param str      - Input string.
+ * @param maxBytes - Hard byte cap.
+ * @param marker   - Marker or notice appended when truncation occurs.
+ */
+export declare function capBytesWithMarker(str: string, maxBytes: number, marker: string): string;
+/**
+ * Return `str` unchanged if it fits within `maxBytes`, otherwise return a
  * byte-safe slice with an ellipsis appended. Useful for single-value fields
  * (e.g., tool response strings) where head+tail splitting is not needed.
  *

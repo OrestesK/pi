@@ -94,21 +94,28 @@ export function escapeXML(str) {
 // ─────────────────────────────────────────────────────────
 /**
  * Return `str` unchanged if it fits within `maxBytes`, otherwise return a
- * byte-safe slice with an ellipsis appended. Useful for single-value fields
- * (e.g., tool response strings) where head+tail splitting is not needed.
+ * byte-safe slice with `marker` appended. Useful for display-only fields where
+ * the truncation marker or notice must be included inside the byte budget.
  *
  * The returned string is always <= `maxBytes` bytes. When `maxBytes` is
- * smaller than the ellipsis marker, the marker itself is byte-safely truncated.
+ * smaller than `marker`, the marker itself is byte-safely truncated.
  *
  * @param str      - Input string.
  * @param maxBytes - Hard byte cap.
+ * @param marker   - Marker or notice appended when truncation occurs.
  */
-export function capBytes(str, maxBytes) {
+export function capBytesWithMarker(str, maxBytes, marker) {
     if (Buffer.byteLength(str) <= maxBytes)
         return str;
-    const marker = "...";
     const markerBytes = Buffer.byteLength(marker);
     if (maxBytes <= markerBytes)
         return byteSafePrefix(marker, maxBytes);
     return byteSafePrefix(str, maxBytes - markerBytes) + marker;
+}
+/**
+ * Return `str` unchanged if it fits within `maxBytes`, otherwise return a
+ * byte-safe slice with an ellipsis appended.
+ */
+export function capBytes(str, maxBytes) {
+    return capBytesWithMarker(str, maxBytes, "...");
 }

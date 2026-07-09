@@ -1,0 +1,168 @@
+import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { test } from "node:test";
+
+import {
+  buildPiOutputBudgetPatch,
+  PI_BATCH_OUTPUT_BUDGET_BYTES,
+  PI_CONTEXT_BATCH_TOOL,
+  PI_CONTEXT_SEARCH_TOOL,
+  PI_OUTPUT_BUDGET_NOTICE,
+  PI_SEARCH_OUTPUT_BUDGET_BYTES,
+} from "../build/pi-output-budget.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const packageRoot = join(__dirname, "..");
+
+function byteLength(text) {
+  return Buffer.byteLength(text, "utf8");
+}
+
+function oneTextBlock(text) {
+  return [{ type: "text", text }];
+}
+
+function mcpEvent(tool, text, extra = {}) {
+  return {
+    toolName: "mcp",
+    input: { args: "{}", tool },
+    content: oneTextBlock(text),
+    details: { error: null, mcpResult: { ok: true }, mode: "tool" },
+    isError: false,
+    ...extra,
+  };
+}
+
+function assertBudgetedPatch(patch, budget) {
+  assert.ok(patch);
+  assert.deepEqual(Object.keys(patch), ["content"]);
+  assert.equal(patch.content.length, 1);
+  assert.equal(patch.content[0].type, "text");
+  assert.ok(patch.content[0].text.endsWith(PI_OUTPUT_BUDGET_NOTICE));
+  assert.ok(byteLength(patch.content[0].text) <= budget);
+  assert.equal(Buffer.from(patch.content[0].text, "utf8").toString("utf8"), patch.content[0].text);
+}
+
+test("caps search output to exactly 40 KiB including notice", () => {
+  const patch = buildPiOutputBudgetPatch(mcpEvent(PI_CONTEXT_SEARCH_TOOL, "s".repeat(50 * 1024)));
+
+  assertBudgetedPatch(patch, PI_SEARCH_OUTPUT_BUDGET_BYTES);
+  assert.equal(byteLength(patch.content[0].text), 40 * 1024);
+});
+
+test("caps batch output to exactly 80 KiB including notice", () => {
+  const patch = buildPiOutputBudgetPatch(mcpEvent(PI_CONTEXT_BATCH_TOOL, "b".repeat(90 * 1024)));
+
+  assertBudgetedPatch(patch, PI_BATCH_OUTPUT_BUDGET_BYTES);
+  assert.equal(byteLength(patch.content[0].text), 80 * 1024);
+});
+
+test("caps mixed ASCII, CJK, and emoji without splitting UTF-8 characters", () => {
+  const text = "ASCII漢字🙂".repeat(10 * 1024);
+  const patch = buildPiOutputBudgetPatch(mcpEvent(PI_CONTEXT_SEARCH_TOOL, text));
+
+  assertBudgetedPatch(patch, PI_SEARCH_OUTPUT_BUDGET_BYTES);
+  assert.match(patch.content[0].text, /ASCII|漢|字|🙂/u);
+});
+
+test("returns undefined for under-budget targeted output", () => {
+  assert.equal(buildPiOutputBudgetPatch(mcpEvent(PI_CONTEXT_SEARCH_TOOL, "small result")), undefined);
+  assert.equal(buildPiOutputBudgetPatch(mcpEvent(PI_CONTEXT_BATCH_TOOL, "small result")), undefined);
+});
+
+test("passes through non-context-mode and non-exact MCP results", () => {
+  const large = "x".repeat(100 * 1024);
+
+  assert.equal(buildPiOutputBudgetPatch({ ...mcpEvent(PI_CONTEXT_SEARCH_TOOL, large), toolName: "MCP" }), undefined);
+  assert.equal(buildPiOutputBudgetPatch(mcpEvent(`${PI_CONTEXT_SEARCH_TOOL} `, large)), undefined);
+  assert.equal(buildPiOutputBudgetPatch(mcpEvent("ctx_search", large)), undefined);
+  assert.equal(
+    buildPiOutputBudgetPatch({
+      toolName: "mcp",
+      input: { tool: "not_context_mode" },
+      content: oneTextBlock(large),
+      details: { error: null, mcpResult: { tool: PI_CONTEXT_SEARCH_TOOL }, mode: "tool" },
+    }),
+    undefined,
+  );
+  assert.equal(
+    buildPiOutputBudgetPatch({ toolName: "mcp", input: { tool: PI_CONTEXT_SEARCH_TOOL }, content: [] }),
+    undefined,
+  );
+  assert.equal(
+    buildPiOutputBudgetPatch({ toolName: "mcp", input: { tool: PI_CONTEXT_SEARCH_TOOL }, content: oneTextBlock(1) }),
+    undefined,
+  );
+});
+
+test("real Pi adapter returns budget patches without session tracking", async () => {
+  const tempHome = await mkdtemp(join(tmpdir(), "pi-context-mode-home-"));
+  const childScript = join(tempHome, "adapter-budget-child.mjs");
+  await writeFile(
+    childScript,
+    `
+      import assert from "node:assert/strict";
+      const {
+        PI_CONTEXT_BATCH_TOOL,
+        PI_CONTEXT_SEARCH_TOOL,
+        PI_OUTPUT_BUDGET_NOTICE,
+        PI_SEARCH_OUTPUT_BUDGET_BYTES,
+        PI_BATCH_OUTPUT_BUDGET_BYTES,
+      } = await import(${JSON.stringify(pathToFileURL(join(packageRoot, "build/pi-output-budget.js")).href)});
+      const { default: piExtension } = await import(${JSON.stringify(pathToFileURL(join(packageRoot, "build/pi-extension.js")).href)});
+      const handlers = new Map();
+      piExtension({
+        on(name, handler) {
+          handlers.set(name, handler);
+        },
+        registerCommand() {},
+      });
+      const toolResult = handlers.get("tool_result");
+      assert.equal(typeof toolResult, "function");
+      const oneTextBlock = (text) => [{ type: "text", text }];
+      const byteLength = (text) => Buffer.byteLength(text, "utf8");
+      for (const [tool, budget, payload] of [
+        [PI_CONTEXT_SEARCH_TOOL, PI_SEARCH_OUTPUT_BUDGET_BYTES, "s".repeat(50 * 1024)],
+        [PI_CONTEXT_BATCH_TOOL, PI_BATCH_OUTPUT_BUDGET_BYTES, "b".repeat(90 * 1024)],
+      ]) {
+        const patch = toolResult({
+          toolName: "mcp",
+          input: { args: "{}", tool },
+          content: oneTextBlock(payload),
+          details: { error: null, mcpResult: { ok: true }, mode: "tool" },
+          isError: false,
+        });
+        assert.ok(patch);
+        assert.deepEqual(Object.keys(patch), ["content"]);
+        assert.equal(patch.content.length, 1);
+        assert.equal(patch.content[0].type, "text");
+        assert.ok(patch.content[0].text.endsWith(PI_OUTPUT_BUDGET_NOTICE));
+        assert.ok(byteLength(patch.content[0].text) <= budget);
+      }
+    `,
+  );
+
+  try {
+    const result = await new Promise((resolve) => {
+      execFile(
+        process.execPath,
+        [childScript],
+        {
+          cwd: packageRoot,
+          env: { ...process.env, HOME: tempHome, PI_PROJECT_DIR: packageRoot },
+          timeout: 15_000,
+        },
+        (error, stdout, stderr) => resolve({ error, stdout, stderr }),
+      );
+    });
+
+    assert.equal(result.error, null, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+  } finally {
+    await rm(tempHome, { recursive: true, force: true });
+  }
+});

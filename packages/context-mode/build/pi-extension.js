@@ -18,6 +18,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { SessionDB } from "./session/db.js";
 import { extractEvents, extractUserEvents } from "./session/extract.js";
 import { buildResumeSnapshot } from "./session/snapshot.js";
+import { buildPiOutputBudgetPatch } from "./pi-output-budget.js";
 // ── Pi Tool Name Mapping ─────────────────────────────────
 // Pi uses lowercase; shared extractors expect PascalCase (Claude Code convention).
 const PI_TOOL_MAP = {
@@ -198,53 +199,55 @@ export default function piExtension(pi) {
     });
     // ── 3. tool_result — PostToolUse event capture ─────────
     pi.on("tool_result", (event) => {
+        const outputBudgetPatch = buildPiOutputBudgetPatch(event);
         try {
-            if (!_sessionId)
-                return;
-            const rawToolName = String(event?.toolName ?? event?.tool_name ?? "");
-            const mappedToolName = PI_TOOL_MAP[rawToolName.toLowerCase()] ?? rawToolName;
-            // Normalize result to string
-            const rawResult = event?.result ?? event?.output;
-            const resultStr = typeof rawResult === "string"
-                ? rawResult
-                : rawResult != null
-                    ? JSON.stringify(rawResult)
-                    : undefined;
-            // Detect errors
-            const hasError = Boolean(event?.error || event?.isError);
-            const hookInput = {
-                tool_name: mappedToolName,
-                tool_input: event?.params ?? event?.input ?? {},
-                tool_response: resultStr,
-                tool_output: hasError ? { isError: true } : undefined,
-            };
-            const events = extractEvents(hookInput);
-            if (events.length > 0) {
-                for (const ev of events) {
-                    db.insertEvent(_sessionId, ev, "PostToolUse");
+            if (_sessionId) {
+                const rawToolName = String(event?.toolName ?? event?.tool_name ?? "");
+                const mappedToolName = PI_TOOL_MAP[rawToolName.toLowerCase()] ?? rawToolName;
+                // Normalize result to string
+                const rawResult = event?.result ?? event?.output;
+                const resultStr = typeof rawResult === "string"
+                    ? rawResult
+                    : rawResult != null
+                        ? JSON.stringify(rawResult)
+                        : undefined;
+                // Detect errors
+                const hasError = Boolean(event?.error || event?.isError);
+                const hookInput = {
+                    tool_name: mappedToolName,
+                    tool_input: event?.params ?? event?.input ?? {},
+                    tool_response: resultStr,
+                    tool_output: hasError ? { isError: true } : undefined,
+                };
+                const events = extractEvents(hookInput);
+                if (events.length > 0) {
+                    for (const ev of events) {
+                        db.insertEvent(_sessionId, ev, "PostToolUse");
+                    }
                 }
-            }
-            else if (rawToolName) {
-                // Fallback: record unrecognized tool call as generic event
-                const data = JSON.stringify({
-                    tool: rawToolName,
-                    params: event?.params ?? event?.input,
-                });
-                db.insertEvent(_sessionId, {
-                    type: "tool_call",
-                    category: "pi",
-                    data,
-                    priority: 1,
-                    data_hash: createHash("sha256")
-                        .update(data)
-                        .digest("hex")
-                        .slice(0, 16),
-                }, "PostToolUse");
+                else if (rawToolName) {
+                    // Fallback: record unrecognized tool call as generic event
+                    const data = JSON.stringify({
+                        tool: rawToolName,
+                        params: event?.params ?? event?.input,
+                    });
+                    db.insertEvent(_sessionId, {
+                        type: "tool_call",
+                        category: "pi",
+                        data,
+                        priority: 1,
+                        data_hash: createHash("sha256")
+                            .update(data)
+                            .digest("hex")
+                            .slice(0, 16),
+                    }, "PostToolUse");
+                }
             }
         }
         catch {
             // Silent — session capture must never break the tool call
         }
+        return outputBudgetPatch;
     });
     // ── 4. before_agent_start — Routing + active_memory + resume injection ─
     pi.on("before_agent_start", async (event) => {
