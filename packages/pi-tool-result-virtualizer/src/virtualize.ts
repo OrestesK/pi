@@ -353,10 +353,12 @@ function buildReceipt(stored: StoredSource, sourceText: string): string {
 		"",
 		preview.text,
 		"",
-		"## Choose before relying on hidden content",
-		`Recommended summary path: call tool_result_summary_contract sourceId:"${stored.sourceId}" prompt:"<focused question>" and then run the returned subagent task. This keeps the parent context small and requires cited line ranges or retrieval commands.`,
-		`${exportRecoveryLabel(stored)}: ${exportRecoveryDescription(stored)}. Use only when exact stored text is required; it defeats context savings if pasted back inline.`,
-		`Bounded triage tools: tool_result_outline sourceId:"${stored.sourceId}"; tool_result_search query:"..." sourceId:"${stored.sourceId}"; tool_result_get sourceId:"${stored.sourceId}" lineStart:1 lineLimit:80. Bounded get/search output is not full recovery when capped.`,
+		"## Retrieve before relying on hidden content",
+		`1. Search: tool_result_search query:"..." sourceId:"${stored.sourceId}"`,
+		`2. Get cited lines: tool_result_get sourceId:"${stored.sourceId}" lineStart:1 lineLimit:80`,
+		`Optional deterministic triage: tool_result_outline sourceId:"${stored.sourceId}".`,
+		`Optional delegated synthesis: tool_result_summary_contract sourceId:"${stored.sourceId}" prompt:"<focused question>"; run the returned subagent task.`,
+		`${exportRecoveryLabel(stored)}: ${exportRecoveryDescription(stored)}. Use only for exact stored text; do not paste it back inline unless unavoidable.`,
 	].join("\n");
 }
 

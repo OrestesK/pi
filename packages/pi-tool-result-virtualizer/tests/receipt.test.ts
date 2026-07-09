@@ -10,7 +10,7 @@ const storedReceipt = [
 	"Preview only — not complete evidence. Do not make claims about hidden content from this receipt alone.",
 	"",
 	"## Cropped preview",
-	"Preview only — not complete evidence. Use the recommended summary path or exact retrieval/export before making claims about hidden content.",
+	"Preview only — not complete evidence. Search, then get cited lines before claiming hidden content.",
 	"Sampled 30 of 1800 lines; omitted 1770 hidden lines.",
 	"### Head lines 1-10",
 	"1: head 1",
@@ -24,7 +24,8 @@ const storedReceipt = [
 	"1791: tail 1791",
 	"1800: tail 1800",
 	"",
-	"## Choose before relying on hidden content",
+	"## Retrieve before relying on hidden content",
+	"999: retrieval guidance must not appear in preview",
 ].join("\n");
 
 const failureReceipt = [

@@ -41,7 +41,7 @@ function parseStoredReceipt(lines: string[]): ParsedToolResultVirtualizerReceipt
 			inCroppedPreview = true;
 			continue;
 		}
-		if (line.startsWith("## Choose before relying")) break;
+		if (inCroppedPreview && line.startsWith("## ")) break;
 		if (!inCroppedPreview) continue;
 		if (line.length === 0 || line.startsWith("Preview only")) continue;
 		if (line.startsWith("Sampled ") || line.startsWith("[omitted ")) {

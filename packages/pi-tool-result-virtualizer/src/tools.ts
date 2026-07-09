@@ -12,7 +12,7 @@ function buildRecommendedSubagentTask(source: SourceRead, prompt: string): strin
 		`Read-only focused summary for tool-result source ${metadata.sourceId}.`,
 		"Do not edit files, run destructive commands, or mutate external systems.",
 		`User focus: ${prompt}`,
-		"Use tool_result_outline first for triage, then tool_result_search and bounded tool_result_get windows for relevant evidence. Use tool_result_export only if exact oversized ranges are required offline. Do not paste the full raw source into the parent context.",
+		"Use tool_result_search first for relevant evidence, then bounded tool_result_get windows for cited lines. tool_result_outline is optional triage. Use tool_result_export only if exact oversized ranges are required offline. Do not paste the full raw source into the parent context.",
 		"Return exactly:",
 		`- Source id: ${metadata.sourceId}`,
 		"- Retrieval commands or cited line ranges inspected:",
@@ -85,7 +85,7 @@ export function buildToolResultTools(store: ToolResultStore): ToolDefinitionLike
 		description: "Return an honest ready-to-call subagent task contract for focused summarization of a stored tool result without dumping the raw source into parent context.",
 		promptSnippet: "Create a focused subagent summary contract for a stored large tool result",
 		promptGuidelines: [
-			"Prefer tool_result_summary_contract after a compact receipt when a focused answer is needed; it returns a ready-to-call subagent task and does not itself summarize or retrieve all raw content.",
+			"Use tool_result_summary_contract for optional delegated synthesis after direct tool_result_search/tool_result_get retrieval; it returns a ready-to-call subagent task and does not summarize or retrieve raw content itself.",
 		],
 		parameters: SUMMARY_CONTRACT_PARAMS,
 		async execute(_toolCallId, params) {

@@ -45,8 +45,16 @@ test("bash virtualization captures details.fullOutputPath, strips truncation con
 	assert.match(receipt, /BASH_FULL line 0895/);
 	assert.match(receipt, /BASH_FULL line 1799/);
 	assert.doesNotMatch(receipt, /BASH_FULL line 0100/);
-	assert.match(receipt, /Recommended summary path/);
-	assert.match(receipt, /tool_result_summary_contract/);
+	const searchIndex = receipt.indexOf("tool_result_search");
+	const getIndex = receipt.indexOf("tool_result_get");
+	const summaryIndex = receipt.indexOf("tool_result_summary_contract");
+	assert.ok(searchIndex >= 0);
+	assert.ok(getIndex > searchIndex);
+	assert.ok(summaryIndex > getIndex);
+	assert.match(receipt, /1\. Search: tool_result_search query:"\.\.\." sourceId:"tr_/);
+	assert.match(receipt, /2\. Get cited lines: tool_result_get sourceId:"tr_.+" lineStart:1 lineLimit:80/);
+	assert.match(receipt, /Optional deterministic triage: tool_result_outline/);
+	assert.match(receipt, /Optional delegated synthesis: tool_result_summary_contract/);
 	assert.match(receipt, /Exact captured-output escape hatch/);
 	assert.match(receipt, /tool_result_export/);
 	assert.ok(Buffer.byteLength(receipt, "utf8") < 8_500);

@@ -127,7 +127,7 @@ export function formatSourcePreview(
 	const preview = sampleSourcePreview(text, options);
 	const lines = [
 		"## Cropped preview",
-		"Preview only — not complete evidence. Use the recommended summary path or exact retrieval/export before making claims about hidden content.",
+		"Preview only — not complete evidence. Search, then get cited lines before claiming hidden content.",
 		`Sampled ${preview.sampledLineCount} of ${preview.lineCount} lines; omitted ${preview.omittedLineCount} hidden lines.`,
 	];
 	let previousEndLine = 0;

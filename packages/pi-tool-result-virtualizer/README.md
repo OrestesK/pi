@@ -8,10 +8,10 @@ Local Pi extension that stores large tool-result text in a mode-restricted sidec
 - Stores large text results under `${PI_TOOL_RESULT_VIRTUALIZER_DIR:-~/.pi/tool-result-virtualizer}`. This avoids tracked config repos when `~/.pi/agent` is symlinked to a checkout.
 - For `bash`, prefers `details.fullOutputPath` when present so retrieval can use the full raw output instead of Pi's truncated `content`.
 - For `read`, snapshots `event.input.path` and applies `offset`/`limit` when present.
-- Replaces `content` with a decision-first receipt containing source id, capture status, size, line count, hash prefix, a cropped head/middle/tail preview, and an explicit choice between recommended summary and exact full export.
+- Replaces `content` with a retrieval-first receipt containing source id, capture status, size, line count, hash prefix, a cropped head/middle/tail preview, direct search/get examples, and optional triage, synthesis, or exact export paths.
 - Treats text as large at 50,000 bytes or 200 lines. The byte threshold follows large-result offloading prior art that uses tens-of-thousands-of-characters or ~1,500–2,500-token boundaries instead of the earlier 8 KiB value; the line threshold still catches pathological many-line outputs.
 - Skips recursive handling by protected tool name, context-mode direct/MCP-wrapper tool identity, and `details.toolResultVirtualizer` metadata, not by raw receipt-marker text, so ordinary output containing `[tool-result-virtualizer]` is still captured.
-- Lets `read` results for root or one-level nested `SKILL.md` files under Pi skill roots pass through instead of becoming retrieval receipts, mirroring Pi core's skill-loading convention so skill instructions load in full rather than through a sidecar source id.
+- Lets `read` results for exact canonical `SKILL.md` paths advertised in the current model invocation pass through instead of becoming retrieval receipts. Each invocation atomically refreshes that set, including empty or disabled invocations; Pi-style path spelling and `realpath` preserve exact alias matches without a broad skill-root bypass.
 - Validates protected-tool `sourceId` parameters as `tr_[a-z0-9_]+` under 128 bytes, and export `filePath` parameters as relative managed-export paths under 1024 bytes without absolute paths, parent traversal, or NUL bytes. Invalid values fail with compact errors instead of echoing raw input.
 - On local store/write failure for a large result, suppresses the raw output and returns a compact failure receipt instead of failing open into the model context.
 - Removes `details.truncation.content` while preserving numeric truncation metadata and `fullOutputPath`.
@@ -48,9 +48,11 @@ Local Pi extension that stores large tool-result text in a mode-restricted sidec
 
 A virtualized receipt is intentionally not evidence for hidden content. It gives only deterministic orientation metadata and a cropped preview:
 
-1. **Recommended summary path:** call `tool_result_summary_contract` with the source id and a focused prompt, then run the returned `subagent` task. The summary contract tells the child to use `tool_result_outline`, `tool_result_search`, and bounded `tool_result_get` windows, and to cite inspected line ranges or retrieval commands.
-2. **Exact stored-content escape hatch:** call `tool_result_export` with the source id and no line options. This writes the exact stored content under the managed export directory and returns only metadata. For `details.fullOutputPath` captures that is the captured full output; for `read.input.path` captures that is the selected read range; for `event.content` captures it may already reflect upstream truncation or omission. Use it when exact stored text is required; do not paste the full export back into parent context unless unavoidable.
-3. **Bounded manual triage:** use `tool_result_outline`, `tool_result_search`, and `tool_result_get` for targeted evidence. These outputs are protected by byte caps and must not be described as full recovery when capped.
+1. **Search:** call `tool_result_search` with a focused query and the receipt's source id.
+2. **Get cited lines:** call `tool_result_get` with that source id and a bounded `lineStart`/`lineLimit` window. Search, then get, is the direct evidence path.
+3. **Optional deterministic triage:** call `tool_result_outline` for bounded orientation before targeted search/get. It is not complete evidence.
+4. **Optional delegated synthesis:** call `tool_result_summary_contract` with a focused prompt, then run the returned `subagent` task. This is optional, not the first retrieval step.
+5. **Exact stored-content escape hatch:** call `tool_result_export` with no line options. For `details.fullOutputPath` captures this exports the captured full output; for `read.input.path` it exports the selected read range; for `event.content` it may already reflect upstream truncation or omission. Use only when exact stored text is required; avoid pasting it back into parent context.
 
 The cropped preview defaults to first 10 lines, middle 10 lines, and last 10 lines, merging overlaps for small sources and byte-capping each preview line. It is for orientation only.
 

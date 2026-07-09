@@ -284,10 +284,14 @@ test("summary contract returns an honest ready-to-call subagent task without raw
 		assert.match(text, /subagent/);
 		assert.match(text, new RegExp(sourceId));
 		assert.match(text, /Find the actionable failure and cite lines/);
-		assert.match(text, /tool_result_outline/);
-		assert.match(text, /tool_result_search/);
-		assert.match(text, /tool_result_get/);
-		assert.match(text, /tool_result_export/);
+		const searchIndex = text.indexOf("tool_result_search");
+		const getIndex = text.indexOf("tool_result_get");
+		const outlineIndex = text.indexOf("tool_result_outline");
+		assert.ok(searchIndex >= 0);
+		assert.ok(getIndex > searchIndex);
+		assert.ok(outlineIndex > getIndex);
+		assert.match(text, /tool_result_outline is optional triage/);
+		assert.match(text, /tool_result_export only if exact oversized ranges are required offline/);
 		assert.match(text, /retrieval commands or cited line ranges/i);
 		assert.match(text, /Exact stored-content escape hatch/);
 		assert.doesNotMatch(text, /SUMMARY_SECRET_SHOULD_STAY_LOCAL line/);
