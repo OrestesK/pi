@@ -8,5 +8,7 @@
 	branch = ok/local
 [submodule "packages/pi-subagents"]
 	path = packages/pi-subagents
-	url = https://github.com/nicobailon/pi-subagents.git
+	url = git@github.com:OrestesK/pi-subagents.git
 	branch = ok/local
+[submodule "packages/pi-slipstream-compact"]
+	path = packages/pi-slipstream-compact

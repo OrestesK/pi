@@ -28,3 +28,5 @@ mcp-onboarding.json
 /.pi-lens/
 /favorites.json
 /pisesh-meta.json
+/benchmarks
+/.pi-subagents/artifacts
