@@ -2,11 +2,11 @@
 
 Candidate-output review judges one or more candidate results for a frozen benchmark task.
 
-This review is intentionally model- or human-judgment-based. Do not turn it into a brittle deterministic scorer. Tests/logs are evidence, not the whole verdict, unless the task explicitly declares deterministic scoring as primary.
+This review is intentionally model- or human-judgment-based. Do not turn it into test-suite scoring. For PR-derived `gold_reference_single_output` tasks, the primary score is the adjudicated PR-quality judgment against the broad rubric, task-specific outcome rubric, and original merged PR/source reference.
 
-Use only scorer evidence derived from the accepted task packet. Public tests, hidden tests, prompts, evaluator briefs, and scorer commands copied from a candidate workspace are not authoritative. Candidate changes to those files may inform scope-control/process review, but they must not redefine the task or scorer.
+Use the accepted task packet and task-specific outcome rubric as source of truth. Candidate-workspace prompts, checks, edited task files, and self-reported validation may inform scope-control/process review, but they must not redefine the task or scoring basis.
 
-Keep three outcomes distinct: final output/code correctness, trajectory/process compliance, and harness/report-format health. Do not let candidate-edited tests, leaked private path names, generated cleanup artifacts, or acceptance-wrapper parse failures overwrite the frozen scorer result; record them as separate evidence.
+Keep three outcomes distinct: final output/code correctness, trajectory/process compliance, and harness/report-format health. Do not let candidate-edited task/check files, leaked private path names, generated cleanup artifacts, or acceptance-wrapper parse failures overwrite the rubric judgment; record them as separate evidence.
 
 ## Required inputs
 
@@ -16,8 +16,7 @@ For pairwise review:
 - evaluator brief or outcome rubric;
 - candidate X artifact(s);
 - candidate Y artifact(s);
-- public test/log summaries from frozen task/scorer inputs if any;
-- hidden/scorer summaries from frozen task/scorer inputs if allowed for this review mode;
+- process and verification summaries when available;
 - known risks and anti-solutions;
 - rubric version;
 - opaque blinding record id; the anonymization/randomization paths stay outside the reviewer packet.
@@ -25,6 +24,15 @@ For pairwise review:
 For single-output review:
 
 - same packet, but only one candidate.
+
+For gold-reference single-output review:
+
+- frozen task statement;
+- task-independent PR-quality rubric;
+- private per-task outcome rubric supplement when present;
+- original merged PR/source commit or equivalent private gold reference;
+- one candidate artifact/diff/final answer;
+- process and verification summaries when available.
 
 For panel review:
 
@@ -43,11 +51,11 @@ Normal review packet must hide:
 - run order;
 - agent self-promotion or summaries unless normalized for every candidate;
 - task generation rationale;
-- gold/reference patch unless in audit mode.
+- gold/reference patch unless the mode is `gold_reference_single_output` or audit.
 
 Use X/Y labels for paired review. Swap order for a second judge pass when result is important or when using LLM judges at scale.
 
-Normal reviewer packets should use opaque artifact ids and sanitized bounded excerpts. Do not include raw host paths, unblinding paths, task-origin details, generation rationale, gold patches, or hidden-test bodies unless the lane is explicitly audit-only.
+Normal reviewer packets should use opaque artifact ids and sanitized bounded excerpts. Do not include raw host paths, unblinding paths, task-origin details, generation rationale, or gold patches unless the lane is explicitly `gold_reference_single_output` or audit-only. Gold-reference packets are judge-private and must not be candidate-facing.
 
 ## Review panel topology
 
@@ -65,12 +73,15 @@ Do not let many leaf reviewers feed reporting directly. Leaf reviewers emit stru
 1. Read the public task statement.
 2. Read the evaluator brief and anti-solutions.
 3. Inspect final candidate outputs/diffs first.
-4. Inspect tests/logs as evidence, after confirming they came from frozen task/scorer inputs.
-5. Decide absolute readiness for each reviewed candidate.
-6. In `blinded_pairwise` mode, decide pairwise winner or tie/neither.
-7. In `single_output` mode, decide the single-output verdict and do not produce a pairwise winner.
-8. Inspect trajectory/process only if requested as a separate diagnostic stage.
-9. For panel review, leaf reviewers stop after their lane output. Reducers consume leaf outputs, resolve disagreement, and decide whether targeted second-wave review is needed.
+4. For gold-reference review, compare candidate behavior and design against the original PR/source intent without requiring byte-for-byte patch equivalence.
+5. Before using any finding to reject or downgrade, classify the failed expectation as `public_task_stated`, `task_specific_outcome_rubric`, `repo_discoverable`, `gold_reference_intent`, or `not_applicable`.
+6. Reject shape-biased counted findings: do not downgrade a candidate for file names, helper names, method names, call order, or module decomposition unless those details are required by public task text or repo-discoverable behavior.
+7. Inspect process/verification summaries only as confidence evidence, not as a substitute for rubric judgment.
+8. Decide absolute readiness for each reviewed candidate.
+9. In `blinded_pairwise` mode, decide pairwise winner or tie/neither.
+10. In `single_output` or `gold_reference_single_output` mode, decide the single-output verdict and do not produce a pairwise winner.
+11. Inspect trajectory/process only if requested as a separate diagnostic stage.
+12. For panel review, leaf reviewers stop after their lane output. Reducers consume leaf outputs, resolve disagreement, and decide whether targeted second-wave review is needed.
 
 ## Verdicts
 
@@ -103,14 +114,16 @@ Judge these dimensions when relevant:
 
 | Dimension | Question |
 |---|---|
-| Correctness | Does it solve the task under plausible requirements? |
+| Goal fulfillment / correctness | Does it solve the task and original PR intent? |
 | Completeness | Does it handle edge cases and integration paths? |
 | Regression risk | Does it preserve existing behavior, API, data, and compatibility expectations? |
-| Maintainability | Is it simple, local, idiomatic, and understandable? |
+| Code quality / maintainability | Is it simple, local, idiomatic, and understandable? |
+| Integration fit | Does it belong in the right owner layer and avoid duplicated sources of truth? |
 | Scope control | Does it avoid unrelated churn, broad rewrites, and overengineering? |
-| Tests/verification | Are checks relevant, honest, and sufficient for confidence? |
-| Safety/security | Any data loss, secret leak, unsafe command, or permission violation risk? |
-| PR readiness | Would a maintainer accept it? |
+| Tests/verification | Are checks relevant, honest, and sufficient PR evidence? |
+| Safety/security/privacy | Any data loss, secret leak, unsafe command, permission, or private-reference leakage risk? |
+| Documentation/user-facing behavior | Are docs, comments, examples, and visible behavior aligned when relevant? |
+| PR readiness | Would a maintainer merge it, request minor changes, request major changes, or reject it? |
 
 ## Vetoes
 
@@ -150,8 +163,8 @@ Useful process signals:
 - asked for clarification when needed;
 - did not claim unverified success;
 - avoided unnecessary churn;
-- did not edit task/scorer files except where explicitly allowed;
-- did not inspect parent directories, private artifacts, hidden tests, manifests, or evaluator briefs;
+- did not edit task or rubric files except where explicitly allowed;
+- did not inspect parent directories, private artifacts, manifests, or evaluator briefs;
 - avoided incidental generated artifacts where practical, and handled cleanup only within the run's policy.
 
 Use trajectory for diagnostics, safety vetoes, and tie-breaks. Do not let a clean trajectory rescue a wrong final output, and do not let a process flag erase a correct final output unless the benchmark policy declares that flag a veto.
@@ -171,13 +184,13 @@ Panel outputs should include:
 
 ## Output format
 
-Use `templates/candidate-output-review.json` when structured output is useful. Canonical `review_mode` values are `blinded_pairwise`, `single_output`, and `audit`.
+Use `templates/candidate-output-review.json` when structured output is useful. Canonical `review_mode` values are `blinded_pairwise`, `single_output`, `gold_reference_single_output`, and `audit`.
 
 The template supports both paired review and single-output review:
 
 - `blinded_pairwise` review uses `winner` and X/Y readiness fields;
 - `single_output` review sets `winner` to `null`, uses `single_output_verdict`, and marks Y fields as `not_applicable` or `null`.
 
-Use qualitative `dimension_assessments`, not unlabeled numeric scoring. The primary output remains verdict + evidence; dimension labels are diagnostic only unless a benchmark report explicitly predeclares otherwise.
+Use qualitative `dimension_assessments`, not unlabeled numeric scoring. The primary output remains verdict + evidence; dimension labels are diagnostic only unless a benchmark report explicitly predeclares otherwise. If `quality_score_0_to_10` is requested, use the anchored scale in the PR-quality rubric and report it as secondary evidence only.
 
 Keep free-text explanation short and evidence-backed.

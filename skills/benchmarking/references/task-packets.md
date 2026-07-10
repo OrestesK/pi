@@ -55,8 +55,8 @@ Recommended task layout under `tasks/<task-id>/`:
   private/
     evaluator-brief.md
     reference-outcome.md         # optional but recommended
-    gold.patch                   # optional
-    hidden-tests/                # optional
+    gold.patch                   # optional judge-private intent reference
+    per_task_rubric_supplement.json # task-specific outcome rubric
     anti-solutions.md            # optional
     task-origin.md              # audit-only, not for normal candidate-output review
     generation-rationale.md     # optional audit-only generation notes
@@ -81,13 +81,12 @@ It may include:
 - success criteria written as outcomes;
 - explicit allowed-edit boundaries and read-only artifact rules.
 
-For implementation tasks, `public/task.md` must state that public tests, task files, manifests, private files, hidden tests, scorer files, and benchmark metadata are read-only. If candidates believe tests or task material are wrong, they must report that instead of editing them.
+For implementation tasks, `public/task.md` must state that task files, manifests, private files, rubric materials, and benchmark metadata are read-only. If candidates believe task material is wrong, they must report that instead of editing it.
 
 It must not include:
 
 - gold/reference patch;
-- hidden tests;
-- hidden test names when those names leak the fix;
+- non-public exact check details;
 - reviewer notes;
 - candidate comparison labels;
 - private source PR comments that reveal implementation;
@@ -102,14 +101,14 @@ It may include:
 - evaluator brief;
 - reference outcome;
 - gold patch when available;
-- hidden tests or scorer commands;
+- task-specific outcome rubric;
 - anti-solutions;
 - known edge cases;
 - task provenance;
 - leakage risks;
 - expected difficulty and task type.
 
-Candidate-output reviewers should not see gold patches or generation rationale by default. Give them outcome notes, risks, anti-solutions, logs, and candidate artifacts. Use gold/reference patches and task-origin/generation-rationale material only in audit mode or deterministic validation.
+Candidate-output reviewers should not see generation rationale by default. Give them the task-specific outcome rubric, outcome notes, risks, anti-solutions, process summaries, and candidate artifacts. Use raw gold/reference patches and task-origin/generation-rationale material only in audit mode or gold-reference judge mode.
 
 ## Reviewer exposure tiers
 
@@ -117,12 +116,12 @@ Declare evidence exposure before broad reviewer fanout.
 
 | Tier | Intended readers | Examples |
 |---|---|---|
-| `normal_reviewer` | Blinded leaf reviewers. | Public task, reviewer-visible evaluator excerpt, anti-solutions, blinded candidate artifacts, frozen public/scorer summaries when allowed, opaque blinding id. |
-| `elevated_reviewer` | Specialized lanes that need more context. | Sanitized hidden/scorer summaries, process excerpts, limited transcript excerpts. |
-| `audit_only` | Curators, auditors, deterministic validators. | Gold/reference materials, hidden-test bodies, task origin, generation rationale, raw transcripts, raw local paths. |
+| `normal_reviewer` | Blinded leaf reviewers. | Public task, reviewer-visible evaluator excerpt, task-specific outcome rubric, anti-solutions, blinded candidate artifacts, process summaries, opaque blinding id. |
+| `elevated_reviewer` | Specialized lanes that need more context. | Gold-reference intent summary, process excerpts, limited transcript excerpts. |
+| `audit_only` | Curators and auditors. | Gold/reference materials, task origin, generation rationale, raw transcripts, raw local paths. |
 | `reducer` | Reducers/adjudicators. | Reviewer JSON outputs, rubric versions, packet ids, blinded labels, agreement stats. |
 
-Candidate agents never receive private/gold/scorer materials. Normal reviewers should receive opaque artifact ids and sanitized bounded excerpts, not raw host paths or unblinding maps.
+Candidate agents never receive private/gold/rubric-internal materials. Normal reviewers should receive opaque artifact ids and sanitized bounded excerpts, not raw host paths or unblinding maps.
 
 ## Manifest fields
 
@@ -139,7 +138,7 @@ Use `templates/task-manifest.yaml` as a starter. Minimum fields:
 - `scoring.review.rubric_version`;
 - `scoring.review.reviewer_prompt_version`;
 - `run_metadata_requirements` for config/model/prompt/tool/artifact capture;
-- `visibility.private_artifacts_not_for_candidate_review` for gold, hidden tests, task origin, and generation rationale;
+- `visibility.private_artifacts_not_for_candidate_review` for gold, task origin, and generation rationale;
 - `visibility.reviewer_exposure_policy` for normal, elevated, audit-only, and reducer-visible evidence;
 - `scoring.review.topology_profile` and reducer policy when panel review is expected;
 - `labeling` when labels or expected findings will support precision/recall/F1;
@@ -151,11 +150,9 @@ Use `templates/task-manifest.yaml` as a starter. Minimum fields:
 
 | Mode | Meaning | Primary evaluator |
 |---|---|---|
-| `deterministic` | Hidden/public tests or exact scorer are authoritative. | Test/scorer output, with review for diagnosis. |
-| `review_only` | No deterministic solution scorer is expected. | Human/LLM rubric review. |
-| `hybrid` | Tests/logs are evidence but not complete truth. | Tests plus reviewer judgment. |
+| `review_only` | The benchmark uses broad rubric + task-specific outcome rubric + gold-reference intent. | Human/LLM rubric review with reducer/adjudicator fan-in. |
 
-Prefer `hybrid` for real software changes where tests exist but do not prove maintainability, compatibility, or design quality.
+Use `review_only` for PR-derived gold-reference benchmark tasks.
 
 ## Generation workflow
 
@@ -175,7 +172,7 @@ Before task curation, verify or mark missing:
 - all referenced files exist;
 - public/private split is clear;
 - no gold/reference path appears in public material;
-- no hidden-test path or secret appears in public material;
+- no private exact-check details or secrets appear in public material;
 - base commit or setup can be located;
 - budget and allowed tools are recorded;
 - rubric/evaluator and reviewer-prompt versions are recorded;
@@ -185,18 +182,18 @@ Before task curation, verify or mark missing:
 - reviewer-visible excerpts exclude audit-only evidence;
 - reducer-visible evidence is limited to reviewer outputs unless an elevated reducer is declared;
 - candidate workspace isolation is checked, especially when candidate workspaces are nested under the suite root;
-- public task instructions declare allowed edit globs and read-only public/task/scorer artifacts;
-- public/scorer commands avoid incidental artifacts where practical, or those artifacts are explicitly separated from source/test diffs;
+- public task instructions declare allowed edit globs and read-only task/rubric artifacts;
+- public commands avoid incidental artifacts where practical, or those artifacts are explicitly separated from source diffs;
 - task status is `draft`, not `accepted`.
 
 ## Acceptance gate
 
 A task packet is not benchmark-ready until task curation returns `accept` and the manifest status changes to `accepted` or equivalent.
 
-After a candidate has seen an accepted packet, treat that packet and its scorer inputs as immutable. Do not patch public tests, hidden tests, evaluator briefs, prompts, setup files, or manifests in place for that run. If a defect is found after exposure, either invalidate the run or create a new task version and rerun candidates.
+After a candidate has seen an accepted packet, treat that packet and its rubric materials as immutable. Do not patch evaluator briefs, prompts, setup files, rubrics, or manifests in place for that run. If a defect is found after exposure, either invalidate the run or create a new task version and rerun candidates.
 
-Scoring must use a clean scorer workspace populated from the accepted task packet, not from candidate workspaces. Candidate edits to tests, prompts, setup files, or scorer files are process evidence; they are not scorer truth.
+Candidate edits to prompts, setup files, task files, or rubric files are process evidence; they are not scoring truth.
 
-Report code/result correctness separately from trajectory/process and harness outcome. A candidate can pass frozen tests while failing process constraints, and an acceptance wrapper can fail because of report-format brittleness rather than task failure. Preserve both signals instead of collapsing them into one verdict.
+Report result correctness separately from trajectory/process and harness outcome. A candidate can be acceptable while process-flagged, and an acceptance wrapper can fail because of report-format brittleness rather than task failure. Preserve both signals instead of collapsing them into one verdict.
 
 Do not run candidate agents on draft tasks for decision-grade comparisons. Exploratory trials are allowed only if labeled as exploratory.

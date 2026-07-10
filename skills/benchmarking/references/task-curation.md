@@ -12,8 +12,7 @@ Review these artifacts when available:
 - `public/task.md`;
 - public setup notes/logs;
 - `private/evaluator-brief.md`;
-- reference outcome or gold patch;
-- hidden tests/scorer notes if present;
+- reference outcome, gold patch, or task-specific outcome rubric;
 - task origin/provenance;
 - mechanical validation output.
 
@@ -57,7 +56,7 @@ Verdict options:
 Reject or revise when public material reveals:
 
 - gold patch details;
-- hidden tests;
+- non-public exact check details;
 - exact implementation names that are not discoverable from the repo;
 - private reviewer notes;
 - source PR comments that give away the solution;
@@ -66,7 +65,7 @@ Reject or revise when public material reveals:
 ### Fairness
 
 - Does the task reward the intended outcome rather than patch imitation?
-- Are tests, logs, and evaluator notes fair to alternate valid implementations?
+- Are rubric requirements and evaluator notes fair to alternate valid implementations?
 - Are anti-solutions documented?
 - Does the task avoid style-only preferences unless style is the task?
 
@@ -89,7 +88,7 @@ Reject or revise when public material reveals:
 
 For tasks expected to use candidate-output reviewers, verify:
 
-- reviewer-visible evaluator excerpts exclude gold patches, hidden-test bodies, task origin, generation rationale, and unblinding data;
+- reviewer-visible evaluator excerpts exclude gold patches, task origin, generation rationale, and unblinding data;
 - normal reviewer packets can be assembled with opaque artifact ids and sanitized bounded excerpts;
 - elevated/audit-only evidence is explicitly marked;
 - reducer-visible material is limited to reviewer outputs and metadata unless an elevated reducer is declared;
@@ -127,7 +126,7 @@ For `revise`, list specific fixes, not generic concerns. Examples:
 - “Move `private/gold.patch` reference out of `public/task.md`.”
 - “Add evaluator note explaining why changing `FooConfig` is an anti-solution.”
 - “Split this into two tasks; current prompt asks for auth migration and UI redesign.”
-- “Mark deterministic scorer absent and classify as `review_only`.”
+- “Mark task-specific rubric as outcome-oriented and classify as `review_only`."
 
 ## Rejection reasons
 

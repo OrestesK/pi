@@ -91,13 +91,13 @@ Call out:
 
 | Artifact kind | Repo-relative path/logical ref | Owner/lane | Source/generated/frozen | Sensitivity | Inspected? | Audit relevance |
 |---|---|---|---|---|---|---|
-| scorer input | `<repo-relative-path>` | candidate-a | frozen | private/public | yes | |
+| rubric input | `<repo-relative-path>` | candidate-a | frozen | private/judge | yes | |
 | workspace snapshot | `<repo-relative-path>` | candidate-b | frozen | public+process residue | yes | |
 
 Include:
 
 - run manifest/report files;
-- task/scorer inputs;
+- task/rubric inputs;
 - declared final-answer/output refs, whether they exist and are non-empty, and any transcript reconstruction source;
 - candidate workspaces and snapshots;
 - generated caches/bytecode/tool files, including whether canonical snapshots exclude, flag, or retain them only as process residue;

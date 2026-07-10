@@ -2,16 +2,27 @@
   "adjudication_id": "<candidate-review-adjudication-id>",
   "task_id": "example-repo-2026-07-06-task-001",
   "reviewed_at": "2026-07-06",
-  "review_mode": "blinded_pairwise",
-  "topology_profile": "matrix_10",
-  "input_packet_id": "<candidate-review-packet-id>",
+  "review_mode": "gold_reference_single_output",
+  "primary_metric": "adjudicated_llm_judge_pr_quality",
+  "topology_profile": "quality_gate_3",
+  "input_packet_id": "<candidate-judge-packet-id>",
   "reviewer_assignment_manifest_id": "<reviewer-assignment-manifest-id>",
+  "validation_policy": {
+    "requires_review_provenance": true,
+    "requires_review_primary_metric_match": true,
+    "requires_generated_packet_match": true,
+    "requires_independence_attestation": true,
+    "requires_task_rubric_sufficiency": true,
+    "requires_expectation_source_on_rejection_findings": true,
+    "rejects_shape_biased_counted_findings": true,
+    "secondary_score_0_to_10_aggregation": "median/range only"
+  },
   "review_lane_review_ids": [
     {
       "review_stage": "leaf_review",
-      "review_role": "correctness",
+      "review_role": "pr_quality_correctness",
       "focus_surface": "output",
-      "allowed_evidence_scope": "normal_reviewer",
+      "allowed_evidence_scope": "gold_reference_judge",
       "review_id": "<candidate-output-review-id>"
     }
   ],
@@ -19,8 +30,7 @@
   "blinding": {
     "blinding_record_id": "<opaque-id-visible-to-reducer>",
     "labels_visible": [
-      "X",
-      "Y"
+      "X"
     ],
     "unblinding_visible": false
   },
@@ -40,12 +50,20 @@
   "final_verdict": {
     "winner": null,
     "single_output_verdict": null,
-    "absolute_readiness": {
+    "absolute_readiness": "<merge|minor_changes|major_changes|reject|inconclusive>",
+    "pairwise_absolute_readiness": {
       "X": null,
-      "Y": null
+      "Y": "not_applicable"
+    },
+    "secondary_score_0_to_10": {
+      "median": null,
+      "range": null,
+      "count": 0,
+      "aggregation": "median/range only; raw judge scores are not averaged"
     },
     "confidence": "medium",
     "decision": "inconclusive",
+    "primary_score_semantics": "adjudicated qualitative PR-quality judgment against broad rubric, task-specific outcome rubric, and gold-reference intent",
     "main_reasons": [],
     "risks": [],
     "missing_evidence": []
@@ -55,13 +73,17 @@
     {
       "id": "F-001",
       "subject": "candidate:X",
-      "label": "correctness",
+      "label": "goal_fulfillment_correctness",
       "severity": "moderate",
       "confidence": "medium",
       "claim": "",
       "evidence_refs": [],
       "counterevidence_refs": [],
       "impact": "",
+      "expectation_source": "<public_task_stated|task_specific_outcome_rubric|repo_discoverable|gold_reference_intent|not_applicable>",
+      "outcome_rationale": "",
+      "counts_against_verdict": true,
+      "gold_shape_risk": "<none|low|medium|high>",
       "disposition": "supported"
     }
   ],
@@ -75,7 +97,7 @@
     }
   },
   "reducer_visibility": {
-    "allowed_evidence_scope": "reducer",
+    "allowed_evidence_scope": "gold_reference_reducer",
     "elevated_reducer": false,
     "raw_candidate_artifacts_allowed": false,
     "elevation_reason": null

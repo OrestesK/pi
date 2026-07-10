@@ -26,16 +26,13 @@ candidates:
     prompt_version: null
 
 frozen_artifacts:
-  scorer_inputs_ref: "runs/<run-id>/reports/<score-id>/scorer-inputs"
-  scorer_workspace_ref: "runs/<run-id>/reports/<score-id>/workspace"
   replay_entrypoint_ref: null
   residue_manifest_ref: null
   sanitization_status: "unknown" # unknown | sanitized | host_local_only
 
 scoring:
-  primary_mode: "hybrid" # deterministic | review_only | hybrid
-  deterministic_results: []
-  candidate_test_or_scorer_edits_ref: null
+  primary_mode: "review_only"
+  candidate_task_edits_ref: null
   score_result_refs: []
 
 review:
@@ -44,7 +41,7 @@ review:
   reviewer_assignment_manifest_ref: null
   review_lane_refs:
     - review_stage: "leaf_review"
-      review_role: "correctness"
+      review_role: "pr_quality_correctness"
       focus_surface: "output"
       allowed_evidence_scope: "normal_reviewer"
       review_ref: null
@@ -67,7 +64,7 @@ observed_metrics:
 
 process:
   code_result_and_process_result_reported_separately: true
-  candidate_task_or_scorer_edits_recorded_as_process_evidence: true
+  candidate_task_edits_recorded_as_process_evidence: true
   private_material_excluded_from_candidate_workspaces: true
   candidate_workspaces_frozen_to_run_artifacts: false
   declared_final_outputs_verified: false

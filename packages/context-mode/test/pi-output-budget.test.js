@@ -61,12 +61,15 @@ test("caps batch output to exactly 80 KiB including notice", () => {
   assert.equal(byteLength(patch.content[0].text), 80 * 1024);
 });
 
-test("caps mixed ASCII, CJK, and emoji without splitting UTF-8 characters", () => {
-  const text = "ASCII漢字🙂".repeat(10 * 1024);
-  const patch = buildPiOutputBudgetPatch(mcpEvent(PI_CONTEXT_SEARCH_TOOL, text));
+test("caps immediately before a multibyte character without splitting UTF-8", () => {
+  const payloadBytes = PI_SEARCH_OUTPUT_BUDGET_BYTES - byteLength(PI_OUTPUT_BUDGET_NOTICE);
+  const prefix = "a".repeat(payloadBytes - 1);
+  const suffix = "z".repeat(byteLength(PI_OUTPUT_BUDGET_NOTICE));
+  const patch = buildPiOutputBudgetPatch(mcpEvent(PI_CONTEXT_SEARCH_TOOL, `${prefix}🙂${suffix}`));
 
   assertBudgetedPatch(patch, PI_SEARCH_OUTPUT_BUDGET_BYTES);
-  assert.match(patch.content[0].text, /ASCII|漢|字|🙂/u);
+  assert.equal(patch.content[0].text, `${prefix}${PI_OUTPUT_BUDGET_NOTICE}`);
+  assert.doesNotMatch(patch.content[0].text, /�/u);
 });
 
 test("returns undefined for under-budget targeted output", () => {

@@ -10,7 +10,7 @@ This is not candidate-output scoring.
 
 Keep these outcomes separate:
 
-- **Final output/code result**: frozen tests, hidden tests, rubric review, or declared scorer outcome.
+- **Final output/code result**: rubric review/adjudication verdict.
 - **Workflow/process result**: planning, tool choice, subagent strategy, artifact hygiene, evidence discipline, safety, and efficiency.
 - **Harness/report-format result**: runner failures, malformed final reports, missing artifacts, broken monitor/reviewer attempts, parser failures.
 
@@ -31,11 +31,11 @@ Use the smallest available evidence set that can answer the question:
 - explicit user approvals or constraints;
 - known policy docs for the benchmark suite.
 
-Do not inspect hidden/private benchmark material unless the workflow review is explicitly in audit mode and the user approved that scope.
+Do not inspect private benchmark material unless the workflow review is explicitly in audit mode and the user approved that scope.
 
 For high-fanout process review, use `references/reviewer-topology.md`. Assign distinct lanes, require reducer fan-in, and record reviewer topology in the structured output. Do not launch many generic process reviewers without a reducer.
 
-Published or user-facing workflow audits should use logical references and repo-relative paths. Do not publish raw home-directory paths, temp workspace paths, tool-install paths, private blinding-map contents, secrets, or hidden-test bodies. Keep raw host paths only in local scratch evidence when they are needed for recovery.
+Published or user-facing workflow audits should use logical references and repo-relative paths. Do not publish raw home-directory paths, temp workspace paths, tool-install paths, private blinding-map contents, or secrets. Keep raw host paths only in local scratch evidence when they are needed for recovery.
 
 ## Review order
 
@@ -63,15 +63,15 @@ Use these dimensions for single-run or comparative review.
 |---|---|
 | Goal focus | Did actions advance the requested benchmark objective without drifting into unrelated work? |
 | Planning and approval | Were tiering, approvals, and scope boundaries handled at the right time? |
-| Benchmark mechanics | Were packet completeness, public/private split, scorer immutability, blinding, and benchmark-run mechanics handled correctly? |
+| Benchmark mechanics | Were packet completeness, public/private split, rubric immutability, blinding, and benchmark-run mechanics handled correctly? |
 | Tool fit | Were tools appropriate and least-powerful enough for the evidence needed? |
 | Code intelligence use | For code work, did workers/reviewers use tree-sitter, ast-grep, and LSP where code structure, symbols, or diagnostics mattered? |
 | Subagent strategy | Were subagents distinct, useful, bounded, and fan-in reviewed? |
 | Concurrency control | Did concurrent work stay isolated and avoid shared-workspace conflicts? |
 | Evidence discipline | Were claims backed by fresh artifacts, logs, diffs, or session evidence? |
-| Artifact hygiene | Were generated files, temp workspaces, reports, and scorer inputs controlled? |
+| Artifact hygiene | Were generated files, temp workspaces, reports, and rubric inputs controlled? |
 | Context economy | Did the run avoid unnecessary context files, broad reads, duplicate artifacts, and noisy outputs? |
-| Safety/privacy | Were private/gold/hidden materials protected and destructive operations avoided? |
+| Safety/privacy | Were private/gold/rubric-internal materials protected and destructive operations avoided? |
 | Recovery and invalidation | Did the workflow detect contamination/failures and version/invalidate instead of papering over them? |
 | Verification | Were final checks relevant, fresh, and inspected before completion? |
 | Reporting clarity | Did the final report separate code/output score, process score, harness issues, missing evidence, and confidence clearly? |
@@ -127,7 +127,7 @@ Report:
 - safety/privacy incidents;
 - recommended workflow winner, tie, or inconclusive.
 
-Never compare raw tool-call counts without context. A hard run with curation, invalidation, frozen scoring, and blinded review should have more workflow cost than a tiny deterministic smoke.
+Never compare raw tool-call counts without context. A hard run with curation, invalidation, rubric adjudication, and blinded review should have more workflow cost than a tiny smoke.
 
 ## Common findings
 
@@ -135,7 +135,7 @@ Useful positive findings:
 
 - external isolated candidate workspaces;
 - accepted packet validation before exposure;
-- frozen scorer-input copies;
+- frozen rubric/input packet copies;
 - blinded review with private X/Y mapping;
 - subagent outputs inspected before claims;
 - invalidation/versioning after contamination;
@@ -143,8 +143,8 @@ Useful positive findings:
 
 Common negative findings:
 
-- candidate sees hidden/private paths;
-- scorer uses candidate-edited tests;
+- candidate sees private paths or rubric-internal material;
+- reviewer uses candidate-edited task/rubric material as scoring truth;
 - generated caches contaminate accepted task packets;
 - invalid tool arguments, schema mismatches, or blocked tool-policy warnings are repeated instead of corrected or escalated, including Edit/Write blind-write, ambiguous-edit, or repeated-edit warnings;
 - read-only git commands keep running after the workspace is known not to be a git repo;
@@ -158,7 +158,7 @@ Common negative findings:
 - declared final-answer/output artifact missing, empty, or reconstructed without being reported as a harness issue;
 - context files written but never used;
 - memory/todo state left stale;
-- reviewer packet prepared before deterministic score exists when scores might make review unnecessary;
+- reviewer packet prepared before candidate artifacts and rubric refs are frozen;
 - missing artifact tree or missing transcript/session references.
 
 ## Deep audit mode
@@ -175,7 +175,7 @@ Collect or explicitly mark missing:
 - subagent logical refs, run ids, statuses, repo-relative output refs, and retry relationships;
 - run/task manifests;
 - candidate metadata, declared final-answer/output refs, reconstruction metadata, frozen workspaces, and workspace file lists;
-- scorer result JSON, logs, diffs, and scorer-input copies;
+- rubric packet refs, review outputs, diffs, and candidate artifact refs;
 - review packets, blinded review outputs, and private blinding-map paths without exposing private map contents in public summaries;
 - todo, memory, and tape state;
 - artifact trees and generated-artifact scans;

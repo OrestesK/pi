@@ -63,7 +63,7 @@ Leaf output lanes:
 
 Leaf process/harness lanes:
 
-- benchmark mechanics and scorer separation;
+- benchmark mechanics and rubric/judge separation;
 - tool-fit/code-intelligence/verification honesty;
 - artifact hygiene and workspace contamination;
 - blinding/report-format integrity;
@@ -159,12 +159,12 @@ Scale fanout only after evidence visibility is explicit.
 
 | Tier | May include | Should not include |
 |---|---|---|
-| `normal_reviewer` | Public task, reviewer-visible evaluator excerpt, anti-solutions, blinded candidate artifacts, frozen public/scorer summaries when allowed, opaque blinding id. | Gold patch, hidden-test bodies, task origin, generation rationale, raw unblinding maps, raw host paths. |
-| `elevated_reviewer` | Sanitized hidden/scorer summaries, process excerpts, limited transcript excerpts. | Raw hidden tests, secrets, unblinding maps, raw task-origin evidence unless explicitly required. |
-| `audit_only` | Gold/reference materials, hidden-test bodies, task origin, generation rationale, raw transcripts, raw local paths. | Candidate-facing packets or normal reviewer packets. |
+| `normal_reviewer` | Public task, reviewer-visible evaluator excerpt, task-specific outcome rubric, anti-solutions, blinded candidate artifacts, process/verification summaries when available, opaque blinding id. | Gold patch, task origin, generation rationale, raw unblinding maps, raw host paths. |
+| `elevated_reviewer` | Gold-reference intent summary, process excerpts, limited transcript excerpts. | Secrets, unblinding maps, raw task-origin evidence unless explicitly required. |
+| `audit_only` | Gold/reference materials, task origin, generation rationale, raw transcripts, raw local paths. | Candidate-facing packets or normal reviewer packets. |
 | `reducer` | Reviewer JSON outputs, rubric versions, packet IDs, blinded labels, agreement stats. | Raw candidate artifacts, unblinding maps, gold materials, unless using an explicitly elevated reducer. |
 
-Candidate agents never receive private/gold/scorer materials.
+Candidate agents never receive private/gold/rubric-internal materials.
 
 ## Metrics
 

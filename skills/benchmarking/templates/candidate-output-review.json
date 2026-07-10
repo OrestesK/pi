@@ -3,16 +3,27 @@
   "task_id": "example-repo-2026-07-06-task-001",
   "reviewer": "<reviewer-id-or-model>",
   "reviewed_at": "2026-07-06",
-  "review_mode": "blinded_pairwise",
+  "review_mode": "gold_reference_single_output",
+  "primary_metric": "adjudicated_llm_judge_pr_quality",
   "review_stage": "leaf_review",
   "review_role": "correctness",
   "focus_surface": "output",
-  "allowed_evidence_scope": "normal_reviewer",
-  "input_packet_id": "<candidate-review-packet-id>",
+  "allowed_evidence_scope": "gold_reference_judge",
+  "input_packet_id": "<candidate-judge-packet-id>",
   "reviewer_assignment_manifest_id": null,
-  "rubric_version": "benchmark-output-review-v1",
-  "reviewer_prompt_version": "candidate-output-review-prompt-v1",
-  "reviewer_model_id": null,
+  "rubric_version": "pr-quality-llm-judge-v2",
+  "reviewer_prompt_version": "candidate-gold-reference-judge-prompt-v2",
+  "reviewer_model_id": "<exact-reviewer-model-id>",
+  "independence_attestation": true,
+  "reviewer_provenance": {
+    "reviewer_id": "<reviewer-id-or-agent-session>",
+    "model_id": "<exact-reviewer-model-id>",
+    "prompt_version": "candidate-gold-reference-judge-prompt-v2",
+    "reviewed_at": "2026-07-06T00:00:00Z",
+    "independence_attestation": true,
+    "raw_gold_visible_to_reviewer": true,
+    "candidate_identity_visible_to_reviewer": false
+  },
   "blinding": {
     "blinding_record_id": "<opaque-id-visible-to-reviewer>",
     "order_swapped_review_id": null
@@ -21,52 +32,83 @@
     "X": "<candidate-x-artifact-id>",
     "Y": "<candidate-y-artifact-id-or-null-for-single-output>"
   },
-  "winner": "tie",
-  "single_output_verdict": null,
+  "gold_reference": {
+    "used": true,
+    "raw_gold_visible_to_reviewer": true,
+    "raw_gold_allowed_in_public_report": false,
+    "reference_refs": []
+  },
+  "review_controls": {
+    "judge_gold_as_intent_reference_not_patch_shape": true,
+    "accept_clean_equivalent_implementations": true,
+    "reject_shape_biased_counted_findings": true
+  },
+  "task_rubric_sufficiency": {
+    "classification": "outcome_rubric_sufficient",
+    "evidence_refs": [
+      "task:private/per_task_rubric_supplement.json:<requirement-or-section>"
+    ],
+    "notes": "State whether the task-specific rubric is outcome-oriented and sufficient to judge the candidate without requiring exact file names, helper names, module decomposition, call order, or exact check behavior. Mark rubric_shape_biased_needs_revise instead of forcing a hard rejection when the rubric is shape-biased."
+  },
+  "winner": null,
+  "single_output_verdict": "<excellent|acceptable|weak|reject>",
+  "quality_score_0_to_10": null,
+  "quality_score_0_to_10_anchor": "Optional secondary score only. Use 0 no usable artifact, 1-2 reject, 3-4 weak major gaps, 5 substantial partial, 6-7 acceptable with changes, 8 mergeable, 9 excellent, 10 exceptional.",
   "confidence": "medium",
-  "absolute_readiness": {
+  "absolute_readiness": "<merge|minor_changes|major_changes|reject>",
+  "pairwise_absolute_readiness": {
     "X": "minor_changes",
-    "Y": "minor_changes"
+    "Y": "not_applicable"
   },
   "dimension_assessments": {
-    "correctness": {
+    "goal_fulfillment_correctness": {
       "X": "acceptable",
-      "Y": "acceptable",
+      "Y": "not_applicable",
       "notes": ""
     },
     "completeness": {
       "X": "acceptable",
-      "Y": "acceptable",
+      "Y": "not_applicable",
       "notes": ""
     },
     "regression_risk": {
       "X": "acceptable",
-      "Y": "acceptable",
+      "Y": "not_applicable",
       "notes": ""
     },
-    "maintainability": {
+    "code_quality_maintainability": {
       "X": "acceptable",
-      "Y": "acceptable",
+      "Y": "not_applicable",
+      "notes": ""
+    },
+    "integration_fit": {
+      "X": "acceptable",
+      "Y": "not_applicable",
       "notes": ""
     },
     "scope_control": {
       "X": "acceptable",
-      "Y": "acceptable",
+      "Y": "not_applicable",
       "notes": ""
     },
     "tests_verification": {
       "X": "acceptable",
-      "Y": "acceptable",
+      "Y": "not_applicable",
       "notes": ""
     },
-    "safety_security": {
+    "safety_security_privacy": {
       "X": "acceptable",
-      "Y": "acceptable",
+      "Y": "not_applicable",
+      "notes": ""
+    },
+    "documentation_user_facing": {
+      "X": "not_applicable",
+      "Y": "not_applicable",
       "notes": ""
     },
     "pr_readiness": {
       "X": "acceptable",
-      "Y": "acceptable",
+      "Y": "not_applicable",
       "notes": ""
     }
   },
@@ -82,13 +124,17 @@
     {
       "id": "F-001",
       "subject": "candidate:X",
-      "label": "correctness",
+      "label": "goal_fulfillment_correctness",
       "severity": "moderate",
       "confidence": "medium",
       "claim": "",
       "evidence_refs": [],
       "counterevidence_refs": [],
       "impact": "",
+      "expectation_source": "<public_task_stated|task_specific_outcome_rubric|repo_discoverable|gold_reference_intent|not_applicable>",
+      "outcome_rationale": "Explain why this finding follows from the public task, task-specific outcome rubric, repo-discoverable behavior, or original PR intent. Leave empty only when counts_against_verdict is false.",
+      "counts_against_verdict": true,
+      "gold_shape_risk": "<none|low|medium|high>",
       "disposition": "supported"
     }
   ],

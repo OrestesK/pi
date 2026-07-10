@@ -13,11 +13,12 @@ A benchmark report should include:
 - config hashes, model IDs, agent versions, prompt versions, and tool versions when known;
 - rubric, reviewer-prompt, reviewer model, and judge setup versions;
 - blinding assignment record and anonymization-map references for paired reviews;
-- deterministic mechanics status;
+- rubric-packet mechanics status;
 - separate final-output/code result, process/trajectory result, and harness/report-format result for each run;
-- candidate edits to task/scorer files as process evidence, not scorer truth;
+- candidate edits to task/rubric files as process evidence, not scoring truth;
 - paired win/loss/tie/neither counts;
 - absolute readiness counts;
+- optional anchored 0-10 secondary score summaries when predeclared, reported as median/range rather than averages;
 - safety vetoes;
 - judge/reviewer agreement and adjudication metrics where available;
 - observed resource metrics: wall time, active runtime, tokens, estimated cost, tool calls, subagent counts, and second-wave count when available;
@@ -47,6 +48,12 @@ paired_win_rate_A = (A_wins + 0.5 * ties) / valid_comparison_tasks
 ```
 
 Report ties and neither-acceptable separately. Do not hide them inside one score.
+
+## Optional 0-10 secondary scores
+
+Use numeric scores only when the benchmark predeclares anchored 0-10 semantics in the rubric/schema. Keep qualitative verdict/readiness as the primary metric. For panel scores, report median, range, count, and reducer rationale. Do not average unlabeled judge scores, and do not convert old qualitative-only reviews into post-hoc numeric scores.
+
+Numeric scores are invalid for decision-grade reporting when leaf reviews lack provenance, task-public sufficiency classification, or expectation-source labels for rejection-critical findings.
 
 ## More than two configs
 
@@ -146,8 +153,8 @@ Do not collapse every run problem into code failure.
 
 Track separately:
 
-- final output/code result: frozen tests, review verdict, or declared scorer outcome;
-- process/trajectory result: private path exposure, task/scorer edits, generated artifact handling, unsafe commands, or policy violations;
+- final output/code result: adjudicated review verdict against the broad rubric and task-specific outcome rubric;
+- process/trajectory result: private path exposure, task/rubric edits, generated artifact handling, unsafe commands, or policy violations;
 - harness/report-format result: wrapper parse failures, missing structured fields, broken artifact capture, or monitor failures.
 
 A benchmark report may count a candidate as code-correct while process-flagged. Only convert a process or harness issue into an invalid run or safety veto when the benchmark policy declares that condition a veto.
@@ -166,7 +173,7 @@ Invalid reasons:
 - task ambiguity made scoring impossible;
 - benchmark bug that prevents fair scoring.
 
-Do not mark a task invalid just because a candidate edited public tests or an acceptance wrapper rejected malformed final JSON, if frozen scorer inputs and candidate artifacts still allow fair scoring. Record those as process or harness flags.
+Do not mark a task invalid just because a candidate edited local checks or an acceptance wrapper rejected malformed final JSON, if the frozen rubric packet and candidate artifacts still allow fair judgment. Record those as process or harness flags.
 
 For structured output, use `templates/benchmark-report.json` and include only metrics that apply to the benchmark. Omit label metrics for unlabeled judgment-only tasks.
 

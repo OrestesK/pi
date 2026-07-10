@@ -24,10 +24,10 @@ visibility:
   private_artifacts:
     - "task:private/evaluator-brief.md"
     - "task:private/reference-outcome.md"
+    - "task:private/per_task_rubric_supplement.json"
     - "task:private/anti-solutions.md"
   private_artifacts_not_for_candidate_review:
     - "task:private/gold.patch"
-    - "task:private/hidden-tests/"
     - "task:private/task-origin.md"
     - "task:private/generation-rationale.md"
   reviewer_exposure_policy:
@@ -35,13 +35,11 @@ visibility:
       - "task:public/task.md"
       - "reviewer-visible evaluator excerpt"
       - "blinded candidate artifacts"
-      - "frozen public/scorer summaries when allowed"
+      - "task-specific outcome rubric"
     elevated_reviewer:
-      - "sanitized hidden/scorer summary if allowed"
       - "bounded process excerpts if process review is requested"
     audit_only:
       - "task:private/gold.patch"
-      - "task:private/hidden-tests/"
       - "task:private/task-origin.md"
       - "task:private/generation-rationale.md"
       - "raw transcripts or host-local recovery refs"
@@ -55,8 +53,7 @@ environment:
   base_state: "repo checkout, container image, or sandbox description"
   setup_command: null
   public_check_command: null
-  hidden_check_command: null
-  candidate_workspace_policy: "workspace contains only candidate-facing files; candidate must not inspect parent directories, private artifacts, hidden tests, task manifests, evaluator briefs, or repo-level status outside the workspace"
+  candidate_workspace_policy: "workspace contains only candidate-facing files; candidate must not inspect parent directories, private artifacts, task manifests, evaluator briefs, or repo-level status outside the workspace"
   allowed_edit_globs:
     - "src/**/*.py"
   readonly_artifacts:
@@ -75,30 +72,58 @@ environment:
     max_tool_calls: null
 
 scoring:
-  primary_mode: "review_only" # deterministic | review_only | hybrid
-  deterministic_evidence:
-    public_tests: "optional"
-    hidden_tests: "none"
-    static_checks: []
+  primary_mode: "review_only"
+  primary_metric: "adjudicated_llm_judge_pr_quality"
   review:
-    rubric_version: "benchmark-output-review-v1"
-    reviewer_prompt_version: "candidate-output-review-prompt-v1"
+    rubric_version: "pr-quality-llm-judge-v2"
+    general_rubric: "benchmarking:references/pr-quality-llm-judge-rubric.md"
+    task_supplement: "task:private/per_task_rubric_supplement.json"
+    reviewer_prompt_version: "candidate-gold-reference-judge-prompt-v2"
     task_curator_prompt_version: "curation-review-prompt-v1"
-    candidate_review_mode: "blinded_pairwise" # blinded_pairwise | single_output | audit
+    candidate_review_mode: "gold_reference_single_output" # blinded_pairwise | single_output | gold_reference_single_output | audit
+    judge_packet_template: "benchmarking:templates/candidate-judge-packet.json"
     output_template: "benchmarking:templates/candidate-output-review.json"
-    topology_profile: "single_review" # single_review | quality_gate_3 | matrix_10 | panel_20 | custom
+    topology_profile: "quality_gate_3" # single_review | quality_gate_3 | matrix_10 | panel_20 | custom
     reviewer_topology_reference: "benchmarking:references/reviewer-topology.md"
     review_lanes:
       - review_stage: "leaf_review"
-        review_role: "correctness"
+        review_role: "pr_quality_correctness"
         focus_surface: "output"
-        allowed_evidence_scope: "normal_reviewer"
-    reducer_required: false
+        allowed_evidence_scope: "gold_reference_judge"
+      - review_stage: "leaf_review"
+        review_role: "maintainability_integration"
+        focus_surface: "output"
+        allowed_evidence_scope: "gold_reference_judge"
+      - review_stage: "leaf_review"
+        review_role: "verification_safety_pr_readiness"
+        focus_surface: "output"
+        allowed_evidence_scope: "gold_reference_judge"
+    reducer_required: true
     reducer_template: "benchmarking:templates/candidate-review-adjudication.json"
     second_wave_policy: "targeted_named_gaps_only"
     order_swap_required: false
-    allow_gold_patch_in_normal_review: false
+    gold_reference:
+      allowed_for_candidate: false
+      allowed_for_judge: true
+      include_raw_gold_in_public_report: false
+      source: "source.base_commit/source.source_commit or task:private/task-origin.md"
     require_neither_acceptable_option: true
+    fairness_policy:
+      judge_gold_as_intent_reference_not_patch_shape: true
+      accept_clean_equivalent_implementations: true
+      require_task_rubric_sufficiency_classification: true
+      require_expectation_source_on_rejection_findings: true
+      expectation_source_categories:
+        - "public_task_stated"
+        - "task_specific_outcome_rubric"
+        - "repo_discoverable"
+        - "gold_reference_intent"
+        - "not_applicable"
+      reject_shape_biased_counted_findings: true
+    secondary_score_0_to_10:
+      enabled: false
+      anchor_reference: "benchmarking:references/pr-quality-llm-judge-rubric.md#optional-anchored-0-10-secondary-score"
+      aggregation: "median/range only; do not average raw scores"
 
 labeling:
   applicable: false
@@ -152,12 +177,11 @@ mechanics:
   config_model_prompt_versions_required: true
   rubric_and_reviewer_prompt_versions_required: true
   accepted_packet_immutable_after_candidate_exposure: true
-  scorer_inputs_copied_from_accepted_packet: true
   candidate_workspace_isolation_checked: false
   public_task_declares_allowed_edits: false
   public_tests_declared_readonly: false
   concurrent_candidate_workspaces_isolated: false
-  candidate_task_or_scorer_edits_recorded_as_process_evidence: true
+  candidate_task_edits_recorded_as_process_evidence: true
   code_result_and_process_result_reported_separately: true
 
 metadata:

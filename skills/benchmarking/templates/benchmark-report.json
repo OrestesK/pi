@@ -4,7 +4,8 @@
   "suite_version": null,
   "reported_at": "2026-07-06",
   "report_mode": "exploratory",
-  "primary_metric": null,
+  "primary_metric": "adjudicated_llm_judge_pr_quality",
+  "primary_metric_semantics": "qualitative PR-quality judgment from judge panel/adjudicator using the broad rubric, task-specific outcome rubric, and gold-reference intent",
   "confidence": "low",
   "runs": [],
   "configs": [],
@@ -20,6 +21,7 @@
     "neither_acceptable": 0,
     "paired_win_rate_a": null,
     "merge_ready_counts": {},
+    "single_output_verdict_counts": {},
     "safety_vetoes": {}
   },
   "process_metrics": {
@@ -31,6 +33,25 @@
     "invalid_task_reasons": {},
     "missing_artifact_counts": {},
     "parse_or_wrapper_failures": 0
+  },
+  "llm_judge_metrics": {
+    "judgeable_candidates": 0,
+    "panel_executed_candidates": 0,
+    "panel_not_executed_candidates": 0,
+    "valid_panel_candidates": 0,
+    "invalid_panel_candidates": 0,
+    "missing_evidence_candidates": 0,
+    "review_schema_error_count": 0,
+    "task_rubric_sufficiency_classification_counts": {},
+    "expectation_source_counts": {},
+    "shape_biased_counted_findings_rejected": 0
+  },
+  "secondary_score_0_to_10": {
+    "applicable": false,
+    "aggregation": "median/range only; do not average raw scores",
+    "median_by_run": {},
+    "range_by_run": {},
+    "score_count_by_run": {}
   },
   "review_panel_metrics": {
     "topology_profiles": {},
@@ -56,12 +77,14 @@
   },
   "provenance": {
     "rubric_versions": [],
+    "gold_reference_policy_versions": [],
     "reviewer_prompt_versions": [],
     "model_ids": [],
     "agent_versions": [],
     "tool_versions": []
   },
   "decision": "inconclusive",
+  "decision_grade_basis": "requires completed judge panel/adjudication using rubric-only judgment packets",
   "decision_rationale": [],
   "risks_and_limitations": [],
   "missing_data": [],

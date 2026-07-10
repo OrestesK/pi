@@ -7,7 +7,7 @@ This file is private evaluator material. Candidate agents must not see it.
 - Public objective:
 - Source type:
 - Base state:
-- Primary evaluation mode: review-only | deterministic | hybrid
+- Primary evaluation mode: gold-reference LLM-judge review
 
 ## Desired outcome
 
@@ -37,11 +37,10 @@ Only this section should be copied into normal candidate-review packets.
 - Known risks and anti-solutions:
 - Public task statement:
 - Candidate diffs/outputs:
-- Public logs/tests:
-- Hidden/scorer summary, if allowed and sanitized:
+- Process and verification summaries, if available:
 - Gold/reference patch availability: audit-only | normal-review-allowed | absent
 
-Do not include task origin, generation rationale, canary strings, raw hidden-test bodies, raw local paths, or unblinding data in the reviewer-visible excerpt.
+Do not include task origin, generation rationale, canary strings, raw local paths, or unblinding data in the reviewer-visible excerpt.
 
 ## Evidence exposure policy
 
@@ -84,5 +83,4 @@ Use only for task curation or audit mode. Do not include in normal candidate-out
 - Task origin:
 - Generation rationale:
 - Gold/reference details:
-- Hidden-test body notes:
 - Raw transcript or host-local evidence refs:

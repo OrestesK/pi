@@ -1,0 +1,75 @@
+{
+  "supplement_id": "<per_task_rubric_supplement_id>",
+  "schema_version": "per_task_rubric_supplement_v3",
+  "task_id": "<task-id>",
+  "created_at": "2026-07-09",
+  "visibility": "judge_private",
+  "source_reference": {
+    "source_repo_logical_ref": "<source-repo:repo-name>",
+    "base_commit": "<base-commit>",
+    "source_commit": "<source-commit>",
+    "source_pr": "<source-pr-or-null>",
+    "gold_diff_ref": "private:<gold-diff-ref-or-command>",
+    "raw_gold_diff_included": false
+  },
+  "intent_summary": "Concise statement of the original PR intent as user-visible behavior, integration outcome, or maintainability outcome. Do not encode exact patch shape.",
+  "must_satisfy": [
+    {
+      "id": "REQ-001",
+      "acceptance_kind": "<behavior|integration|verification|scope>",
+      "requirement": "<outcome requirement derived from the original PR intent>",
+      "observable_outcome": "<what a reviewer should see in the candidate output if this is satisfied>",
+      "expectation_source": "<public_task_stated|task_specific_outcome_rubric|repo_discoverable|gold_reference_intent>",
+      "public_contract_refs": [
+        "task:public/task.md:<line-or-section>"
+      ],
+      "repo_discoverable_refs": [],
+      "gold_evidence_ref": "private:<reference-location>",
+      "shape_constraints": [],
+      "judge_notes": "Recognize clean equivalent implementations. Do not require file names, helper names, method names, call order, or module decomposition unless they are explicitly required by public task text or repo-discoverable behavior.",
+      "counts_against_verdict_by_default": true
+    }
+  ],
+  "task_rubric_sufficiency": {
+    "classification": "<outcome_rubric_sufficient|rubric_shape_biased_needs_revise|not_assessed>",
+    "evidence_refs": [],
+    "notes": "Judges should mark rubric_shape_biased_needs_revise when the supplement would require implementation shape instead of outcomes. Shape-biased requirements must not drive hard rejection."
+  },
+  "important_edge_cases": [
+    {
+      "case": "<edge case stated as behavior/outcome>",
+      "public_contract_refs": [],
+      "repo_discoverable_refs": [],
+      "gold_evidence_ref": "private:<reference-location-or-null>"
+    }
+  ],
+  "integration_surfaces": [
+    {
+      "surface": "<owner layer or external behavior surface>",
+      "expected_outcome": "<observable integration result>",
+      "public_contract_refs": [],
+      "repo_discoverable_refs": []
+    }
+  ],
+  "verification_evidence_suggestions": [
+    {
+      "evidence_kind": "<review_inspection|candidate_self_report|public_check|manual_behavior_probe>",
+      "suggestion": "<evidence that would increase confidence; not a mandatory exact-file, exact-helper, or exact-API-shape requirement>"
+    }
+  ],
+  "implementation_shape_non_requirements": [
+    "Do not require byte-for-byte gold patch equivalence.",
+    "Do not require exact helper names, file names, module boundaries, call order, or internal decomposition unless public task text or repo-discoverable behavior explicitly requires them.",
+    "Different clean designs are acceptable when they satisfy the observable outcome and integration contract."
+  ],
+  "accepted_variations": [
+    "Clean alternate implementations are acceptable when they satisfy the task goal and repo-discoverable contracts, even if module boundaries, helper names, or internal decomposition differ from the original PR."
+  ],
+  "non_goals": [],
+  "known_risks": [],
+  "veto_conditions": [],
+  "privacy_notes": [
+    "This supplement is judge-private and must not be shown to candidate agents before candidate output is frozen.",
+    "Public reports should summarize outcomes without raw gold/reference content unless explicitly approved."
+  ]
+}

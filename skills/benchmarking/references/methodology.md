@@ -6,13 +6,13 @@ Use this reference to choose a benchmark design and keep task creation, curation
 
 | System | Pattern to copy | Boundary |
 |---|---|---|
-| SWE-bench | Base commit, issue statement, hidden tests, run artifacts, prediction records. | Public tasks can be contaminated; private tasks need the same schema discipline. |
-| PatchGym | Mine real Git history into local SWE-bench-style tasks; use hidden tests and oracle patches where available. | Validate mined tasks; history alone does not make a good benchmark. |
+| SWE-bench | Base commit, issue statement, run artifacts, prediction records. | Public tasks can be contaminated; private tasks need the same schema discipline. |
+| PatchGym | Mine real Git history into local SWE-bench-style tasks; preserve oracle/reference patches where available. | Validate mined tasks; history alone does not make a good benchmark. |
 | SWE-smith | Generate many candidate tasks, then filter and validate. | Synthetic task text/bugs need curation before benchmark use. |
-| Terminal-Bench / Harbor | Explicit task directory, solution/reference artifacts, test command, task authoring rubric. | Terminal packaging is useful even when final grading is review-based. |
-| METR Task Standard | Task family, resources, permissions, score function, hidden data, no-internet defaults. | Heavyweight for small PR tasks, but good for long-horizon or black-box tasks. |
-| Inspect AI | Dataset / solver / scorer separation. | Scorers can be deterministic or model-graded; do not mix responsibilities. |
-| LangSmith / Braintrust / Langfuse / Weave / Phoenix | Dataset → experiment → evaluator/scorer → trace artifacts. | Eval ops do not replace task quality review. |
+| Terminal-Bench / Harbor | Explicit task directory, solution/reference artifacts, command context, task authoring rubric. | Terminal packaging is useful even when final grading is review-based. |
+| METR Task Standard | Task family, resources, permissions, private evaluator data, no-internet defaults. | Heavyweight for small PR tasks, but good for long-horizon or black-box tasks. |
+| Inspect AI | Dataset / solver / evaluator separation. | Keep task, solver, judge, and report responsibilities distinct. |
+| LangSmith / Braintrust / Langfuse / Weave / Phoenix | Dataset → experiment → evaluator → trace artifacts. | Eval ops do not replace task quality review. |
 | promptfoo / DeepEval | Lightweight structured assertions and model-graded checks. | Better for prompt/tool behavior than full software PR correctness. |
 
 ## Benchmark stages
@@ -32,28 +32,28 @@ Use this reference to choose a benchmark design and keep task creation, curation
    - Declare the runner mode in `templates/run-manifest.yaml`: `direct_worker`, `direct_parallel_workers`, `goal_workflow`, or `custom_runner`.
    - Capture patches, logs, final answers, transcripts, config hashes, model IDs, tool versions, timestamps, and observed resource metrics.
 
-4. **Frozen scoring / replay snapshot**
-   - Score from accepted packet material copied into clean scorer workspaces.
-   - Distinguish live external workspaces, frozen candidate snapshots, frozen scorer inputs, scorer workspaces, replay entrypoints, residue manifests, and host-local recovery refs in `templates/run-manifest.yaml`.
+4. **Frozen review snapshot**
+   - Judge from accepted packet material copied into clean review workspaces or immutable judge packets.
+   - Distinguish live external workspaces, frozen candidate snapshots, frozen judge inputs, review workspaces, replay entrypoints, residue manifests, and host-local recovery refs in `templates/run-manifest.yaml`.
 
 5. **Candidate-output review**
    - Review frozen task packet plus anonymized candidate artifacts.
-   - Use judgment, not brittle deterministic rules, unless a deterministic scorer is explicitly part of the packet.
+   - Use rubric-grounded judgment rather than brittle rule matching.
    - For high-rigor review, follow `references/reviewer-topology.md`: canonical packet, reviewer assignment, leaf-review fanout, reducer/adjudicator, optional targeted second wave.
 
 6. **Reporting**
    - Aggregate paired outcomes and reducer/adjudicator outputs.
    - Report uncertainty, ties, neither-acceptable counts, category breakdowns, agreement/adjudication metrics, and observed resource metrics.
 
-## Deterministic tests vs deterministic mechanics
+## Rubric review vs benchmark mechanics
 
-Deterministic solution tests are optional. Review-only benchmarks are valid when task packets contain enough evaluator context for model or human judgment.
+Review-first benchmarks are valid when task packets contain enough evaluator context for model or human judgment.
 
-Deterministic mechanics are not optional. Always preserve:
+Benchmark mechanics are not optional. Always preserve:
 
 - complete manifests;
 - public/private split;
-- hidden/gold artifact separation;
+- private/gold artifact separation;
 - stable task version;
 - candidate anonymization;
 - randomization record;
@@ -148,6 +148,6 @@ For manual config comparisons, keep the active suite under `<pi-config-dir>/benc
 | Reviewers see agent identity | Blind labels and randomize X/Y. |
 | Pairwise winner is still bad | Include “neither acceptable” and merge-readiness. |
 | Judge prompt drift changes results | Version rubrics and reviewer prompts. |
-| Tests become the whole benchmark | Treat tests as evidence, not truth, unless task is explicitly deterministic. |
+| Check logs become the whole benchmark | Treat candidate-reported checks as confidence evidence, not scoring truth. |
 | Generated tasks are artificial | Require realism/usefulness review. |
 | Output review leaks gold solution | Hide gold/reference patch except in audit mode. |
