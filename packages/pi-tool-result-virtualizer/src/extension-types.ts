@@ -6,17 +6,6 @@ export type ToolExecutionContextLike = {
 	cwd: string;
 };
 
-export type AdvertisedSkillLike = {
-	filePath: string;
-	disableModelInvocation: boolean;
-};
-
-export type BeforeAgentStartEventLike = {
-	systemPromptOptions: {
-		skills?: AdvertisedSkillLike[];
-	};
-};
-
 export type ToolDefinitionLike = {
 	name: string;
 	label: string;
@@ -35,7 +24,6 @@ export type ToolDefinitionLike = {
 
 export type ExtensionApiLike = {
 	registerTool(definition: ToolDefinitionLike): void;
-	on(event: "before_agent_start", handler: (event: BeforeAgentStartEventLike, ctx: ToolExecutionContextLike) => Promise<unknown>): void;
 	on(event: "tool_result", handler: (event: unknown, ctx: ToolExecutionContextLike) => Promise<unknown>): void;
 	on(event: "context", handler: (event: { messages?: unknown }, ctx: ToolExecutionContextLike) => Promise<unknown>): void;
 };

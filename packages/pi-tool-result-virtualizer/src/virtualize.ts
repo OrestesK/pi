@@ -1,6 +1,6 @@
-import { readFile, realpath } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { TextContent } from "./extension-types.ts";
@@ -19,7 +19,6 @@ export type ToolResultEventLike = {
 
 export type VirtualizeOptions = {
 	cwd: string;
-	advertisedSkillPaths: ReadonlySet<string>;
 };
 
 export type ToolResultPatch = {
@@ -140,17 +139,12 @@ function resolvePiReadPath(path: string, cwd: string): string {
 	return resolve(cwd, normalized);
 }
 
-async function isAdvertisedSkillRead(
-	toolName: string,
-	input: unknown,
-	cwd: string,
-	advertisedSkillPaths: ReadonlySet<string>,
-): Promise<boolean> {
+function isSkillRead(toolName: string, input: unknown, cwd: string): boolean {
 	if (toolName !== "read" || !isRecord(input)) return false;
 	const path = stringField(input, "path");
 	if (path === undefined) return false;
 	try {
-		return advertisedSkillPaths.has(await realpath(resolvePiReadPath(path, cwd)));
+		return basename(resolvePiReadPath(path, cwd)) === "SKILL.md";
 	} catch {
 		return false;
 	}
@@ -257,7 +251,7 @@ async function captureText(
 	return { text: eventText, captureStatus: "event.content" };
 }
 
-async function shouldVirtualize(event: ToolResultEventLike, toolName: string, eventText: string, options: VirtualizeOptions): Promise<boolean> {
+function shouldVirtualize(event: ToolResultEventLike, toolName: string, eventText: string): boolean {
 	if (isProtectedToolResult(event, toolName)) return false;
 	const exceedsThreshold = byteLength(eventText) >= CONTENT_BYTE_THRESHOLD
 		|| lineCount(eventText) >= CONTENT_LINE_THRESHOLD
@@ -270,7 +264,7 @@ async function shouldVirtualize(event: ToolResultEventLike, toolName: string, ev
 			|| (toolName === "read" && input?.path !== undefined);
 		if (!hasRecoverableTruncation) return false;
 	}
-	return !(await isAdvertisedSkillRead(toolName, event.input, options.cwd, options.advertisedSkillPaths));
+	return true;
 }
 
 function compactVisibleDetails(originalDetails: unknown, contentStored: boolean, scalarOnly: boolean): Record<string, unknown> {
@@ -371,7 +365,8 @@ export async function virtualizeToolResult(
 	if (textBlocksFromContent(event.content).length === 0) return undefined;
 	const eventText = textFromContent(event.content);
 	if (isProtectedToolResult(event, toolName) || hasVirtualizerMetadata(event.details)) return undefined;
-	const shouldReplaceContent = await shouldVirtualize(event, toolName, eventText, options);
+	if (isSkillRead(toolName, event.input, options.cwd)) return undefined;
+	const shouldReplaceContent = shouldVirtualize(event, toolName, eventText);
 	const originalDetailsText = serializedDetails(event.details);
 	const originalDetailsBytes = originalDetailsText === undefined ? 0 : byteLength(originalDetailsText);
 	const shouldStoreOriginalDetails = originalDetailsText !== undefined && (originalDetailsBytes >= DETAILS_BYTE_THRESHOLD || truncationContentBytes(event.details) >= DETAILS_BYTE_THRESHOLD);

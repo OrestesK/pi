@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 import piToolResultVirtualizer from "../src/index.ts";
 import { markerLines, schemaProperties, withRegisteredExtension } from "./test-helpers.ts";
 
-function largeSkillReadEvent(path: string, marker: string): Record<string, unknown> {
+function largeReadEvent(path: string, marker: string): Record<string, unknown> {
 	return {
 		toolName: "read",
 		toolCallId: marker,
@@ -17,63 +17,41 @@ function largeSkillReadEvent(path: string, marker: string): Record<string, unkno
 	};
 }
 
-test("advertised external package skill reads pass through", async () => {
-	await withRegisteredExtension(async ({ runBeforeAgentStart, runToolResult }) => {
-		const packageRoot = await mkdtemp(join(tmpdir(), "pi-trv-package-skill-"));
-		const skillPath = join(packageRoot, "skills", "external", "SKILL.md");
+test("all SKILL.md reads pass through", async () => {
+	await withRegisteredExtension(async ({ dir, runToolResult }) => {
+		const skillPath = join(dir, "arbitrary", "SKILL.md");
 		await mkdir(dirname(skillPath), { recursive: true });
-		await writeFile(skillPath, "external skill", "utf8");
-		await runBeforeAgentStart([{ filePath: skillPath, disableModelInvocation: false }]);
+		await writeFile(skillPath, "skill", "utf8");
 
-		assert.equal(await runToolResult(largeSkillReadEvent(skillPath, "ADVERTISED_EXTERNAL_SKILL")), undefined);
+		assert.equal(await runToolResult(largeReadEvent(skillPath, "ANY_SKILL_FILE")), undefined);
 	});
 });
 
-test("advertised skill reads match an at-prefixed absolute read path", async () => {
-	await withRegisteredExtension(async ({ dir, runBeforeAgentStart, runToolResult }) => {
-		const skillPath = join(dir, "package", "at-prefixed", "SKILL.md");
+test("SKILL.md reads accept Pi path spellings", async () => {
+	await withRegisteredExtension(async ({ dir, runToolResult }) => {
+		const skillPath = join(dir, "unicode skill", "SKILL.md");
 		await mkdir(dirname(skillPath), { recursive: true });
-		await writeFile(skillPath, "at-prefixed skill", "utf8");
-		await runBeforeAgentStart([{ filePath: skillPath, disableModelInvocation: false }]);
+		await writeFile(skillPath, "skill", "utf8");
 
-		assert.equal(await runToolResult(largeSkillReadEvent(`@${skillPath}`, "AT_PREFIXED_SKILL")), undefined);
+		assert.equal(await runToolResult(largeReadEvent(`@${skillPath}`, "AT_PREFIXED_SKILL")), undefined);
+		assert.equal(
+			await runToolResult(largeReadEvent(skillPath.replace("unicode skill", "unicode\u00A0skill"), "UNICODE_SKILL")),
+			undefined,
+		);
+		assert.equal(await runToolResult(largeReadEvent(pathToFileURL(skillPath).href, "FILE_URL_SKILL")), undefined);
 	});
 });
 
-test("advertised skill reads match Unicode-space-normalized paths", async () => {
-	await withRegisteredExtension(async ({ dir, runBeforeAgentStart, runToolResult }) => {
-		const skillPath = join(dir, "package", "unicode skill", "SKILL.md");
-		await mkdir(dirname(skillPath), { recursive: true });
-		await writeFile(skillPath, "unicode-space skill", "utf8");
-		await runBeforeAgentStart([{ filePath: skillPath, disableModelInvocation: false }]);
-
-		const unicodeSpelling = skillPath.replace("unicode skill", "unicode\u00A0skill");
-		assert.equal(await runToolResult(largeSkillReadEvent(unicodeSpelling, "UNICODE_SPACE_SKILL")), undefined);
-	});
-});
-
-test("advertised skill reads match file URLs", async () => {
-	await withRegisteredExtension(async ({ dir, runBeforeAgentStart, runToolResult }) => {
-		const skillPath = join(dir, "package", "file-url", "SKILL.md");
-		await mkdir(dirname(skillPath), { recursive: true });
-		await writeFile(skillPath, "file URL skill", "utf8");
-		await runBeforeAgentStart([{ filePath: skillPath, disableModelInvocation: false }]);
-
-		assert.equal(await runToolResult(largeSkillReadEvent(pathToFileURL(skillPath).href, "FILE_URL_SKILL")), undefined);
-	});
-});
-
-test("advertised skill reads expand tilde paths", { skip: process.platform === "win32" }, async () => {
-	await withRegisteredExtension(async ({ dir, runBeforeAgentStart, runToolResult }) => {
+test("SKILL.md reads expand tilde paths", { skip: process.platform === "win32" }, async () => {
+	await withRegisteredExtension(async ({ dir, runToolResult }) => {
 		const previousHome = process.env.HOME;
 		process.env.HOME = dir;
 		try {
 			const skillPath = join(dir, "tilde-skill", "SKILL.md");
 			await mkdir(dirname(skillPath), { recursive: true });
-			await writeFile(skillPath, "tilde skill", "utf8");
-			await runBeforeAgentStart([{ filePath: skillPath, disableModelInvocation: false }]);
+			await writeFile(skillPath, "skill", "utf8");
 
-			assert.equal(await runToolResult(largeSkillReadEvent("~/tilde-skill/SKILL.md", "TILDE_SKILL")), undefined);
+			assert.equal(await runToolResult(largeReadEvent("~/tilde-skill/SKILL.md", "TILDE_SKILL")), undefined);
 		} finally {
 			if (previousHome === undefined) delete process.env.HOME;
 			else process.env.HOME = previousHome;
@@ -81,62 +59,25 @@ test("advertised skill reads expand tilde paths", { skip: process.platform === "
 	});
 });
 
-test("advertised skill reads preserve backslash tilde spellings off Windows", { skip: process.platform === "win32" }, async () => {
-	await withRegisteredExtension(async ({ dir, runBeforeAgentStart, runToolResult }) => {
-		const readPath = "~\\package\\SKILL.md";
-		const skillPath = join(dir, readPath);
-		await writeFile(skillPath, "literal backslash tilde skill", "utf8");
-		await runBeforeAgentStart([{ filePath: skillPath, disableModelInvocation: false }]);
-
-		assert.equal(await runToolResult(largeSkillReadEvent(readPath, "BACKSLASH_TILDE_SKILL")), undefined);
-	});
-});
-
-test("disabled advertised skill reads virtualize", async () => {
-	await withRegisteredExtension(async ({ dir, runBeforeAgentStart, runToolResult }) => {
-		const skillPath = join(dir, ".pi", "skills", "disabled", "SKILL.md");
-		await mkdir(dirname(skillPath), { recursive: true });
-		await writeFile(skillPath, "disabled skill", "utf8");
-		await runBeforeAgentStart([{ filePath: skillPath, disableModelInvocation: true }]);
-
-		assert.ok(await runToolResult(largeSkillReadEvent(skillPath, "DISABLED_SKILL")));
-	});
-});
-
-test("advertised skill state resets on every invocation", async () => {
-	await withRegisteredExtension(async ({ dir, runBeforeAgentStart, runToolResult }) => {
-		const skillPath = join(dir, ".pi", "skills", "reset", "SKILL.md");
-		await mkdir(dirname(skillPath), { recursive: true });
-		await writeFile(skillPath, "reset skill", "utf8");
-		await runBeforeAgentStart([{ filePath: skillPath, disableModelInvocation: false }]);
-		assert.equal(await runToolResult(largeSkillReadEvent(skillPath, "RESET_SKILL_FIRST")), undefined);
-
-		await runBeforeAgentStart([]);
-		assert.ok(await runToolResult(largeSkillReadEvent(skillPath, "RESET_SKILL_SECOND")));
-	});
-});
-
-test("advertised skill reads match through symlink aliases", async () => {
-	await withRegisteredExtension(async ({ dir, runBeforeAgentStart, runToolResult }) => {
-		const skillPath = join(dir, "package", "skill", "SKILL.md");
+test("non-SKILL.md symlink aliases retain ordinary virtualization", async () => {
+	await withRegisteredExtension(async ({ dir, runToolResult }) => {
+		const skillPath = join(dir, "package", "SKILL.md");
 		const aliasPath = join(dir, "skill-alias.md");
 		await mkdir(dirname(skillPath), { recursive: true });
-		await writeFile(skillPath, "aliased skill", "utf8");
+		await writeFile(skillPath, "skill", "utf8");
 		await symlink(skillPath, aliasPath);
-		await runBeforeAgentStart([{ filePath: skillPath, disableModelInvocation: false }]);
 
-		assert.equal(await runToolResult(largeSkillReadEvent(aliasPath, "ALIASED_SKILL")), undefined);
+		assert.ok(await runToolResult(largeReadEvent(aliasPath, "ALIASED_SKILL")));
 	});
 });
 
-test("unadvertised root-local SKILL.md reads virtualize", async () => {
-	await withRegisteredExtension(async ({ dir, runBeforeAgentStart, runToolResult }) => {
-		const skillPath = join(dir, ".pi", "skills", "local", "SKILL.md");
-		await mkdir(dirname(skillPath), { recursive: true });
-		await writeFile(skillPath, "local skill", "utf8");
-		await runBeforeAgentStart([]);
+test("non-SKILL.md reads retain ordinary virtualization", async () => {
+	await withRegisteredExtension(async ({ dir, runToolResult }) => {
+		const readPath = join(dir, "arbitrary", "README.md");
+		await mkdir(dirname(readPath), { recursive: true });
+		await writeFile(readPath, "ordinary file", "utf8");
 
-		assert.ok(await runToolResult(largeSkillReadEvent(skillPath, "UNADVERTISED_LOCAL_SKILL")));
+		assert.ok(await runToolResult(largeReadEvent(readPath, "ORDINARY_READ")));
 	});
 });
 

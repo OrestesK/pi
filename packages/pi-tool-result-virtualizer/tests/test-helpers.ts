@@ -33,15 +33,9 @@ export async function supportsFts5Trigram(): Promise<boolean> {
 
 export type RegisteredTool = ToolDefinitionLike;
 
-type AdvertisedSkill = {
-	filePath: string;
-	disableModelInvocation: boolean;
-};
-
 export type ExtensionFixture = {
 	dir: string;
 	tools: Map<string, RegisteredTool>;
-	runBeforeAgentStart(skills: AdvertisedSkill[]): Promise<void>;
 	runContext(messages: unknown[]): Promise<unknown>;
 	runToolResult(event: unknown): Promise<unknown>;
 	runTool(toolName: string, params: unknown): Promise<{ content: TextContent[]; details?: Record<string, unknown> }>;
@@ -59,7 +53,6 @@ export async function withRegisteredExtension<T>(body: (fixture: ExtensionFixtur
 	process.env.PI_TOOL_RESULT_VIRTUALIZER_DIR = dir;
 	try {
 		const tools = new Map<string, RegisteredTool>();
-		let beforeAgentStartHandler: ((event: { systemPromptOptions: { skills?: AdvertisedSkill[] } }, ctx: ToolExecutionContextLike) => Promise<unknown>) | undefined;
 		let toolResultHandler: ((event: unknown, ctx: ToolExecutionContextLike) => Promise<unknown>) | undefined;
 		let contextHandler: ((event: { messages?: unknown }, ctx: ToolExecutionContextLike) => Promise<unknown>) | undefined;
 		piToolResultVirtualizer({
@@ -67,33 +60,28 @@ export async function withRegisteredExtension<T>(body: (fixture: ExtensionFixtur
 				tools.set(definition.name, definition);
 			},
 			on(event, handler) {
-				if (event === "before_agent_start") beforeAgentStartHandler = handler as (event: { systemPromptOptions: { skills?: AdvertisedSkill[] } }, ctx: ToolExecutionContextLike) => Promise<unknown>;
 				if (event === "tool_result") toolResultHandler = handler as (event: unknown, ctx: ToolExecutionContextLike) => Promise<unknown>;
 				if (event === "context") contextHandler = handler as (event: { messages?: unknown }, ctx: ToolExecutionContextLike) => Promise<unknown>;
 			},
 		});
-		assert.ok(beforeAgentStartHandler);
 		assert.ok(toolResultHandler);
 		assert.ok(contextHandler);
-		const beforeAgentStart = beforeAgentStartHandler;
 		const handler = toolResultHandler;
 		const context = contextHandler;
+		const toolContext = (): ToolExecutionContextLike => ({ cwd: dir });
 		return await body({
 			dir,
 			tools,
-			async runBeforeAgentStart(skills) {
-				await beforeAgentStart({ systemPromptOptions: { skills } }, { cwd: dir });
-			},
 			runContext(messages) {
-				return context({ messages }, { cwd: dir });
+				return context({ messages }, toolContext());
 			},
 			runToolResult(event) {
-				return handler(event, { cwd: dir });
+				return handler(event, toolContext());
 			},
 			runTool(toolName, params) {
 				const tool = tools.get(toolName);
 				assert.ok(tool, `registered tool missing: ${toolName}`);
-				return tool.execute(toolName, params, undefined, undefined, { cwd: dir });
+				return tool.execute(toolName, params, undefined, undefined, toolContext());
 			},
 		});
 	} finally {
