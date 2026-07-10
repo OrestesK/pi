@@ -722,6 +722,235 @@ test("generic wrapped results cover per-tool summaries, previews, partial, and e
   assert.match(render(error), /boom/);
 });
 
+test("context-mode MCP calls render compact lifecycle rows with expandable raw detail", () => {
+  const indexArgs = {
+    tool: "context_mode_ctx_index",
+    args: JSON.stringify({ source: "Audit caffeinate" }),
+  };
+  const indexOutput = [
+    "Indexed 3 sections (0 with code) from: Audit caffeinate",
+    'Use ctx_search(queries: ["..."]) to query this content. Use source: "Audit caffeinate" to scope results.',
+  ].join("\n");
+
+  const runningIndex = ui.wrappedToolCall(
+    "mcp",
+    indexArgs,
+    theme,
+    context(indexArgs, { isPartial: true }),
+    "MCP",
+  );
+  assert.equal(
+    render(runningIndex).trimEnd(),
+    "◦ Context · indexing Audit caffeinate",
+  );
+  const completedIndex = ui.wrappedToolCall(
+    "mcp",
+    indexArgs,
+    theme,
+    context(indexArgs, {
+      isPartial: false,
+      lastComponent: runningIndex,
+    }),
+    "MCP",
+  );
+  assert.strictEqual(completedIndex, runningIndex);
+  assert.equal(render(completedIndex).trimEnd(), "");
+
+  const partialIndexResult = ui.wrappedToolResult(
+    "mcp",
+    textResult("waiting"),
+    options({ isPartial: true }),
+    theme,
+    context(indexArgs, { toolCallId: "context-index-partial" }),
+    "MCP",
+  );
+  assert.equal(render(partialIndexResult).trimEnd(), "");
+
+  const collapsedIndex = ui.wrappedToolResult(
+    "mcp",
+    textResult(indexOutput),
+    options(),
+    theme,
+    context(indexArgs, {
+      lastComponent: partialIndexResult,
+      toolCallId: "context-index-collapsed",
+    }),
+    "MCP",
+  );
+  assert.strictEqual(collapsedIndex, partialIndexResult);
+  assert.equal(
+    render(collapsedIndex).trimEnd(),
+    "✓ Context · indexed Audit caffeinate · 3 sections",
+  );
+  assertRenderedWithinWidth(collapsedIndex);
+
+  const indexedCode = render(
+    ui.wrappedToolResult(
+      "mcp",
+      textResult("Indexed 11 sections (1 with code) from: Audit imagegen"),
+      options(),
+      theme,
+      context(
+        {
+          ...indexArgs,
+          args: JSON.stringify({ source: "Audit imagegen" }),
+        },
+        { toolCallId: "context-index-code" },
+      ),
+      "MCP",
+    ),
+  );
+  assert.match(
+    indexedCode,
+    /^✓ Context · indexed Audit imagegen · 11 sections · 1 code/,
+  );
+
+  const expandedIndex = render(
+    ui.wrappedToolResult(
+      "mcp",
+      textResult(indexOutput),
+      options({ expanded: true }),
+      theme,
+      context(indexArgs, { toolCallId: "context-index-expanded" }),
+      "MCP",
+    ),
+  );
+  assert.match(expandedIndex, /^✓ Context · indexed Audit caffeinate · 3 sections/);
+  assert.match(expandedIndex, /Indexed 3 sections \(0 with code\)/);
+  assert.match(expandedIndex, /Use ctx_search/);
+
+  const searchArgs = {
+    tool: "context_mode_ctx_search",
+    args: JSON.stringify({
+      queries: ["decision confidence GO CAUTION NO-GO", "must-fix findings"],
+    }),
+  };
+  const runningSearch = ui.wrappedToolCall(
+    "mcp",
+    searchArgs,
+    theme,
+    context(searchArgs, { isPartial: true }),
+    "MCP",
+  );
+  assert.equal(
+    render(runningSearch).trimEnd(),
+    "◦ Context · searching 2 queries",
+  );
+
+  const searchOutput = [
+    "## decision confidence GO CAUTION NO-GO",
+    "",
+    "--- [current-session | 2026-07-10 00:55 | Audit | caffeinate] ---",
+    "### Review — security/source audit (1)",
+    ...Array.from({ length: 224 }, (_, index) => `result line ${index + 1}`),
+  ].join("\n");
+  const collapsedSearch = ui.wrappedToolResult(
+    "mcp",
+    textResult(searchOutput),
+    options(),
+    theme,
+    context(searchArgs, { toolCallId: "context-search-collapsed" }),
+    "MCP",
+  );
+  const collapsedSearchText = render(collapsedSearch);
+  assert.match(collapsedSearchText, /^✓ Context · searched 2 queries · 228 lines/);
+  assert.match(collapsedSearchText, /decision confidence GO CAUTION NO-GO/);
+  assert.match(
+    collapsedSearchText,
+    /Audit \| caffeinate · Review — security\/source audit \(1\)/,
+  );
+  assert.match(collapsedSearchText, /Press Ctrl\+O for full result/);
+  assert.doesNotMatch(collapsedSearchText, /result line 1/);
+  assertRenderedWithinWidth(collapsedSearch);
+
+  const expandedSearch = render(
+    ui.wrappedToolResult(
+      "mcp",
+      textResult(searchOutput),
+      options({ expanded: true }),
+      theme,
+      context(searchArgs, { toolCallId: "context-search-expanded" }),
+      "MCP",
+    ),
+  );
+  assert.match(
+    expandedSearch,
+    /--- \[current-session .* Audit \| caffeinate\] ---/,
+  );
+  assert.match(expandedSearch, /result line 1/);
+
+  const noResultsSearch = render(
+    ui.wrappedToolResult(
+      "mcp",
+      textResult("## absent query\nNo results found."),
+      options(),
+      theme,
+      context(
+        {
+          ...searchArgs,
+          args: JSON.stringify({ queries: ["absent query"] }),
+        },
+        { toolCallId: "context-search-no-results" },
+      ),
+      "MCP",
+    ),
+  );
+  assert.match(noResultsSearch, /searched 1 query · 2 lines/);
+  assert.match(noResultsSearch, /absent query/);
+  assert.match(noResultsSearch, /No results found\./);
+
+  const searchError = ui.wrappedToolResult(
+    "mcp",
+    textResult("Search error: store unavailable"),
+    options(),
+    theme,
+    context(searchArgs, {
+      isError: true,
+      toolCallId: "context-search-error",
+    }),
+    "MCP",
+  );
+  assert.equal(
+    render(searchError).trimEnd(),
+    "✗ Context · search failed · Search error: store unavailable",
+  );
+
+  const genericMcp = render(
+    ui.wrappedToolResult(
+      "mcp",
+      textResult("line 1\nline 2"),
+      options(),
+      theme,
+      context(
+        { tool: "slack_search", args: JSON.stringify({ query: "status" }) },
+        { toolCallId: "generic-mcp" },
+      ),
+      "MCP",
+    ),
+  );
+  assert.match(genericMcp, /└ MCP 2 lines/);
+  assert.match(genericMcp, /line 1/);
+
+  const registeredTodo = render(
+    ui.genericToolResult(
+      "todo",
+      textResult(
+        JSON.stringify({
+          assigned: [],
+          open: [{ id: "TODO-1", title: "Thing" }],
+          closed: [],
+        }),
+      ),
+      options(),
+      theme,
+      context({}, { toolCallId: "registered-todo" }),
+      "Todo",
+    ),
+  );
+  assert.match(registeredTodo, /└ Todo 1 line/);
+  assert.doesNotMatch(registeredTodo, /open todo/);
+});
+
 test("local built-in tool call/result renderers cover temp-safe branches", () => {
   assert.match(ui.formatReadCall({ path: "/tmp/file.txt", offset: 2, limit: 3 }, theme), /Read/);
   assert.match(ui.formatGrepCall({ pattern: "needle", path: "/tmp" }, theme), /needle/);

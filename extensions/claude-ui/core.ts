@@ -1300,17 +1300,7 @@ function patchToolExecutionRenderers(): void {
           return original(args, theme, context);
         }
 
-        return setText(
-          context.lastComponent,
-          genericToolCall(
-            title,
-            toolName === "Agent"
-              ? agentToolCallBody(args, theme)
-              : webToolCallBody(toolName, args, theme),
-            theme,
-            isToolPending(context),
-          ),
-        );
+        return wrappedToolCall(toolName, args, theme, context, title);
       };
     }
     return prototype.__claudeToolExecutionOriginalGetCallRenderer?.call(this);
@@ -1493,7 +1483,13 @@ type ToolRenderContextLike = {
   lastComponent: unknown;
   isError: boolean;
   executionStarted?: boolean;
+  isPartial?: boolean;
 };
+
+interface ContextModeMcpRequest {
+  action: "index" | "search";
+  params: Record<string, unknown>;
+}
 
 type SubagentProgress = {
   index?: number;
@@ -1942,6 +1938,97 @@ function genericToolCall(
 
 function isToolPending(context: ToolRenderContextLike): boolean {
   return pendingToolCalls.has(context.toolCallId);
+}
+
+function contextModeMcpRequest(
+  args: unknown,
+): ContextModeMcpRequest | undefined {
+  const tool = argValueLabel(args, "tool");
+  const action =
+    tool === "context_mode_ctx_index"
+      ? "index"
+      : tool === "context_mode_ctx_search"
+        ? "search"
+        : undefined;
+  if (!action) return undefined;
+
+  const rawParams = argValueLabel(args, "args");
+  return {
+    action,
+    params: rawParams ? (parseJsonRecord(rawParams) ?? {}) : {},
+  };
+}
+
+function contextModeStatusLine(
+  theme: Theme,
+  status: "pending" | "success" | "error",
+  details: string,
+): string {
+  const marker =
+    status === "pending"
+      ? theme.fg("accent", "◦")
+      : status === "success"
+        ? theme.fg("success", "✓")
+        : theme.fg("error", "✗");
+  return `${marker} ${label(theme, "Context")}${muted(
+    theme,
+    ` · ${truncateVisible(details, 110)}`,
+  )}`;
+}
+
+function contextModeQueryCount(
+  params: Record<string, unknown>,
+): number | undefined {
+  const queries = argStringArray(params, "queries");
+  if (queries.length > 0) return queries.length;
+  return argValueLabel(params, "query") ? 1 : undefined;
+}
+
+function contextModePendingDetails(request: ContextModeMcpRequest): string {
+  if (request.action === "index") {
+    const source =
+      argValueLabel(request.params, "source") ??
+      argValueLabel(request.params, "path") ??
+      "content";
+    return `indexing ${compactOneLine(source, 90)}`;
+  }
+
+  const queryCount = contextModeQueryCount(request.params);
+  return queryCount === undefined
+    ? "searching indexed content"
+    : `searching ${plural(queryCount, "query", "queries")}`;
+}
+
+function wrappedToolCall(
+  toolName: string,
+  args: unknown,
+  theme: Theme,
+  context: ToolRenderContextLike,
+  title: string,
+): Text {
+  const contextModeRequest =
+    toolName === "mcp" ? contextModeMcpRequest(args) : undefined;
+  if (contextModeRequest) {
+    return setText(
+      context.lastComponent,
+      context.isPartial === false
+        ? ""
+        : contextModeStatusLine(
+            theme,
+            "pending",
+            contextModePendingDetails(contextModeRequest),
+          ),
+    );
+  }
+
+  const body =
+    toolName === "Agent"
+      ? agentToolCallBody(args, theme)
+      : webToolCallBody(toolName, args, theme);
+  return setText(
+    context.lastComponent,
+    genericToolCall(title, body, theme, isToolPending(context)),
+  );
 }
 
 function positiveCount(value: unknown): number | undefined {
@@ -3894,6 +3981,126 @@ function resultDetailSummary(
   }
 }
 
+function contextModeSearchPreviewLines(output: string): string[] {
+  const lines = contentLines(output);
+  const queryIndex = lines.findIndex((line) => line.startsWith("## "));
+  const query =
+    queryIndex >= 0 ? lines[queryIndex]?.slice(3).trim() : undefined;
+  const sourceIndex = lines.findIndex((line) => /^--- \[.+\] ---$/.test(line));
+  const provenance =
+    sourceIndex >= 0 ? lines[sourceIndex]?.slice(5, -5) : undefined;
+  const provenanceParts = provenance?.split(" | ") ?? [];
+  const sourceStart = /^\d{4}-\d{2}-\d{2}/.test(provenanceParts[1] ?? "")
+    ? 2
+    : 1;
+  const source = provenanceParts.slice(sourceStart).join(" | ").trim();
+  const heading =
+    sourceIndex >= 0
+      ? lines
+          .slice(sourceIndex + 1)
+          .find((line) => line.startsWith("### "))
+          ?.slice(4)
+          .trim()
+      : undefined;
+  const match = [source || undefined, heading].filter(Boolean).join(" · ");
+  const detail =
+    queryIndex >= 0 && !match
+      ? lines
+          .slice(queryIndex + 1)
+          .map((line) => line.trim())
+          .find((line) => line.length > 0 && line !== "---")
+      : undefined;
+  const preview = [query, match || detail].filter(
+    (line): line is string => line !== undefined && line.length > 0,
+  );
+  if (preview.length > 0) return preview;
+
+  const firstLine = lines
+    .map((line) => line.trim())
+    .find((line) => line.length > 0 && line !== "---");
+  return firstLine ? [firstLine.replace(/^#{2,3}\s+/, "")] : [];
+}
+
+function contextModeSearchPreviewBlock(
+  output: string,
+  theme: Theme,
+  expanded: boolean,
+): string {
+  if (expanded) {
+    return previewBlock(output, theme, true, EXPANDED_PREVIEW_LINES);
+  }
+
+  const lines = contextModeSearchPreviewLines(output).slice(0, 2);
+  if (lines.length === 0) return "";
+  const preview = lines.map((line) =>
+    muted(theme, `${DETAIL_INDENT}│ ${truncateVisible(line, 120)}`),
+  );
+  if (countLines(output) > lines.length) {
+    preview.push(
+      muted(theme, `${DETAIL_INDENT}│ Press Ctrl+O for full result`),
+    );
+  }
+  return `\n${preview.join("\n")}`;
+}
+
+function renderContextModeMcpResult(
+  request: ContextModeMcpRequest,
+  result: AgentToolResult<unknown>,
+  options: ToolRenderOptions,
+  theme: Theme,
+  context: ToolRenderContextLike,
+): Text | undefined {
+  if (options.isPartial) return setText(context.lastComponent, "");
+  if (context.isError) {
+    return setText(
+      context.lastComponent,
+      contextModeStatusLine(
+        theme,
+        "error",
+        `${request.action} failed · ${firstTextLine(result)}`,
+      ),
+    );
+  }
+
+  const output = extractToolText(result);
+  if (request.action === "index") {
+    const indexed = output.match(
+      /^Indexed (\d+) sections \((\d+) with code\) from: (.+)$/m,
+    );
+    if (!indexed) return undefined;
+
+    const sectionCount = Number(indexed[1]);
+    const codeCount = Number(indexed[2]);
+    const source = indexed[3] ?? "content";
+    const details = [
+      `indexed ${source}`,
+      plural(sectionCount, "section"),
+      codeCount > 0 ? `${codeCount} code` : undefined,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const preview = options.expanded
+      ? previewBlock(output, theme, true, EXPANDED_PREVIEW_LINES)
+      : "";
+    return setText(
+      context.lastComponent,
+      `${contextModeStatusLine(theme, "success", details)}${preview}`,
+    );
+  }
+
+  const queryCount = contextModeQueryCount(request.params);
+  const details = [
+    queryCount === undefined
+      ? "searched indexed content"
+      : `searched ${plural(queryCount, "query", "queries")}`,
+    plural(countLines(output), "line"),
+  ].join(" · ");
+  return setText(
+    context.lastComponent,
+    `${contextModeStatusLine(theme, "success", details)}${contextModeSearchPreviewBlock(output, theme, options.expanded)}`,
+  );
+}
+
 function wrappedToolResult(
   toolName: string,
   result: AgentToolResult<unknown>,
@@ -3902,6 +4109,19 @@ function wrappedToolResult(
   context: ToolRenderContextLike,
   title: string,
 ): Text {
+  const contextModeRequest =
+    toolName === "mcp" ? contextModeMcpRequest(context.args) : undefined;
+  if (contextModeRequest) {
+    const rendered = renderContextModeMcpResult(
+      contextModeRequest,
+      result,
+      options,
+      theme,
+      context,
+    );
+    if (rendered) return rendered;
+  }
+
   if (options.isPartial) {
     return setText(
       context.lastComponent,
@@ -3937,13 +4157,25 @@ function wrappedToolResult(
 }
 
 function genericToolResult(
+  toolName: string,
   result: AgentToolResult<unknown>,
   options: ToolRenderOptions,
   theme: Theme,
   context: ToolRenderContextLike,
   title: string,
 ): Text {
-  return wrappedToolResult(title, result, options, theme, context, title);
+  const resultToolName =
+    toolName === "mcp" && contextModeMcpRequest(context.args)
+      ? toolName
+      : title;
+  return wrappedToolResult(
+    resultToolName,
+    result,
+    options,
+    theme,
+    context,
+    title,
+  );
 }
 
 function treeLine(theme: Theme, title: string, details: string): string {
@@ -5195,17 +5427,14 @@ function installToolRenderInterceptor(pi: ExtensionAPI): void {
       ...(hasCustomRender
         ? {}
         : {
-            renderCall: (args: any, theme: any, context: any) => {
-              const title = name === "Agent" ? "Agent" : webToolTitle(name);
-              const body =
-                name === "Agent"
-                  ? agentToolCallBody(args, theme)
-                  : webToolCallBody(name, args, theme);
-              return setText(
-                context.lastComponent,
-                genericToolCall(title, body, theme, isToolPending(context)),
-              );
-            },
+            renderCall: (args: any, theme: any, context: any) =>
+              wrappedToolCall(
+                name,
+                args,
+                theme,
+                context,
+                name === "Agent" ? "Agent" : webToolTitle(name),
+              ),
             renderResult: (
               result: any,
               options: any,
@@ -5213,6 +5442,7 @@ function installToolRenderInterceptor(pi: ExtensionAPI): void {
               context: any,
             ) =>
               genericToolResult(
+                name,
                 result,
                 options,
                 theme,
@@ -5684,6 +5914,7 @@ export const __claudeUiTestInternals = {
   formatReadCall,
   formatWriteCall,
   genericToolCall,
+  genericToolResult,
   renderBashResult,
   renderEditResult,
   renderFindResult,
@@ -5697,6 +5928,7 @@ export const __claudeUiTestInternals = {
   shouldUseOriginalToolCallRenderer,
   webToolCallBody,
   webToolTitle,
+  wrappedToolCall,
   wrappedToolResult,
 };
 
