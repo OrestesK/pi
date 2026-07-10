@@ -102,8 +102,15 @@
     "packages/pi-goal-supervisor",
     "packages/pisesh",
     "npm:pi-btw",
-    "npm:pi-openai-service-tier"
+    "npm:pi-openai-service-tier",
+    "packages/pi-sixel",
+    "npm:@carter-mcalister/pi-codex-image-gen@0.2.0"
   ],
+  "pi-sixel": {
+    "maxColumns": 120,
+    "maxRows": 36,
+    "quality": "high"
+  },
   "subagents": {
     "defaultModel": "openai-codex/gpt-5.6-terra",
     "disableBuiltins": false

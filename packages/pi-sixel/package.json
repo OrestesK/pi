@@ -1,0 +1,48 @@
+{
+  "name": "pi-sixel",
+  "version": "0.1.0",
+  "description": "Native SIXEL image previews for Pi, powered by Chafa",
+  "type": "module",
+  "author": "OrestesK",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "sixel",
+    "terminal",
+    "image-preview",
+    "clipboard",
+    "image-generation",
+    "chafa",
+    "foot"
+  ],
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm test && npm run typecheck",
+    "prepublishOnly": "npm run check"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.80.3",
+    "@earendil-works/pi-tui": "0.80.3",
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  }
+}
