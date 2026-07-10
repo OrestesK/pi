@@ -47,7 +47,7 @@ Before the first mutating tool call, internally verify:
 - [ ] Did the user explicitly approve if Tier 2+?
 - [ ] Which TDD scenario applies if behavior changes?
 
-If any answer requires approval, stop and ask. Do not continue into file edits, worker dispatch, or multi-step execution while a material question is unresolved.
+If any answer requires approval, stop and ask. Do not continue into parent file edits, write-child dispatch, or multi-step execution while a material question is unresolved.
 
 ### Clarification Checkpoints
 
@@ -56,7 +56,7 @@ Pause for user clarification before continuing when:
 - the next action would edit files and the scope is not explicitly approved,
 - there are two or more plausible implementation paths,
 - a task could be solved by changing behavior, tests, docs, config, or workflow and the intended target is unclear,
-- the next step would dispatch a worker with broad instructions,
+- the next step would dispatch a write child with broad instructions,
 - a plan batch contains more than one task and the user has not approved that batch,
 - new information invalidates or materially changes the approved plan.
 
@@ -83,7 +83,7 @@ Ask one focused question, preferably with options and a recommendation. Do not a
 - Write plan to `.scratch/plans/YYYY-MM-DD-<slug>.md`
 - Mark every assumption: **[ASSUMPTION: ...]**
 - Present summary. Wait for explicit approval.
-- Implement via worker subagents with exact instructions.
+- The parent implements the approved plan. Use write children only when at least two independent implementation areas can proceed concurrently in the shared checkout, with the parent owning at least one area and every writer receiving an exclusive file list and exact edit packet.
 - Examples: redesign a system, migrate libraries, build a new service
 
 The user can always escalate. If they say "wait", "let's talk", or "hold on" — move up a tier.
@@ -111,11 +111,11 @@ Do not stack blocking workflow on tiny Tier 1 edits. Async advisory/recon/reflec
 Implementation-specific routing rules:
 
 - `manager-workflow` owns visibility, tiering, approval, write safety, and execution batching. It does not decide whether read-only advisory/recon/reflection subagents should spawn.
-- Load `pi-subagents` by default for nontrivial work, uncertainty, planning, review, research, handoff, cleanup, final-readiness pressure, or any waiting/slack period. Do not require proof that subagents are necessary; require an explicit reason to stay parent-only.
+- Load `pi-subagents` by default for nontrivial work, uncertainty, planning, review, research, handoff, cleanup, final-readiness pressure, or any waiting/slack period. Read-only/advisory children remain the default for broad investigation; parent implementation is normal.
 - Enter review requests through `review`, vague product/design requests through `brainstorming`, and implementation work through this skill before applying any write-capable subagent recipe.
-- Apply fixes from review feedback only when the user explicitly authorizes writing; use one writer/fix pass at a time, then fresh review.
-- If the user asks to verify or pressure-test a parent proposal before implementation, complete and inspect the proposal gate before scouting implementation locations or dispatching workers.
-- For tiny Tier 1 edits, parent-only execution is allowed only when the reason is explicit: exact tiny change, already-grounded context, no material uncertainty, and no distinct non-mutating advisory/reflection angle.
+- Apply fixes from review feedback only when the user explicitly authorizes writing; the parent normally performs each fix pass, followed by fresh read-only review.
+- If the user asks to verify or pressure-test a parent proposal before implementation, complete and inspect the proposal gate before scouting implementation locations or starting implementation.
+- The parent normally implements approved work directly. A write child is permitted only when at least two independent implementation areas can proceed concurrently in the shared checkout, with the parent owning at least one area and every writer receiving an exclusive, non-overlapping file list and exact edit packet.
 
 ## Delegation Rules
 
@@ -163,18 +163,17 @@ Do not proceed past a requested checkpoint without feedback.
 
 ### Subagent Execution Policy
 
-For approved plan execution with subagents:
+For exceptional concurrent write execution with subagents:
 
-- Use one fresh worker per task.
-- Give exact file/function/change instructions.
-- Include the TDD scenario and verification command.
-- Workers write summaries to `.scratch/` or explicit output paths.
-- Parent verifies worker claims from diffs, output, or rerun checks.
-- Dispatch `reviewer` after implementation:
+- Use write workers only when at least two independent implementation areas will run concurrently in the shared checkout. The parent must own at least one area; assign one fresh worker to each additional area with an exclusive, non-overlapping file list.
+- Give every write child an exact edit packet: assigned files and symbols, required behavior, non-goals, TDD scenario when applicable, validation commands and evidence, and prohibited product/API/compatibility/scope decisions.
+- Require each child to stop before touching an unassigned file and contact the parent only for a real blocker, discovered file overlap, or an unapproved product/API/compatibility/scope decision.
+- Do not run repository-wide mutating formatters, code generators, migrations, or equivalent commands while concurrent writes are active.
+- Workers write summaries to `.scratch/` or explicit output paths. The parent inspects their diffs, integrates their changes, and verifies the combined result.
+- Dispatch read-only `reviewer` agents after implementation:
   1. spec compliance review against the approved task/design,
   2. code quality review when needed.
-- Send must-fix findings back as focused worker tasks, then re-review the affected mode.
-- Do not run parallel implementation workers unless the user has created isolated workspaces/worktrees and approved that execution mode. If the request asks for parallel writers but clean worktrees/isolated workspaces are unavailable, refuse that shape or fall back to one writer plus parallel read-only reviewers/scouts; never launch workspace-mutation-capable implementation workers in the shared checkout.
+- The parent applies must-fix findings, then re-reviews the affected mode. Use write children for fixes only when at least two independent fix areas satisfy the same concurrent-write contract.
 - If two focused fix attempts fail, stop and ask; the plan likely needs redesign.
 
 ### Research Phase
@@ -190,16 +189,27 @@ For approved plan execution with subagents:
 
 ### Implementation Phase
 
-- Worker agents get exact instructions: which files, which functions, what changes, line numbers
-- Include the TDD scenario and verification command when behavior changes
-- If you can't specify exactly, you haven't planned enough — go back to planning
-- Workers run in sequence, not parallel
-- Workers run checks before reporting done
-- Workers write results to `.scratch/`, not back to main context
+Before editing behavior, identify the behavior owner:
+
+- Observable behavior: what user/system-visible behavior should change?
+- Normal entrypoint: what command, route, UI action, function, job, or workflow exercises it?
+- Canonical owner: which existing module/component owns this behavior today?
+- Proof surface: what focused check would prove the behavior changed?
+
+Do not start from helper or abstraction design. Start from the existing owner path and observable behavior.
+
+- The parent normally implements approved changes and directly reads the precise files and symbols it edits.
+- Use write workers only under the exceptional concurrent-write policy above.
+- Give every write worker an exact edit packet: assigned files and symbols, required behavior, non-goals, TDD scenario when applicable, validation commands and evidence, and prohibited product/API/compatibility/scope decisions.
+- If the edit packet cannot specify those boundaries exactly, go back to planning.
+- Concurrent writers must have exclusive, non-overlapping file lists. Each child stops before an unassigned file and communicates only a real blocker, discovered overlap, or an unapproved product/API/compatibility/scope decision.
+- Do not run repository-wide mutating formatters, code generators, migrations, or equivalent commands while concurrent writes are active.
+- The parent and workers run focused checks; the parent inspects and integrates worker diffs, then verifies the combined result.
+- Workers write results to `.scratch/`, not back to main context.
 
 ### Review Phase
 
-- Dispatch reviewer agents after implementation by default. Skip review only when the change is truly Tier 1/trivial, the user requested no review, or there is an explicit parent-only reason.
+- Dispatch read-only reviewer agents after implementation by default. Skip review only when the change is truly Tier 1/trivial, the user requested no review, or there is an explicit parent-only reason.
 - Prefer a fresh-context parallel review gate for nontrivial work: correctness/regressions, tests/verification, and simplicity/maintainability. Add security, ops/resource, UX, or architecture reviewers when relevant.
 - Use `/parallel-review` or `/quality-gate` patterns directly through `subagent(...)` when they fit.
 - Use `/quick-adversarial-check` before committing to a diagnosis, architecture direction, or user-facing claim that has meaningful uncertainty.

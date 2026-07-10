@@ -43,24 +43,28 @@ pi/
 
 `settings.json` is the source of truth. Current package entries:
 
-| Entry                            | Purpose                                                                        |
-| -------------------------------- | ------------------------------------------------------------------------------ |
-| `extensions/claude-ui`           | Terminal UI customization                                                      |
-| `packages/pi-subagents`          | Subagent orchestration, roles, prompt recipes                                  |
-| `npm:pi-mcp-adapter`             | Lazy MCP loading                                                               |
-| `npm:pi-lens`                    | AST-aware code tooling; ast-grep skill only                                    |
-| `npm:pi-web-access`              | Web search and content extraction                                              |
-| `packages/pi-memory-md`          | Git-backed markdown memory                                                     |
-| `npm:@aliou/pi-guardrails`       | Command/path safety policies                                                   |
-| `npm:@aliou/pi-toolchain`        | Preferred CLI enforcement                                                      |
-| `npm:pi-ask-user`                | Structured user decision UI                                                    |
-| `packages/context-mode`          | Large-output processing plus Pi extension hooks/commands; selected skills only |
-| `npm:pi-intercom`                | Local session coordination                                                     |
-| `packages/pi-codex-retry`        | Recoverable Codex transport retry                                              |
-| `packages/pi-slipstream-compact` | Validated compaction replacement                                               |
-| `packages/pi-goal-supervisor`    | `/goal` continuation supervisor                                                |
-| `packages/pisesh`                | Local session management helper                                                |
-| `npm:pi-btw`                     | `/btw` side conversations plus bundled `btw` skill                             |
+| Entry                                            | Purpose                                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `extensions/claude-ui`                           | Terminal UI customization                                                      |
+| `packages/pi-subagents`                          | Subagent orchestration, roles, prompt recipes                                  |
+| `npm:pi-mcp-adapter`                             | Lazy MCP loading                                                               |
+| `npm:pi-lens`                                    | AST-aware code tooling; ast-grep skill only                                    |
+| `npm:pi-web-access`                              | Web search and content extraction                                              |
+| `packages/pi-memory-md`                          | Git-backed markdown memory                                                     |
+| `packages/pi-tool-result-virtualizer`            | Compact receipts and local storage for large tool results                      |
+| `npm:@aliou/pi-guardrails`                       | Command/path safety policies                                                   |
+| `npm:@aliou/pi-toolchain`                        | Preferred CLI enforcement                                                      |
+| `npm:pi-ask-user`                                | Structured user decision UI                                                    |
+| `packages/context-mode`                          | Large-output processing plus Pi extension hooks/commands; selected skills only |
+| `npm:pi-intercom`                                | Local session coordination                                                     |
+| `packages/pi-codex-retry`                        | Recoverable Codex transport retry                                              |
+| `packages/pi-slipstream-compact`                 | Validated compaction replacement                                               |
+| `packages/pi-sixel`                              | Configurable native SIXEL previews for pasted and generated images             |
+| `packages/pi-goal-supervisor`                    | `/goal` continuation supervisor                                                |
+| `packages/pisesh`                                | Local session management helper                                                |
+| `npm:pi-btw`                                     | `/btw` side conversations plus bundled `btw` skill                             |
+| `npm:pi-openai-service-tier`                     | OpenAI service-tier and fast-mode selection                                    |
+| `npm:@carter-mcalister/pi-codex-image-gen@0.2.0` | Codex-compatible image-generation tool                                         |
 
 ## MCP servers
 
