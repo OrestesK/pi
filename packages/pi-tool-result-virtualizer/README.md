@@ -1,76 +1,100 @@
 # pi-tool-result-virtualizer
 
-Local Pi extension that stores large tool-result text in a mode-restricted sidecar and replaces model-visible tool results with compact retrieval receipts.
+Keeps large tool results out of model context while preserving exact local retrieval.
 
-## Behavior
+## Install
 
-- Intercepts `tool_result` events.
-- Stores large text results under `${PI_TOOL_RESULT_VIRTUALIZER_DIR:-~/.pi/tool-result-virtualizer}`. This avoids tracked config repos when `~/.pi/agent` is symlinked to a checkout.
-- For `bash`, prefers `details.fullOutputPath` when present so retrieval can use the full raw output instead of Pi's truncated `content`.
-- For `read`, snapshots `event.input.path` and applies `offset`/`limit` when present.
-- Replaces `content` with a retrieval-first receipt containing source id, capture status, size, line count, hash prefix, a cropped head/middle/tail preview, direct search/get examples, and optional triage, synthesis, or exact export paths.
-- Treats text as large at 50,000 bytes or 200 lines. The byte threshold follows large-result offloading prior art that uses tens-of-thousands-of-characters or ~1,500–2,500-token boundaries instead of the earlier 8 KiB value; the line threshold still catches pathological many-line outputs.
-- Skips recursive handling by protected tool name, context-mode direct/MCP-wrapper tool identity, and `details.toolResultVirtualizer` metadata, not by raw receipt-marker text, so ordinary output containing `[tool-result-virtualizer]` is still captured.
-- Lets every `read` result whose requested path is named exactly `SKILL.md` bypass the virtualizer entirely, regardless of skill root or model-advertisement state. Pi-style path spellings are normalized, but symlink targets do not widen the filename rule. No prompt parsing or turn-lifecycle state is involved.
-- Validates protected-tool `sourceId` parameters as `tr_[a-z0-9_]+` under 128 bytes, and export `filePath` parameters as relative managed-export paths under 1024 bytes without absolute paths, parent traversal, or NUL bytes. Invalid values fail with compact errors instead of echoing raw input.
-- On local store/write failure for a large result, suppresses the raw output and returns a compact failure receipt instead of failing open into the model context.
-- Removes `details.truncation.content` while preserving numeric truncation metadata and `fullOutputPath`.
-- Stores oversized original `details` JSON in the local sidecar and keeps only compact scalar/session metadata plus hashes in session-visible details; oversized scalar strings become metadata placeholders instead of raw prefixes. Details-only compaction is marked as `storageKind: "details"` so list/diagnostics output does not present it as ordinary virtualized content.
-- Compacts oversized string arguments for protected `tool_result_*` assistant tool calls only in the provider-context copy; persisted session JSONL and actual tool execution arguments remain unchanged.
-- Uses an optional derived SQLite FTS5 trigram sidecar (`search-index.sqlite`) to accelerate broad `tool_result_search` candidate selection when `node:sqlite` and trigram FTS are available. Source text files and validated `index.jsonl` rows remain authoritative; exact line/context matches still come from source files; sourceId-restricted, short, non-ASCII, oversized, SQLite-failing, or SQLite-consistency-failing searches fall back to the linear file scan or rebuild the derived index.
-- Registers bounded retrieval/export tools; each accepts optional `reason` text for future session search/recovery, stored byte-capped in compact details. Search also byte-caps echoed query metadata in details while still using the full query for matching:
-  - `tool_result_outline`: return a bounded deterministic triage outline with head/tail samples, broad keyword hits, and explicit omissions; use search/get/export for evidence.
-  - `tool_result_summary_contract`: return an honest ready-to-call `subagent` task contract for a focused summary. This tool does not spawn a subagent; it exists because this extension does not have a clean stable internal tool-to-tool/subagent invocation API. The contract requires source id, retrieval commands or cited line ranges, concise findings, omitted/uncertain areas, and whether exact full retrieval is still needed.
-  - `tool_result_get`: return a bounded, byte-capped line window; use `tool_result_export` for exact oversized ranges.
-  - `tool_result_search`: search stored sources with non-blank queries, newest-first broad ordering, byte-capped match-centered cited line ranges, and sourceId/linear-scan guidance for broad no-match searches.
-  - `tool_result_list`: list recent stored sources and metadata, including `storageKind`, with byte-capped visible output.
-  - `tool_result_diagnostics`: report byte-capped store health totals, index corruption counters, and recent source metadata without raw source text.
-  - `tool_result_retention_preview`: non-destructively preview retention cleanup candidates by count/age selectors; byte-caps visible output and defaults to showing at most 20 candidate and kept source ids while preserving full counts and omitted counts.
-  - `tool_result_export_details`: write exact stored original details JSON to a local file while returning only compact metadata. Exports fail by default if `filePath` already exists; pass `overwrite: true` to replace it.
-  - `tool_result_export`: write a full stored source or line range under the managed export directory while returning only compact metadata. With no `lineStart`/`lineLimit`, this writes the exact stored content. For `details.fullOutputPath` captures that is the captured full output; for `read.input.path` captures that is the selected read range; for `event.content` captures it may already reflect upstream truncation or omission. Exports fail by default if `filePath` already exists; pass `overwrite: true` to replace it.
+> Pi packages run with full local permissions. Review the source before installing.
 
-## Architecture
+From this package directory:
 
-- `src/index.ts`: Pi extension entrypoint; constructs the store, registers tool definitions in order, and wires lifecycle hooks.
-- `src/extension-types.ts`: narrow Pi API/tool-definition type surface used by this extension.
-- `src/config.ts`: store-root resolution.
-- `src/schemas.ts`: protected-tool parameter schemas.
-- `src/params.ts`: runtime parameter parsing, validation, and compact reason/query details metadata.
-- `src/tools.ts`: definitions and handlers for the nine `tool_result_*` tools.
-- `src/context.ts`: provider-context-only compaction for oversized protected `tool_result_*` assistant tool-call arguments.
-- `src/virtualize.ts`: capture selection, compact receipt generation, protected-tool skip policy, and session-visible details compaction.
-- `src/store.ts`: local sidecar storage, exact source/details retrieval, search, diagnostics metadata, retention preview, managed export path resolution, and export.
-- `src/search-index.ts`: optional derived `node:sqlite` FTS5 trigram candidate index for broad search acceleration with linear fallback.
-- `src/formatting.ts`: byte-safe protected-tool output capping and reusable retrieval/search/diagnostics/retention formatting.
-- `src/outline.ts`: deterministic outline triage and shared cropped-preview sampling over stored source text.
+```sh
+pi install "$PWD"
+```
 
-## Receipt workflow
+## Quick start
 
-A virtualized receipt is intentionally not evidence for hidden content. It gives only deterministic orientation metadata and a cropped preview:
+1. Run `/reload` in an existing Pi session, or start a new session.
+2. Ask Pi to run `node -e "for (let i = 1; i <= 250; i++) console.log(i)"` with the `bash` tool.
+3. Confirm that the result is replaced by a receipt with a `tr_...` source id.
+4. Ask Pi to call `tool_result_search` for `200` with that source id.
 
-1. **Search:** call `tool_result_search` with a focused query and the receipt's source id.
-2. **Get cited lines:** call `tool_result_get` with that source id and a bounded `lineStart`/`lineLimit` window. Search, then get, is the direct evidence path.
-3. **Optional deterministic triage:** call `tool_result_outline` for bounded orientation before targeted search/get. It is not complete evidence.
-4. **Optional delegated synthesis:** call `tool_result_summary_contract` with a focused prompt, then run the returned `subagent` task. This is optional, not the first retrieval step.
-5. **Exact stored-content escape hatch:** call `tool_result_export` with no line options. For `details.fullOutputPath` captures this exports the captured full output; for `read.input.path` it exports the selected read range; for `event.content` it may already reflect upstream truncation or omission. Use only when exact stored text is required; avoid pasting it back into parent context.
+## How it works
 
-The cropped preview defaults to first 10 lines, middle 10 lines, and last 10 lines, merging overlaps for small sources and byte-capping each preview line. It is for orientation only.
+- Intercepts text from `tool_result` events.
+- Virtualizes results at 50,000 bytes or 200 lines.
+- Stores captured text under `${PI_TOOL_RESULT_VIRTUALIZER_DIR:-~/.pi/tool-result-virtualizer}`.
+- Replaces model-visible content with a compact receipt containing source metadata, a cropped preview, and retrieval commands.
+
+A receipt is orientation, not evidence for hidden content.
+
+## Retrieve a result
+
+1. Call `tool_result_search` with a focused query and the receipt's source id.
+2. Call `tool_result_get` with the cited `lineStart` and `lineLimit`.
+3. Optionally call `tool_result_outline` for deterministic triage.
+4. Optionally call `tool_result_summary_contract`, then run its returned `subagent` task.
+5. Call `tool_result_export` with no line options only when exact stored text is required.
+
+The receipt preview samples the first, middle, and last 10 lines, merges overlaps, and byte-caps each line.
+
+## Tools
+
+Each tool accepts optional `reason` text, stored byte-capped for later session search and recovery.
+
+| Tool | Use |
+| --- | --- |
+| `tool_result_outline` | Show deterministic samples, broad keyword hits, and omissions |
+| `tool_result_summary_contract` | Return a focused, ready-to-call `subagent` task without spawning it |
+| `tool_result_get` | Read a bounded, byte-capped line window |
+| `tool_result_search` | Search stored sources and return cited match ranges |
+| `tool_result_list` | List recent sources and compact metadata |
+| `tool_result_diagnostics` | Show store and index health without source text |
+| `tool_result_retention_preview` | Preview count- or age-based cleanup without deleting data |
+| `tool_result_export_details` | Export exact stored original-details JSON |
+| `tool_result_export` | Export a full source or exact line range |
+
+Exports stay inside the managed export directory and refuse to overwrite an existing path unless `overwrite: true` is set.
+
+## Storage and safety
+
+- For `bash`, `details.fullOutputPath` is preferred when available. For `read`, `event.input.path`, `offset`, and `limit` define the capture.
+- Protected tools, context-mode results, and `details.toolResultVirtualizer` metadata bypass recursive capture. Raw `[tool-result-virtualizer]` text does not.
+- Reads whose requested filename is exactly `SKILL.md` bypass virtualization. Normalized path spellings do not widen this filename rule through symlinks.
+- `sourceId` must match `tr_[a-z0-9_]+` and stay under 128 bytes.
+- Export paths must be relative managed paths under 1,024 bytes with no absolute path, parent traversal, or NUL byte.
+- Invalid input returns a compact error without echoing raw input.
+- If local storage fails for a large result, raw output is suppressed and a compact failure receipt is returned instead.
+
+A full export reflects the stored capture. `details.fullOutputPath` can provide full raw command output; `read.input.path` provides the selected range; `event.content` may already contain upstream truncation or omission.
+
+## Persistence and search
+
+- Numeric truncation metadata and `fullOutputPath` are preserved while `details.truncation.content` is removed.
+- Oversized original `details` JSON is stored in the sidecar. Session-visible details keep compact metadata and hashes; details-only entries use `storageKind: "details"`.
+- Protected `tool_result_*` assistant arguments are compacted only in provider context. Persisted session JSONL and actual tool arguments remain unchanged.
+- Optional built-in `node:sqlite` FTS5 trigram search accelerates broad queries. Source files and validated `index.jsonl` rows remain authoritative.
+- Unsupported or inconsistent indexed searches fall back to a linear scan or rebuild the derived index.
+- Search matches the full query while byte-capping echoed query metadata.
 
 ## Non-goals
 
-- Does not claim universal public novelty.
-- Does not replace Slipstream compaction.
+- Does not replace Slipstream compaction or context-mode output handling.
 - Does not override built-in `bash` or `read` tools.
-- Does not store non-text/image results.
-- Does not delete stored sidecar data; retention is preview-only until an exact cleanup scope is approved.
-- Does not internally spawn subagents from `tool_result_summary_contract`; it returns an explicit contract plus structured `details.recommendedSubagentTask` until Pi exposes a clean stable invocation API for that integration.
-- Does not require a SQLite server, Docker service, or native npm dependency; FTS acceleration uses probed built-in `node:sqlite` only when available and falls back to the file scan.
-- Does not rewrite persisted assistant tool-call arguments or session JSONL; a tested `message_end` rewrite path is rejected because it changes the actual input delivered to the tool.
-- Does not compact non-`tool_result_*` tool-call arguments.
-- Does not replace context-mode `ctx_*` outputs; context-mode remains a separate sandbox/FTS/session-continuity system and its own tool output is treated as user-visible coordination UX.
+- Does not store non-text or image results.
+- Does not delete sidecar data; retention is preview-only.
+- Does not spawn subagents.
+- Does not require a SQLite server, Docker service, or native npm dependency.
+- Does not rewrite persisted assistant tool-call arguments or session JSONL.
+- Does not compact arguments for tools outside `tool_result_*`.
 
-## Verification
+## Development
 
-```bash
-(cd packages/pi-tool-result-virtualizer && pnpm run check)
+```sh
+pnpm install --frozen-lockfile
+pnpm run check
 ```
+
+## License
+
+MIT

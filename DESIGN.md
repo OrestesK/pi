@@ -1,96 +1,69 @@
 # Design Decisions
 
-This document explains why the config is shaped this way. It is not the agent policy source; use `AGENTS.md` for that.
+This document records stable rationale. It does not define agent behavior. Use [`AGENTS.md`](AGENTS.md) for executable policy and the [README file map](README.md#file-map) for configuration ownership.
 
 ## Goals
 
-- Keep always-loaded instructions concise
-- Keep agent behavior stronger than human docs
-- Put workflow detail in skills, not root prompt prose
-- Make risky operations explicit and hard to trigger accidentally
-- Keep large research/plans/reviews in files
-- Give subagents narrow, self-contained contracts
-
-## Authority split
-
-| Surface                      | Role                                                                                                            |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `AGENTS.md`                  | Always-loaded parent-session policy: safety, tool routing, workflow triggers, memory rules                      |
-| `APPEND_SYSTEM.md`           | Local machine, stack, commands, language conventions where possible                                             |
-| `skills/`                    | On-demand workflow manuals                                                                                      |
-| `agents/`                    | Local subagent role contracts; same-name files override packaged builtins and may not inherit all parent policy |
-| `settings.json` / `mcp.json` | Runtime config registries for packages, models, UI, compaction, and MCP servers                                 |
-| `extensions/`                | Auto-discovered local runtime behavior: commands, UI helpers, todos, and guardrails                             |
-| `README.md`                  | Repository map and setup                                                                                        |
-| `USAGE.md`                   | Human quick-start guide                                                                                         |
+- Keep always-loaded instructions concise.
+- Keep executable behavior stronger and more precise than human guides.
+- Load detailed workflows from skills instead of root prompt prose.
+- Make risky operations explicit and hard to trigger accidentally.
+- Keep large research, plans, and reviews in inspectable files.
+- Give subagents narrow, self-contained contracts.
 
 ## Core choices
 
 ### Structural tools first
 
-Code navigation should start from symbols and AST structure. Text search remains useful for logs, comments, config text, URLs, and fallback cases.
+Code navigation starts from symbols and AST structure. Text search remains useful for logs, comments, configuration text, URLs, and fallback cases.
 
-### Read-only git by default
+### Read-only Git by default
 
-The agent can inspect git state but does not mutate staging, history, refs, or branch state. The user remains responsible for commits, branches, merges, rebases, pushes, and stacked-PR operations.
+The agent can inspect Git state but does not mutate staging, history, refs, or branches. The user owns commits, branches, merges, rebases, pushes, and stacked-PR operations.
 
 ### Guardrails plus prompt policy
 
-Prompt rules are not enough for high-risk operations. `extensions/guardrails.json` blocks configured destructive shell patterns, common git mutation patterns, and protected paths, while `AGENTS.md` states the operating policy. Guardrails are not a full sandbox or exhaustive command parser; with `permissions.json` in `yolo`, external/private MCP approval gates are prompt policy rather than runtime-enforced confirmations.
+Prompt rules alone are insufficient for high-risk operations. `extensions/guardrails.json` blocks configured destructive shell patterns, common Git mutations, and protected paths while `AGENTS.md` defines the operating policy.
+
+Guardrails are not a full sandbox or exhaustive command parser. Because `permissions.json` uses `yolo`, external/private MCP approval rules remain prompt policy rather than universal runtime confirmation dialogs.
 
 ### Skills over prompt bloat
 
-Detailed procedures live in skills so the base prompt stays smaller:
+Detailed procedures live in skills so the base prompt can focus on invariants. The key workflow owners cover implementation management, brainstorming, planning, debugging, TDD, review, completion evidence, and subagent orchestration. Their current locations are listed in the [file map](README.md#file-map).
 
-- `manager-workflow`: tiering and implementation flow
-- `brainstorming`: vague/design work
-- `writing-plans`: approved multi-step plans
-- `systematic-debugging`: root-cause workflow
-- `test-driven-development`: behavior-change testing discipline
-- `review`: review standards
-- `verification-before-completion`: final evidence gate
-- `pi-subagents`: parallel/adversarial workflows
+### Self-contained subagent prompts
 
-### Subagent prompts stay self-contained
-
-Scout/worker/reviewer prompts intentionally repeat some safety and workflow rules because child agents may use replacement prompts and may not inherit root instructions.
+Local role prompts intentionally repeat selected safety and workflow boundaries because child agents may use replacement prompts and may not inherit all parent instructions.
 
 ### Scratch files for intermediate work
 
-`.scratch/` is gitignored and holds research, plans, reviews, compaction artifacts, and continuation notes. This keeps large intermediate artifacts inspectable without flooding the conversation.
+`.scratch/` is gitignored and holds research, plans, reviews, compaction artifacts, and continuation notes. Large intermediate evidence stays inspectable without filling the conversation.
 
 ### Lazy integrations by default
 
-MCP servers and heavier workflows load on demand unless they need direct-tool availability. Tree-sitter stays direct because code navigation is core behavior.
+MCP servers and heavier workflows load on demand unless they require direct-tool availability. Tree-sitter stays direct because structural navigation is a core capability.
 
 ## Package selection rationale
 
-The complete enabled-package inventory belongs in `settings.json` and is summarized in `README.md`. The design categories are:
+The complete package inventory belongs in [`settings.json`](settings.json). Packages are selected by capability:
 
-- **Delegation:** subagents, review gates, research/decision workflows
-- **Memory:** durable markdown memory delivered into prompt context
-- **Code intelligence:** AST-aware search/refactoring and direct tree-sitter tools
-- **Large-output handling:** context-mode indexing/analysis outside the main prompt
-- **Research:** web/content access and library-doc lookup
-- **Safety/tooling:** guardrails plus preferred CLI enforcement
-- **Interaction:** structured user questions, inter-session coordination, session helpers
+- **Delegation:** subagents, review gates, and research/decision workflows
+- **Memory:** durable Markdown memory delivered into prompt context
+- **Code intelligence:** structural search, refactoring, and direct tree-sitter tools
+- **Large-output handling:** sandboxed analysis and local result virtualization
+- **Research:** web/content access and library documentation
+- **Safety and tooling:** guardrails and preferred CLI enforcement
+- **Interaction:** structured questions, inter-session coordination, and session helpers
 - **Resilience:** compaction, goal continuation, and recoverable transport retries
 
 ## Local-only assumptions
 
-This is a personal config, not a turnkey distribution. Before reuse, review every authority surface, not only `AGENTS.md`:
+This is a personal configuration, not a turnkey distribution. Reuse requires reviewing every active surface shown in the [file map](README.md#file-map), especially host conventions, model/package paths, MCP OAuth dependencies, permissions, extensions, and guardrails.
 
-- `APPEND_SYSTEM.md` for OS/editor/package-manager/cloud details
-- `settings.json` for model, packages, memory, compaction, and paths
-- `mcp.json` for MCP commands and OAuth dependencies
-- `extensions/` for auto-discovered local runtime behavior and commands
-- `permissions.json` for permission mode
-- `extensions/guardrails.json` for command and secret-path policy
+## Repository hygiene
 
-## Public repo hygiene
-
-Tracked files should exclude credentials, sessions, caches, logs, generated artifacts, and dependency installs. See `.gitignore` and `README.md` for the current exclusion list.
+Tracked files exclude credentials, sessions, caches, logs, generated artifacts, and dependency installs. [`.gitignore`](.gitignore) is the canonical list; the README summarizes the important categories.
 
 ## Attribution
 
-Copied or closely adapted files are documented in `ATTRIBUTIONS.md` with source repositories and licenses.
+Copied, adapted, and influential sources are recorded in [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md) with their relationships and licenses.

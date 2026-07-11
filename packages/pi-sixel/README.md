@@ -1,21 +1,17 @@
 # pi-sixel
 
-SIXEL image previews in [Pi](https://github.com/earendil-works/pi) for pasted and generated images, rendered locally with [Chafa](https://hpjansson.org/chafa/).
+Renders pasted and generated images as local SIXEL previews in Pi using Chafa.
 
-- Works in any terminal with SIXEL enabled.
 - Shows pasted images after prompt submission.
-- Shows supported `image_generation` results and optional Carter image-generation messages.
+- Shows supported `image_generation` results.
+- Optionally renders Carter image-generation messages.
 
-> **Status:** This package is local and is not published to npm.
-
-## Quick start
-
-### 1. Check the prerequisites
+## Requirements
 
 - A terminal with SIXEL support enabled.
 - `chafa` on `PATH` with SIXEL output support.
 
-On Arch Linux, install the `chafa` package. On macOS with Homebrew, run `brew install chafa`.
+On Arch Linux, install `chafa`. On macOS with Homebrew, run `brew install chafa`.
 
 Test Chafa and the current terminal with an existing image:
 
@@ -25,29 +21,27 @@ chafa --format=sixels --size=40x20 --animate=off --polite=on --work=9 --color-sp
 
 The command should display an image, not raw escape-sequence text.
 
-### 2. Install the package
+## Install
 
-> **Security:** Pi packages execute with full local permissions. Review the source before installing third-party packages.
+> Pi packages run with full local permissions. Review the source before installing.
 
-From the `pi-sixel` package directory:
+From this package directory:
 
 ```sh
 pi install "$PWD"
 ```
 
-### 3. Reload and test
+## Quick start
 
 1. Run `/reload` in an existing Pi session.
 2. Paste an image into the prompt and submit it.
-3. Confirm that the SIXEL preview appears below the submitted prompt.
+3. Confirm that the preview appears below the submitted prompt.
 
-## Optional configuration
+## Configuration
 
-Defaults: 120 columns, 36 rows, up to 4 pasted images, and high quality.
-
-- Global: `$PI_CODING_AGENT_DIR/settings.json` when that variable is set; otherwise `~/.pi/agent/settings.json`.
+- Global: `$PI_CODING_AGENT_DIR/settings.json` when set; otherwise `~/.pi/agent/settings.json`.
 - Project: `.pi/settings.json`.
-- Project keys override matching global keys.
+- Project values override matching global values.
 
 ```json
 {
@@ -60,20 +54,20 @@ Defaults: 120 columns, 36 rows, up to 4 pasted images, and high quality.
 }
 ```
 
-| Setting      |  Default | Accepted values           | Effect                                                                |
-| ------------ | -------: | ------------------------- | --------------------------------------------------------------------- |
-| `maxColumns` |    `120` | Integer from `8` to `120` | Maximum width in terminal columns, capped by the available TUI width. |
-| `maxRows`    |     `36` | Integer from `1` to `40`  | Reserved preview height in terminal rows.                             |
-| `maxImages`  |      `4` | Integer from `1` to `32`  | Maximum pasted images rendered for one submitted prompt.              |
-| `quality`    | `"high"` | `"balanced"` or `"high"`  | `balanced` favors speed; `high` favors color quality.                 |
+| Setting | Default | Accepted values | Effect |
+| --- | ---: | --- | --- |
+| `maxColumns` | `120` | Integer from `8` to `120` | Maximum width in terminal columns, capped by available TUI width |
+| `maxRows` | `36` | Integer from `1` to `40` | Reserved preview height in terminal rows |
+| `maxImages` | `4` | Integer from `1` to `32` | Maximum pasted images rendered for one submitted prompt |
+| `quality` | `"high"` | `"balanced"` or `"high"` | `balanced` favors speed; `high` favors color quality |
 
-Width and height are terminal cells, not fixed pixel dimensions. The final raster depends on terminal cell geometry and source aspect ratio.
+Width and height are terminal cells, not fixed pixels. The final raster depends on terminal geometry and source aspect ratio.
 
-Run `/reload` after changing settings. Invalid supplied values stop extension loading with a configuration error.
+Run `/reload` after changing settings. Invalid values stop extension loading with a configuration error.
 
-## Optional Carter integration
+## Carter integration
 
-For Carter previews, list `pi-sixel` before `@carter-mcalister/pi-codex-image-gen`; both use the `image_generation_call` renderer:
+Carter integration is needed only for its `image_generation_call` renderer. List `pi-sixel` before `@carter-mcalister/pi-codex-image-gen`:
 
 ```json
 {
@@ -88,18 +82,19 @@ Standard `image_generation` results need no Carter setup.
 
 ## Troubleshooting
 
-- **No image, or raw escape text from the Chafa test:** SIXEL is unsupported or disabled in the current terminal.
-- **`SIXEL preview unavailable.`:** confirm `chafa` is on `PATH`, rerun the Chafa test, and verify that the source is a supported image up to 20 MiB.
-- **Configuration error:** validate the JSON and the accepted values in the table above.
-- **No pasted preview:** use Pi's built-in image paste and submit the prompt; the preview does not appear while editing.
+- **No image, or raw escape text from the Chafa test:** SIXEL is unsupported or disabled in the terminal.
+- **`SIXEL preview unavailable.`:** confirm `chafa` is on `PATH`, rerun the Chafa test, and verify that the source is a supported image no larger than 20 MiB.
+- **Configuration error:** validate the JSON and accepted values above.
+- **No pasted preview:** use Pi's built-in image paste and submit the prompt; previews do not appear while editing.
 - **No standard generated preview:** the successful `image_generation` result must expose a supported regular file at `details.saved_path`.
-- **No Carter preview:** confirm that `pi-sixel` appears before Carter in the `packages` list.
+- **No Carter preview:** confirm that `pi-sixel` appears before Carter in the package list.
 
-## Compatibility and limits
+## Limits
 
-- Verified with Pi 0.80.3 and Chafa 1.18.2; retest after Pi upgrades because image-line handling is internal.
-- Pasted previews accept up to `maxImages` regular, non-symlink PNG, JPEG, GIF, or WebP files, each up to 20 MiB. Generated-image preview batches remain limited to one image. GIF previews are static.
-- Rendering stays local; Chafa uses fixed arguments, a 5-second timeout, and a 4 MiB output cap.
+- The last documented compatibility check used Pi 0.80.3 and Chafa 1.18.2. Retest after Pi upgrades because image-line handling is internal.
+- Pasted previews accept up to `maxImages` regular, non-symlink PNG, JPEG, GIF, or WebP files, each up to 20 MiB.
+- Generated-image preview batches are limited to one image. GIF previews are static.
+- Rendering stays local. Chafa uses fixed arguments, a 5-second timeout, and a 4 MiB output cap.
 
 ## Development
 

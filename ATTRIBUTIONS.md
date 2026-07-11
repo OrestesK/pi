@@ -1,6 +1,6 @@
 # Attributions
 
-This config combines original personal configuration with copied, adapted, and inspired work from the pi community.
+This config combines original personal configuration with copied, adapted, and inspired work from the Pi community. See the [repository map](README.md#file-map) for the role of each local surface.
 
 ## Copied or closely adapted files
 
@@ -8,15 +8,14 @@ These files are copied verbatim or closely adapted from upstream repositories. T
 
 | Local file                                      | Upstream source                                                                                         | Relationship                | Upstream license |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------- |
-| `extensions/answer.ts`                          | [`mitsuhiko/agent-stuff`](https://github.com/mitsuhiko/agent-stuff) `extensions/answer.ts`              | Copied verbatim             | Apache-2.0       |
-| `extensions/files.ts`                           | [`mitsuhiko/agent-stuff`](https://github.com/mitsuhiko/agent-stuff) `extensions/files.ts`               | Locally modified adaptation | Apache-2.0       |
-| `extensions/continue.ts`                        | [`MansoorMajeed/Clawd`](https://github.com/MansoorMajeed/Clawd) `extensions/continue.ts`                | Locally modified adaptation | Apache-2.0       |
-| `extensions/compact-advisor.ts`                 | [`MansoorMajeed/Clawd`](https://github.com/MansoorMajeed/Clawd) `extensions/compact-advisor.ts`         | Copied verbatim             | Apache-2.0       |
-| `extensions/todos/index.ts`                     | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `extensions/todos/index.ts`                     | Locally modified adaptation | MIT              |
-| `skills/session-reader/scripts/read_session.py` | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/session-reader/scripts/read_session.py` | Copied verbatim             | MIT              |
-| `skills/self-improve/SKILL.md`                  | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/self-improve/SKILL.md`                  | Closely adapted             | MIT              |
-| `skills/session-reader/SKILL.md`                | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/session-reader/SKILL.md`                | Closely adapted             | MIT              |
-| `packages/pisesh/`                              | [`Blue-B/pisesh`](https://github.com/Blue-B/pisesh)                                                       | Locally modified adaptation | MIT              |
+| [`extensions/answer.ts`](extensions/answer.ts) | [`mitsuhiko/agent-stuff`](https://github.com/mitsuhiko/agent-stuff) `extensions/answer.ts` | Copied verbatim | Apache-2.0 |
+| [`extensions/files.ts`](extensions/files.ts) | [`mitsuhiko/agent-stuff`](https://github.com/mitsuhiko/agent-stuff) `extensions/files.ts` | Locally modified adaptation | Apache-2.0 |
+| [`extensions/continue.ts`](extensions/continue.ts) | [`MansoorMajeed/Clawd`](https://github.com/MansoorMajeed/Clawd) `extensions/continue.ts` | Locally modified adaptation | Apache-2.0 |
+| [`extensions/compact-advisor.ts`](extensions/compact-advisor.ts) | [`MansoorMajeed/Clawd`](https://github.com/MansoorMajeed/Clawd) `extensions/compact-advisor.ts` | Copied verbatim | Apache-2.0 |
+| [`extensions/todos/index.ts`](extensions/todos/index.ts) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `extensions/todos/index.ts` | Locally modified adaptation | MIT |
+| [`skills/session-reader/scripts/read_session.py`](skills/session-reader/scripts/read_session.py) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/session-reader/scripts/read_session.py` | Copied verbatim | MIT |
+| [`skills/self-improve/SKILL.md`](skills/self-improve/SKILL.md) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/self-improve/SKILL.md` | Closely adapted | MIT |
+| [`skills/session-reader/SKILL.md`](skills/session-reader/SKILL.md) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/session-reader/SKILL.md` | Closely adapted | MIT |
 
 ## Local runtime surfaces
 
@@ -24,8 +23,8 @@ These paths are active local runtime surfaces. The exact upstream source is not 
 
 | Local path                        | Provenance note                                                       |
 | --------------------------------- | --------------------------------------------------------------------- |
-| `extensions/claude-ui/`           | Original local extension for Claude-style UI rendering/tool wrappers. |
-| `extensions/subagent/config.json` | Local runtime config for the enabled `packages/pi-subagents` package. |
+| [`extensions/claude-ui/`](extensions/claude-ui/) | Original local extension for Claude-style UI rendering and tool wrappers. |
+| [`extensions/subagent/config.json`](extensions/subagent/config.json) | Local runtime config for the enabled `packages/pi-subagents` package. |
 
 ## Design and workflow influences
 
@@ -43,4 +42,4 @@ These sources influenced the structure, workflow, or prompting patterns but were
 ## Notes
 
 - Upstream repositories checked did not include separate root `NOTICE` files at the time this attribution file was written.
-- If this repository gets a root license, copied/adapted files listed above should still be treated according to their upstream licenses.
+- The repository's root license does not replace the upstream license obligations of copied or adapted files listed above.
