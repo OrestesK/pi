@@ -8,7 +8,7 @@
           "reasoning": true,
           "thinkingLevelMap": { "xhigh": "xhigh", "minimal": "low" },
           "input": ["text", "image"],
-          "contextWindow": 272000,
+          "contextWindow": 353000,
           "maxTokens": 128000
         },
         {
@@ -17,7 +17,7 @@
           "reasoning": true,
           "thinkingLevelMap": { "xhigh": "xhigh", "minimal": "low" },
           "input": ["text", "image"],
-          "contextWindow": 272000,
+          "contextWindow": 353000,
           "maxTokens": 128000
         },
         {
@@ -26,7 +26,7 @@
           "reasoning": true,
           "thinkingLevelMap": { "xhigh": "xhigh", "minimal": "low" },
           "input": ["text", "image"],
-          "contextWindow": 272000,
+          "contextWindow": 353000,
           "maxTokens": 128000
         },
         {
@@ -35,7 +35,7 @@
           "reasoning": true,
           "thinkingLevelMap": { "xhigh": "xhigh", "minimal": "low" },
           "input": ["text", "image"],
-          "contextWindow": 272000,
+          "contextWindow": 258000,
           "maxTokens": 128000
         },
         {
