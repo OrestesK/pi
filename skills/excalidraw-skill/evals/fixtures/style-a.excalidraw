@@ -1,0 +1,153 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mcp-excalidraw-server",
+  "elements": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 40,
+      "y": 30,
+      "width": 500,
+      "height": 45,
+      "strokeColor": "#1e1e1e",
+      "text": "Simple Service Flow",
+      "fontSize": 30,
+      "fontFamily": 2,
+      "createdAt": "2026-07-11T06:17:58.163Z",
+      "updatedAt": "2026-07-11T06:17:58.163Z",
+      "version": 1
+    },
+    {
+      "id": "client",
+      "type": "rectangle",
+      "x": 60,
+      "y": 150,
+      "width": 180,
+      "height": 90,
+      "backgroundColor": "transparent",
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "roughness": 1,
+      "label": {
+        "text": "Client"
+      },
+      "fontSize": 20,
+      "fontFamily": 2,
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-07-11T06:17:58.163Z",
+      "updatedAt": "2026-07-11T06:17:58.163Z",
+      "version": 1
+    },
+    {
+      "id": "api",
+      "type": "rectangle",
+      "x": 360,
+      "y": 150,
+      "width": 180,
+      "height": 90,
+      "backgroundColor": "transparent",
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "roughness": 1,
+      "label": {
+        "text": "API"
+      },
+      "fontSize": 20,
+      "fontFamily": 2,
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-07-11T06:17:58.163Z",
+      "updatedAt": "2026-07-11T06:17:58.163Z",
+      "version": 1
+    },
+    {
+      "id": "db",
+      "type": "rectangle",
+      "x": 660,
+      "y": 150,
+      "width": 180,
+      "height": 90,
+      "backgroundColor": "transparent",
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "roughness": 1,
+      "label": {
+        "text": "Database"
+      },
+      "fontSize": 20,
+      "fontFamily": 2,
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-07-11T06:17:58.163Z",
+      "updatedAt": "2026-07-11T06:17:58.163Z",
+      "version": 1
+    },
+    {
+      "id": "client-api",
+      "type": "arrow",
+      "x": 248,
+      "y": 195,
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ]
+      ],
+      "start": {
+        "id": "client"
+      },
+      "end": {
+        "id": "api"
+      },
+      "createdAt": "2026-07-11T06:17:58.163Z",
+      "updatedAt": "2026-07-11T06:17:58.163Z",
+      "version": 1
+    },
+    {
+      "id": "api-db",
+      "type": "arrow",
+      "x": 548,
+      "y": 195,
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          104,
+          0
+        ]
+      ],
+      "start": {
+        "id": "api"
+      },
+      "end": {
+        "id": "db"
+      },
+      "createdAt": "2026-07-11T06:17:58.163Z",
+      "updatedAt": "2026-07-11T06:17:58.163Z",
+      "version": 1
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  }
+}

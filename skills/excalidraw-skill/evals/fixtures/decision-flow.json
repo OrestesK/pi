@@ -1,0 +1,25 @@
+{
+  "target": {"width": 1200, "height": 675, "placement": "README"},
+  "nodes": [
+    {"id":"request","label":"Request"},
+    {"id":"evidence","label":"Gather evidence"},
+    {"id":"decision","label":"Change required?"},
+    {"id":"implement","label":"Implement"},
+    {"id":"validate","label":"Validate"},
+    {"id":"preview","label":"Optional preview"},
+    {"id":"failure","label":"Replan"},
+    {"id":"response","label":"Response"}
+  ],
+  "edges": [
+    {"id":"d01","from":"request","to":"evidence","label":"inspect"},
+    {"id":"d02","from":"evidence","to":"decision","label":"synthesize"},
+    {"id":"d03","from":"decision","to":"response","label":"no"},
+    {"id":"d04","from":"decision","to":"implement","label":"yes"},
+    {"id":"d05","from":"implement","to":"validate","label":"check"},
+    {"id":"d06","from":"implement","to":"preview","label":"optional"},
+    {"id":"d07","from":"preview","to":"response","label":"show"},
+    {"id":"d08","from":"validate","to":"response","label":"pass"},
+    {"id":"d09","from":"validate","to":"failure","label":"fail"},
+    {"id":"d10","from":"failure","to":"evidence","label":"retry"}
+  ]
+}

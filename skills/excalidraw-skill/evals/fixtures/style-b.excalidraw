@@ -1,0 +1,135 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mcp-excalidraw-server",
+  "elements": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 40,
+      "y": 30,
+      "width": 600,
+      "height": 45,
+      "strokeColor": "#1e1e1e",
+      "text": "Bounded Runtime",
+      "fontSize": 30,
+      "fontFamily": 2,
+      "createdAt": "2026-07-11T06:18:00.773Z",
+      "updatedAt": "2026-07-11T06:18:00.773Z",
+      "version": 1
+    },
+    {
+      "id": "runtime-boundary",
+      "type": "rectangle",
+      "x": 60,
+      "y": 130,
+      "width": 720,
+      "height": 260,
+      "backgroundColor": "transparent",
+      "strokeColor": "#adb5bd",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-07-11T06:18:00.773Z",
+      "updatedAt": "2026-07-11T06:18:00.773Z",
+      "version": 1
+    },
+    {
+      "id": "runtime-label",
+      "type": "text",
+      "x": 80,
+      "y": 145,
+      "width": 260,
+      "height": 30,
+      "strokeColor": "#1e1e1e",
+      "text": "Runtime environment",
+      "fontSize": 16,
+      "fontFamily": 2,
+      "createdAt": "2026-07-11T06:18:00.773Z",
+      "updatedAt": "2026-07-11T06:18:00.773Z",
+      "version": 1
+    },
+    {
+      "id": "worker",
+      "type": "rectangle",
+      "x": 160,
+      "y": 225,
+      "width": 190,
+      "height": 90,
+      "backgroundColor": "transparent",
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "roughness": 1,
+      "label": {
+        "text": "Worker"
+      },
+      "fontSize": 20,
+      "fontFamily": 2,
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-07-11T06:18:00.773Z",
+      "updatedAt": "2026-07-11T06:18:00.773Z",
+      "version": 1
+    },
+    {
+      "id": "store",
+      "type": "rectangle",
+      "x": 500,
+      "y": 225,
+      "width": 190,
+      "height": 90,
+      "backgroundColor": "transparent",
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "roughness": 1,
+      "label": {
+        "text": "Object Store"
+      },
+      "fontSize": 20,
+      "fontFamily": 2,
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-07-11T06:18:00.773Z",
+      "updatedAt": "2026-07-11T06:18:00.773Z",
+      "version": 1
+    },
+    {
+      "id": "worker-store",
+      "type": "arrow",
+      "x": 358,
+      "y": 270,
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          134,
+          0
+        ]
+      ],
+      "start": {
+        "id": "worker"
+      },
+      "end": {
+        "id": "store"
+      },
+      "createdAt": "2026-07-11T06:18:00.773Z",
+      "updatedAt": "2026-07-11T06:18:00.773Z",
+      "version": 1
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  }
+}

@@ -54,6 +54,14 @@
       "url": "https://valsai.retool.com/mcp",
       "lifecycle": "lazy",
       "directTools": true
+    },
+    "excalidraw-local": {
+      "command": "pnpm",
+      "args": [
+        "dlx",
+        "mcp-excalidraw-server@1.1.0"
+      ],
+      "lifecycle": "lazy"
     }
   }
 }

@@ -1,0 +1,105 @@
+{
+  "skill_name": "excalidraw-skill",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Draw a CI/CD pipeline architecture diagram on the Excalidraw canvas with these components: GitHub (source), GitHub Actions (CI), Docker Registry (artifact store), and Kubernetes Cluster (deployment target). Use the local default style and show the flow from left to right.",
+      "expected_output": "A white-canvas diagram with 4 transparent rounded boxes, 20px body labels, short black solid 2px arrows bound at both ends, generous spacing, no legend or decoration, a clean native-scene audit, and native/50%/35%/grayscale visual checks.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "Convert this Mermaid flowchart to Excalidraw:\n```\ngraph TD\n  A[User] -->|HTTP Request| B[Load Balancer]\n  B --> C[Web Server 1]\n  B --> D[Web Server 2]\n  C --> E[(Database)]\n  D --> E\n```\nUse the local default style and verify the exported image at reduced scale.",
+      "expected_output": "All 5 nodes and relationships are preserved, but Mermaid styling is normalized to the clean local profile. Bound arrows do not cross unrelated nodes; the export passes native, 50%, 35%, and grayscale inspection.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Create a simple diagram with 'Auth Service' and 'User DB' connected by a 'queries' arrow. Then add 'Redis Cache' between them with a 'cache hit' relationship. Refine it without introducing a legend or decorative styling.",
+      "expected_output": "Three clean rounded boxes with direct bound arrows, readable local labels, consistent 20px text, no crossings, and a final native-scene audit plus rendered-image inspection.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Without MCP tools, use only `npx -y mcp-excalidraw-server` to build Frontend → API → Postgres, query the three rectangles, save snapshot `v1`, export `/tmp/three-tier.excalidraw`, run the local scene audit in overview mode, and report server/browser status.",
+      "expected_output": "CLI-only workflow completes; both arrows are endpoint-bound; snapshot/export/status evidence exists; the audit passes without errors.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Inspect the three attached native Excalidraw reference scenes before drawing. Produce a trait matrix citing each fixture, infer the consensus visual contract, then draw a 6-node deployment flow that matches it without copying labels or architecture from the references.",
+      "expected_output": "The agent reads all three fixtures, records at least six traits with fixture-by-fixture evidence, identifies sparse color as optional rather than universal, and exports a generated scene whose typography, shapes, arrows, spacing, boundaries, and color behavior match the consensus.",
+      "files": [
+        "evals/fixtures/style-a.excalidraw",
+        "evals/fixtures/style-b.excalidraw",
+        "evals/fixtures/style-c.excalidraw"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Create a README overview from the attached 27-node/44-edge source inventory. Before drawing, classify every attached node ID and edge ID as included, abstracted, movedToDetail, or omittedWithRationale. Do not silently omit semantics.",
+      "expected_output": "The semantic-cut manifest covers every stable node and edge ID exactly once. The proposed overview has at most 9 primary nodes and 11 primary edges; infrastructure, recovery detail, and continuity mechanics move to approved callouts or detail panels. The exported scene maps included IDs to scene IDs.",
+      "files": [
+        "evals/fixtures/semantic-inventory.json"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Fit the attached 27-node/44-edge inventory into one phone-width overview image. Every label must be visible.",
+      "expected_output": "The agent uses the concrete inventory to identify the completeness/target-scale conflict, recommends overview plus detail, and asks for one focused approval decision instead of shrinking text or silently choosing a bad layout.",
+      "files": [
+        "evals/fixtures/semantic-inventory.json"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Draw the attached 8-node/10-edge request-flow specification. Preserve every stable ID and relationship. The final image must make the primary path and endpoint obvious without a legend.",
+      "expected_output": "The native scene maps every attached node/edge ID, shows explicit yes/no ownership, one local failure loop and subordinate preview, has zero false junctions, uses bound semantic arrows, and passes structural plus broad visual review.",
+      "files": [
+        "evals/fixtures/decision-flow.json"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Render the attached decision-flow specification for its declared 1200×675 README target. Validate it at native size, 50%, 35%, and grayscale before claiming completion.",
+      "expected_output": "The agent exports `.excalidraw`, 1200×675 PNG, 50%, 35%, and grayscale artifacts; inspects each; and fails/revises when the route, endpoint, critical labels, or distinctions disappear. Evidence paths are reported.",
+      "files": [
+        "evals/fixtures/decision-flow.json"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Use the first 24 nodes of the attached inventory to create a technical deep-dive with a sequence view and an architecture view. The user prefers simple monochrome Excalidraw diagrams.",
+      "expected_output": "The agent selects technical mode, maps all requested IDs, divides the canvas into two coherent dashed-boundary panels, keeps one local flow per panel, uses one restrained grammar, and does not apply overview budgets to total elements.",
+      "files": [
+        "evals/fixtures/semantic-inventory.json"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Independently review the attached candidate native scene. Import/render it, inspect native, 50%, 35%, and grayscale outputs, run the scene audit, and decide whether it is ready. Do not assume the candidate is good or bad.",
+      "expected_output": "The agent independently derives FAIL from the artifact, citing actual scene IDs and rendered evidence for overview-budget, binding, tiny-text, palette, long-route, opacity, hierarchy, target-scale, and grayscale failures. It recommends redesign rather than cosmetic fixes.",
+      "files": [
+        "evals/fixtures/bad-overview.excalidraw"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Perform the real final gate for the attached candidate scene. The attached prior review is available as evidence but must not determine the verdict. Inspect the artifact independently against the attached semantic inventory.",
+      "expected_output": "The agent identifies the prior review's scope limitation, performs broad blind reviews of hierarchy, topology, style fidelity, target scale, grayscale, and semantics, cites candidate element/render evidence, and synthesizes FAIL independently.",
+      "files": [
+        "evals/fixtures/bad-overview.excalidraw",
+        "evals/fixtures/narrow-review.md",
+        "evals/fixtures/semantic-inventory.json"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Build the attached decision-flow scene and preserve staged-construction evidence. Do not create the full scene in one batch.",
+      "expected_output": "Evidence includes a skeleton screenshot, a primary-arrow screenshot, and one optional-cluster screenshot before the final export. Each stage is inspected and corrected; a single all-elements batch fails the eval even if the final scene looks acceptable.",
+      "files": [
+        "evals/fixtures/decision-flow.json"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,205 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mcp-excalidraw-server",
+  "elements": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 40,
+      "y": 30,
+      "width": 650,
+      "height": 45,
+      "strokeColor": "#1e1e1e",
+      "text": "Role-Accented Pipeline",
+      "fontSize": 30,
+      "fontFamily": 2,
+      "createdAt": "2026-07-11T06:18:03.563Z",
+      "updatedAt": "2026-07-11T06:18:03.563Z",
+      "version": 1
+    },
+    {
+      "id": "source",
+      "type": "rectangle",
+      "x": 60,
+      "y": 150,
+      "width": 180,
+      "height": 90,
+      "backgroundColor": "#e7f5ff",
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "roughness": 1,
+      "label": {
+        "text": "Source"
+      },
+      "fontSize": 20,
+      "fontFamily": 2,
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-07-11T06:18:03.563Z",
+      "updatedAt": "2026-07-11T06:18:03.563Z",
+      "version": 1
+    },
+    {
+      "id": "queue",
+      "type": "rectangle",
+      "x": 340,
+      "y": 150,
+      "width": 180,
+      "height": 90,
+      "backgroundColor": "#fff4e6",
+      "strokeColor": "#f08c00",
+      "strokeWidth": 2,
+      "roughness": 1,
+      "label": {
+        "text": "Queue"
+      },
+      "fontSize": 20,
+      "fontFamily": 2,
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-07-11T06:18:03.563Z",
+      "updatedAt": "2026-07-11T06:18:03.563Z",
+      "version": 1
+    },
+    {
+      "id": "worker",
+      "type": "rectangle",
+      "x": 620,
+      "y": 150,
+      "width": 180,
+      "height": 90,
+      "backgroundColor": "#e7f5ff",
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "roughness": 1,
+      "label": {
+        "text": "Worker"
+      },
+      "fontSize": 20,
+      "fontFamily": 2,
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-07-11T06:18:03.563Z",
+      "updatedAt": "2026-07-11T06:18:03.563Z",
+      "version": 1
+    },
+    {
+      "id": "result",
+      "type": "rectangle",
+      "x": 900,
+      "y": 150,
+      "width": 180,
+      "height": 90,
+      "backgroundColor": "#f3f0ff",
+      "strokeColor": "#6741d9",
+      "strokeWidth": 2,
+      "roughness": 1,
+      "label": {
+        "text": "Result"
+      },
+      "fontSize": 20,
+      "fontFamily": 2,
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-07-11T06:18:03.563Z",
+      "updatedAt": "2026-07-11T06:18:03.563Z",
+      "version": 1
+    },
+    {
+      "id": "source-queue",
+      "type": "arrow",
+      "x": 248,
+      "y": 195,
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          84,
+          0
+        ]
+      ],
+      "start": {
+        "id": "source"
+      },
+      "end": {
+        "id": "queue"
+      },
+      "createdAt": "2026-07-11T06:18:03.563Z",
+      "updatedAt": "2026-07-11T06:18:03.563Z",
+      "version": 1
+    },
+    {
+      "id": "queue-worker",
+      "type": "arrow",
+      "x": 528,
+      "y": 195,
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          84,
+          0
+        ]
+      ],
+      "start": {
+        "id": "queue"
+      },
+      "end": {
+        "id": "worker"
+      },
+      "createdAt": "2026-07-11T06:18:03.563Z",
+      "updatedAt": "2026-07-11T06:18:03.563Z",
+      "version": 1
+    },
+    {
+      "id": "worker-result",
+      "type": "arrow",
+      "x": 808,
+      "y": 195,
+      "strokeColor": "#1e1e1e",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          84,
+          0
+        ]
+      ],
+      "start": {
+        "id": "worker"
+      },
+      "end": {
+        "id": "result"
+      },
+      "createdAt": "2026-07-11T06:18:03.563Z",
+      "updatedAt": "2026-07-11T06:18:03.563Z",
+      "version": 1
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  }
+}
