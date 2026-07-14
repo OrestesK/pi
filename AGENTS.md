@@ -60,6 +60,7 @@ Async orchestration rules:
 - Track every async run id and relevant output/progress path.
 - Prefer event-based progress over polling.
 - Inspect relevant async outputs before final claims.
+- After inspection, if a subagent result adds no material information beyond what the parent already knows and changes no decision, plan, risk, validation, or next action, do not restate or summarize it. Return only a terse acknowledgment when a user-visible response is necessary, then continue; this does not permit skipping inspection or ignoring unresolved work.
 - Do not let unresolved relevant async work silently disappear; inspect it before final claims or explicitly report it as pending/non-blocking.
 - Persistent interactive parents keep every top-level subagent execution async, including known immediate dependencies; record run IDs and inspect results after completion notifications before proceeding.
 - Use async subagents for independent work that can run while the parent continues dispatching, planning, asking, verifying, or synthesizing.
@@ -278,9 +279,13 @@ For code tasks, code-intelligence use is mandatory, not advisory. This applies t
 
 ### Docs and web
 
-- Use context7 for library/framework docs when available. Do not rely on memory when current docs or source can verify it
-- Use web/content search for current non-library research
-- Use `code_search` or `web_search` when examples, ecosystem usage, or current external behavior would materially improve confidence
+- When a code task requires determining or relying on external library, framework, API, protocol, CLI, or service behavior, verify that behavior in current, version-matched public documentation before inspecting local integration or implementation code.
+- Before docs verification, local inspection is limited to manifests, lockfiles, imports, and dependency metadata needed to identify the dependency and version.
+- Use Context7 first to locate or query current version-matched official documentation when available. If it cannot provide adequate official material for the required version or behavior, use web/content search and prefer official documentation or primary specifications.
+- After checking public documentation, inspect local code to determine how the dependency is integrated and whether the project intentionally differs from documented behavior.
+- Skip docs-first research only for demonstrably repo-local or purely mechanical work, or after public documentation cannot answer the question. In the latter case, state the source attempted and unresolved uncertainty before inspecting local behavior.
+- Do not rely on memory when current docs or source can verify it.
+- Use `code_search` or `web_search` when examples, ecosystem usage, or current external behavior would materially improve confidence.
 
 ### Shell and command output
 

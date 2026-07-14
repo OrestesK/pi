@@ -1,7 +1,4 @@
 {
-  "bash": {
-    "sourceMode": "composed-bash"
-  },
   "features": {},
-  "version": "0.5.2-20260331"
+  "version": "0.8.1-20260619"
 }
