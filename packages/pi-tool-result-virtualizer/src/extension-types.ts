@@ -4,6 +4,14 @@ export type JsonSchema = Record<string, unknown>;
 
 export type ToolExecutionContextLike = {
 	cwd: string;
+	sessionManager?: {
+		getSessionId(): string;
+	};
+};
+
+export type ExtensionEventBusLike = {
+	on(event: string, handler: (data: unknown) => void): (() => void) | void;
+	emit(event: string, data: unknown): void;
 };
 
 export type ToolDefinitionLike = {
@@ -17,13 +25,31 @@ export type ToolDefinitionLike = {
 		toolCallId: string,
 		params: unknown,
 		signal: AbortSignal | undefined,
-		onUpdate: ((result: { content: TextContent[]; details?: Record<string, unknown> }) => void) | undefined,
+		onUpdate:
+			| ((result: {
+					content: TextContent[];
+					details?: Record<string, unknown>;
+			  }) => void)
+			| undefined,
 		ctx: ToolExecutionContextLike,
 	): Promise<{ content: TextContent[]; details?: Record<string, unknown> }>;
 };
 
 export type ExtensionApiLike = {
+	events?: ExtensionEventBusLike;
 	registerTool(definition: ToolDefinitionLike): void;
-	on(event: "tool_result", handler: (event: unknown, ctx: ToolExecutionContextLike) => Promise<unknown>): void;
-	on(event: "context", handler: (event: { messages?: unknown }, ctx: ToolExecutionContextLike) => Promise<unknown>): void;
+	on(
+		event: "tool_result",
+		handler: (
+			event: unknown,
+			ctx: ToolExecutionContextLike,
+		) => Promise<unknown>,
+	): void;
+	on(
+		event: "context",
+		handler: (
+			event: { messages?: unknown },
+			ctx: ToolExecutionContextLike,
+		) => Promise<unknown>,
+	): void;
 };

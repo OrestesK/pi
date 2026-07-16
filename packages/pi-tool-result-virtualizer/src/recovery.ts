@@ -1,17 +1,20 @@
 import type { StoredSourceMetadata } from "./store.ts";
 
-export function exportRecoveryLabel(source: StoredSourceMetadata): string {
-	if (source.captureStatus === "details.fullOutputPath") return "Exact captured-output escape hatch";
-	if (source.captureStatus === "read.input.path") return "Exact stored read-range escape hatch";
-	return "Exact stored-content escape hatch";
+export function retrievalLabel(source: StoredSourceMetadata): string {
+	if (source.captureStatus === "details.fullOutputPath")
+		return "Captured-output retrieval";
+	if (source.captureStatus === "read.input.path")
+		return "Stored read-range retrieval";
+	return "Stored-content retrieval";
 }
 
-export function exportRecoveryDescription(source: StoredSourceMetadata): string {
+export function retrievalDescription(source: StoredSourceMetadata): string {
+	const calls = `use tool_result_outline sourceId:"${source.sourceId}" for shape, tool_result_search for focused evidence, and bounded tool_result_get windows for cited lines`;
 	if (source.captureStatus === "details.fullOutputPath") {
-		return `call tool_result_export sourceId:"${source.sourceId}" with no lineStart/lineLimit to write the exact captured full output to a local file`;
+		return `${calls} across the captured full output`;
 	}
 	if (source.captureStatus === "read.input.path") {
-		return `call tool_result_export sourceId:"${source.sourceId}" with no lineStart/lineLimit to write the exact stored read range to a local file`;
+		return `${calls} across the stored read range`;
 	}
-	return `call tool_result_export sourceId:"${source.sourceId}" with no lineStart/lineLimit to write the exact stored tool-result content to a local file. This may already reflect upstream truncation or omission before the virtualizer saw the result`;
+	return `${calls}. Stored content may already reflect upstream truncation or omission before the virtualizer saw the result`;
 }

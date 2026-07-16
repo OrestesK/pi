@@ -5,8 +5,20 @@ import { fileURLToPath } from "node:url";
 
 import type { TextContent } from "./extension-types.ts";
 import { formatSourcePreview } from "./outline.ts";
-import { exportRecoveryDescription, exportRecoveryLabel } from "./recovery.ts";
-import { type CaptureStatus, type StoredSource, ToolResultStore } from "./store.ts";
+import type { CaptureProvenance } from "./provenance.ts";
+import {
+	createReceiptDecisionCard,
+	type ReceiptDecisionCard,
+} from "./receipt.ts";
+import { retrievalDescription, retrievalLabel } from "./recovery.ts";
+import { resultRefFromMetadata } from "./result-ref.ts";
+import type { CaptureStatus, StoredSource, ToolResultStore } from "./store.ts";
+import {
+	recordTelemetry,
+	type TelemetryEventInput,
+	type TelemetrySink,
+	type VirtualizationReason,
+} from "./telemetry.ts";
 
 export type ToolResultEventLike = {
 	toolName?: unknown;
@@ -19,6 +31,9 @@ export type ToolResultEventLike = {
 
 export type VirtualizeOptions = {
 	cwd: string;
+	provenance?: CaptureProvenance;
+	telemetry?: TelemetrySink;
+	delegationAvailable?: boolean;
 };
 
 export type ToolResultPatch = {
@@ -47,7 +62,9 @@ function contentBlocks(content: unknown): unknown[] {
 function textBlocksFromContent(content: unknown): string[] {
 	return contentBlocks(content).flatMap((item): string[] => {
 		if (!isRecord(item)) return [];
-		return item.type === "text" && typeof item.text === "string" ? [item.text] : [];
+		return item.type === "text" && typeof item.text === "string"
+			? [item.text]
+			: [];
 	});
 }
 
@@ -55,13 +72,21 @@ function textFromContent(content: unknown): string {
 	return textBlocksFromContent(content).join("\n");
 }
 
-function visibleContent(originalContent: unknown, text: string, replaceText: boolean): TextContent[] {
+function visibleContent(
+	originalContent: unknown,
+	text: string,
+	replaceText: boolean,
+): TextContent[] {
 	const blocks = contentBlocks(originalContent);
 	if (!replaceText) return blocks as TextContent[];
 	const replaced: unknown[] = [];
 	let insertedText = false;
 	for (const block of blocks) {
-		if (isRecord(block) && block.type === "text" && typeof block.text === "string") {
+		if (
+			isRecord(block) &&
+			block.type === "text" &&
+			typeof block.text === "string"
+		) {
 			if (!insertedText) {
 				replaced.push({ type: "text", text });
 				insertedText = true;
@@ -91,21 +116,31 @@ function lineCount(text: string): number {
 	return matches.length;
 }
 
-function stringField(record: Record<string, unknown>, key: string): string | undefined {
+function stringField(
+	record: Record<string, unknown>,
+	key: string,
+): string | undefined {
 	const value = record[key];
 	return typeof value === "string" ? value : undefined;
 }
 
-function numberField(record: Record<string, unknown>, key: string): number | undefined {
+function numberField(
+	record: Record<string, unknown>,
+	key: string,
+): number | undefined {
 	const value = record[key];
-	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+	return typeof value === "number" && Number.isFinite(value)
+		? value
+		: undefined;
 }
 
 function detailsRecord(details: unknown): Record<string, unknown> | undefined {
 	return isRecord(details) ? details : undefined;
 }
 
-function truncationRecord(details: unknown): Record<string, unknown> | undefined {
+function truncationRecord(
+	details: unknown,
+): Record<string, unknown> | undefined {
 	const detailsObject = detailsRecord(details);
 	if (!detailsObject) return undefined;
 	const truncation = detailsObject.truncation;
@@ -115,24 +150,36 @@ function truncationRecord(details: unknown): Record<string, unknown> | undefined
 function hasVirtualizerMetadata(details: unknown): boolean {
 	const detailsObject = detailsRecord(details);
 	const metadata = detailsObject?.toolResultVirtualizer;
-	return isRecord(metadata)
-		&& metadata.virtualizer === VIRTUALIZER_METADATA_NAME
-		&& metadata.version === VIRTUALIZER_METADATA_VERSION
-		&& typeof metadata.sourceId === "string";
+	return (
+		isRecord(metadata) &&
+		metadata.virtualizer === VIRTUALIZER_METADATA_NAME &&
+		metadata.version === VIRTUALIZER_METADATA_VERSION &&
+		typeof metadata.sourceId === "string"
+	);
 }
 
 function isContextModeMcpInput(input: unknown): boolean {
 	if (!isRecord(input)) return false;
-	return input.server === "context-mode"
-		|| (typeof input.tool === "string" && input.tool.startsWith(CONTEXT_MODE_MCP_TOOL_PREFIX))
-		|| (typeof input.describe === "string" && input.describe.startsWith(CONTEXT_MODE_MCP_TOOL_PREFIX));
+	return (
+		input.server === "context-mode" ||
+		(typeof input.tool === "string" &&
+			input.tool.startsWith(CONTEXT_MODE_MCP_TOOL_PREFIX)) ||
+		(typeof input.describe === "string" &&
+			input.describe.startsWith(CONTEXT_MODE_MCP_TOOL_PREFIX))
+	);
 }
 
 function resolvePiReadPath(path: string, cwd: string): string {
-	let normalized = path.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ");
+	let normalized = path.replace(
+		/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g,
+		" ",
+	);
 	if (normalized.startsWith("@")) normalized = normalized.slice(1);
 	if (normalized === "~") normalized = homedir();
-	else if (normalized.startsWith("~/") || (process.platform === "win32" && normalized.startsWith("~\\"))) {
+	else if (
+		normalized.startsWith("~/") ||
+		(process.platform === "win32" && normalized.startsWith("~\\"))
+	) {
 		normalized = join(homedir(), normalized.slice(2));
 	}
 	if (normalized.startsWith("file://")) normalized = fileURLToPath(normalized);
@@ -151,11 +198,20 @@ function isSkillRead(toolName: string, input: unknown, cwd: string): boolean {
 }
 
 function isProtectedToolName(toolName: string): boolean {
-	return PROTECTED_TOOL_NAMES.has(toolName) || PROTECTED_TOOL_PREFIXES.some((prefix) => toolName.startsWith(prefix));
+	return (
+		PROTECTED_TOOL_NAMES.has(toolName) ||
+		PROTECTED_TOOL_PREFIXES.some((prefix) => toolName.startsWith(prefix))
+	);
 }
 
-function isProtectedToolResult(event: ToolResultEventLike, toolName: string): boolean {
-	return isProtectedToolName(toolName) || (toolName === "mcp" && isContextModeMcpInput(event.input));
+function isProtectedToolResult(
+	event: ToolResultEventLike,
+	toolName: string,
+): boolean {
+	return (
+		isProtectedToolName(toolName) ||
+		(toolName === "mcp" && isContextModeMcpInput(event.input))
+	);
 }
 
 function truncationContentBytes(details: unknown): number {
@@ -177,29 +233,45 @@ function serializedDetails(details: unknown): string | undefined {
 	}
 }
 
-function compactScalarDetails(originalDetails: unknown): Record<string, unknown> {
+function compactScalarDetails(
+	originalDetails: unknown,
+): Record<string, unknown> {
 	const original = detailsRecord(originalDetails);
 	if (!original) return {};
 	const compact: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(original)) {
-		if (value === null || typeof value === "number" || typeof value === "boolean") compact[key] = value;
-		else if (typeof value === "string") compact[key] = compactDetailString(value);
+		if (
+			value === null ||
+			typeof value === "number" ||
+			typeof value === "boolean"
+		)
+			compact[key] = value;
+		else if (typeof value === "string")
+			compact[key] = compactDetailString(value);
 	}
 	return compact;
 }
 
-function compactInputSummary(toolName: string, input: unknown): string | undefined {
+function compactInputSummary(
+	toolName: string,
+	input: unknown,
+): string | undefined {
 	if (!isRecord(input)) return undefined;
 	if (toolName === "bash") {
 		const command = stringField(input, "command");
-		return command === undefined ? undefined : `bash command (${command.length} chars)`;
+		return command === undefined
+			? undefined
+			: `bash command (${command.length} chars)`;
 	}
 	if (toolName === "read") {
 		const path = stringField(input, "path");
 		if (path === undefined) return undefined;
 		const offset = numberField(input, "offset");
 		const limit = numberField(input, "limit");
-		const range = offset === undefined && limit === undefined ? "" : ` offset=${offset ?? 1} limit=${limit ?? "all"}`;
+		const range =
+			offset === undefined && limit === undefined
+				? ""
+				: ` offset=${offset ?? 1} limit=${limit ?? "all"}`;
 		return `read ${path}${range}`;
 	}
 	return `${toolName} input keys: ${Object.keys(input).sort().join(",")}`;
@@ -211,7 +283,10 @@ function selectReadRange(text: string, input: Record<string, unknown>): string {
 	const lines = text.match(/[^\n]*(?:\n|$)/g) ?? [];
 	if (lines.at(-1) === "") lines.pop();
 	const startIndex = Math.min(offset - 1, lines.length);
-	const selected = limit === undefined ? lines.slice(startIndex) : lines.slice(startIndex, startIndex + Math.max(0, Math.floor(limit)));
+	const selected =
+		limit === undefined
+			? lines.slice(startIndex)
+			: lines.slice(startIndex, startIndex + Math.max(0, Math.floor(limit)));
 	return selected.join("");
 }
 
@@ -220,10 +295,17 @@ async function captureText(
 	toolName: string,
 	eventText: string,
 	options: VirtualizeOptions,
-): Promise<{ text: string; captureStatus: CaptureStatus; originalPath?: string; originalFullOutputPath?: string }> {
+): Promise<{
+	text: string;
+	captureStatus: CaptureStatus;
+	originalPath?: string;
+	originalFullOutputPath?: string;
+}> {
 	const details = detailsRecord(event.details);
 	const input = isRecord(event.input) ? event.input : undefined;
-	const fullOutputPath = details ? stringField(details, "fullOutputPath") : undefined;
+	const fullOutputPath = details
+		? stringField(details, "fullOutputPath")
+		: undefined;
 	if (toolName === "bash" && fullOutputPath !== undefined) {
 		try {
 			return {
@@ -251,26 +333,39 @@ async function captureText(
 	return { text: eventText, captureStatus: "event.content" };
 }
 
-function shouldVirtualize(event: ToolResultEventLike, toolName: string, eventText: string): boolean {
+function shouldVirtualize(
+	event: ToolResultEventLike,
+	toolName: string,
+	eventText: string,
+): boolean {
 	if (isProtectedToolResult(event, toolName)) return false;
-	const exceedsThreshold = byteLength(eventText) >= CONTENT_BYTE_THRESHOLD
-		|| lineCount(eventText) >= CONTENT_LINE_THRESHOLD
-		|| truncationContentBytes(event.details) >= CONTENT_BYTE_THRESHOLD;
+	const exceedsThreshold =
+		byteLength(eventText) >= CONTENT_BYTE_THRESHOLD ||
+		lineCount(eventText) >= CONTENT_LINE_THRESHOLD ||
+		truncationContentBytes(event.details) >= CONTENT_BYTE_THRESHOLD;
 	if (!exceedsThreshold) {
 		if (!isTruncated(event.details)) return false;
 		const details = detailsRecord(event.details);
 		const input = isRecord(event.input) ? event.input : undefined;
-		const hasRecoverableTruncation = (toolName === "bash" && details?.fullOutputPath !== undefined)
-			|| (toolName === "read" && input?.path !== undefined);
+		const hasRecoverableTruncation =
+			(toolName === "bash" && details?.fullOutputPath !== undefined) ||
+			(toolName === "read" && input?.path !== undefined);
 		if (!hasRecoverableTruncation) return false;
 	}
 	return true;
 }
 
-function compactVisibleDetails(originalDetails: unknown, contentStored: boolean, scalarOnly: boolean): Record<string, unknown> {
+function compactVisibleDetails(
+	originalDetails: unknown,
+	contentStored: boolean,
+	scalarOnly: boolean,
+): Record<string, unknown> {
 	const compact = scalarOnly
 		? compactScalarDetails(originalDetails)
-		: detailsRecord(originalDetails) ? { ...detailsRecord(originalDetails) } : {};
+		: detailsRecord(originalDetails)
+			? { ...detailsRecord(originalDetails) }
+			: {};
+	delete compact.fullOutputPath;
 	const truncation = truncationRecord(originalDetails);
 	if (truncation) {
 		const compactTruncation: Record<string, unknown> = { ...truncation };
@@ -281,8 +376,18 @@ function compactVisibleDetails(originalDetails: unknown, contentStored: boolean,
 	return compact;
 }
 
-function compactDetails(originalDetails: unknown, stored: StoredSource, visibleContentBytes: number, contentReplaced: boolean): Record<string, unknown> {
-	const compact = compactVisibleDetails(originalDetails, true, stored.originalDetailsPath !== undefined);
+function compactDetails(
+	originalDetails: unknown,
+	stored: StoredSource,
+	decisionCard: ReceiptDecisionCard,
+	visibleContentBytes: number,
+	contentReplaced: boolean,
+): Record<string, unknown> {
+	const compact = compactVisibleDetails(
+		originalDetails,
+		true,
+		stored.originalDetailsPath !== undefined,
+	);
 	const virtualizerMetadata: Record<string, unknown> = {
 		virtualizer: VIRTUALIZER_METADATA_NAME,
 		version: VIRTUALIZER_METADATA_VERSION,
@@ -293,13 +398,17 @@ function compactDetails(originalDetails: unknown, stored: StoredSource, visibleC
 		byteCount: stored.byteCount,
 		lineCount: stored.lineCount,
 		sha256: stored.sha256,
+		resultRef: decisionCard.resultRef,
+		citations: decisionCard.citations,
+		actions: decisionCard.actions,
 		contentReplaced,
 	};
 	if (contentReplaced) virtualizerMetadata.receiptBytes = visibleContentBytes;
 	else virtualizerMetadata.visibleContentBytes = visibleContentBytes;
 	if (stored.originalDetailsPath !== undefined) {
 		virtualizerMetadata.hasOriginalDetails = true;
-		virtualizerMetadata.originalDetailsByteCount = stored.originalDetailsByteCount;
+		virtualizerMetadata.originalDetailsByteCount =
+			stored.originalDetailsByteCount;
 		virtualizerMetadata.originalDetailsSha256 = stored.originalDetailsSha256;
 	}
 	compact.toolResultVirtualizer = virtualizerMetadata;
@@ -320,7 +429,12 @@ function buildFailureReceipt(toolName: string, eventText: string): string {
 	].join("\n");
 }
 
-function buildFailureDetails(originalDetails: unknown, toolName: string, eventText: string, visibleContentBytes: number): Record<string, unknown> {
+function buildFailureDetails(
+	originalDetails: unknown,
+	toolName: string,
+	eventText: string,
+	visibleContentBytes: number,
+): Record<string, unknown> {
 	const details = compactVisibleDetails(originalDetails, false, true);
 	details.toolResultVirtualizerFailure = {
 		toolName,
@@ -332,13 +446,21 @@ function buildFailureDetails(originalDetails: unknown, toolName: string, eventTe
 	return details;
 }
 
-function buildReceipt(stored: StoredSource, sourceText: string): string {
+function buildReceipt(
+	stored: StoredSource,
+	sourceText: string,
+	decisionCard: ReceiptDecisionCard,
+): string {
 	const preview = formatSourcePreview(sourceText, {
 		headLineCount: 10,
 		middleLineCount: 10,
 		tailLineCount: 10,
 		lineByteLimit: 160,
 	});
+	const [outlineAction, exactRangeAction] = decisionCard.actions;
+	const delegateAction = decisionCard.actions.find(
+		(action) => action.intent === "delegate_analysis",
+	);
 	return [
 		`[tool-result-virtualizer] Large ${stored.toolName} result stored locally`,
 		`Source: ${stored.sourceId}`,
@@ -347,12 +469,17 @@ function buildReceipt(stored: StoredSource, sourceText: string): string {
 		"",
 		preview.text,
 		"",
-		"## Retrieve before relying on hidden content",
-		`1. Search: tool_result_search query:"..." sourceId:"${stored.sourceId}"`,
-		`2. Get cited lines: tool_result_get sourceId:"${stored.sourceId}" lineStart:1 lineLimit:80`,
-		`Optional deterministic triage: tool_result_outline sourceId:"${stored.sourceId}".`,
-		`Optional delegated synthesis: tool_result_summary_contract sourceId:"${stored.sourceId}" prompt:"<focused question>"; run the returned subagent task.`,
-		`${exportRecoveryLabel(stored)}: ${exportRecoveryDescription(stored)}. Use only for exact stored text; do not paste it back inline unless unavoidable.`,
+		"## Decision card",
+		`Known fact: call tool_result_search with sourceId "${stored.sourceId}" and your actual fact or phrase as query.`,
+		`1. Unknown shape: tool_result_outline ${JSON.stringify(outlineAction.args)}`,
+		`2. Exact range: tool_result_get ${JSON.stringify(exactRangeAction.args)}`,
+		...(delegateAction === undefined
+			? []
+			: [
+					`3. Delegate preflight: tool_result_delegate ${JSON.stringify(delegateAction.args)}`,
+				]),
+		`Decision card: ${JSON.stringify(decisionCard)}`,
+		`${retrievalLabel(stored)}: ${retrievalDescription(stored)}. Use multiple bounded calls when one response is capped.`,
 	].join("\n");
 }
 
@@ -361,22 +488,72 @@ export async function virtualizeToolResult(
 	store: ToolResultStore,
 	options: VirtualizeOptions,
 ): Promise<ToolResultPatch | undefined> {
+	const startedAt = performance.now();
+	const telemetry = options.telemetry;
+	const record = async (telemetryEvent: TelemetryEventInput): Promise<void> => {
+		if (telemetry) await recordTelemetry(telemetry, telemetryEvent);
+	};
+	const textBlocks = textBlocksFromContent(event.content);
+	const eventText =
+		textBlocks.length === 0 ? "" : textFromContent(event.content);
+	const visibleBytesBefore = byteLength(eventText);
+	await record({
+		type: "tool_result_observed",
+		visibleBytes: visibleBytesBefore,
+		lineCount: lineCount(eventText),
+	});
+	const finish = async (
+		outcome: "skipped" | "stored" | "failed",
+		reason: VirtualizationReason,
+		visibleBytesAfter = visibleBytesBefore,
+		storedBytes = 0,
+	): Promise<void> =>
+		record({
+			type: "virtualization_decision",
+			outcome,
+			reason,
+			visibleBytesBefore,
+			visibleBytesAfter,
+			storedBytes,
+			durationMs: performance.now() - startedAt,
+		});
+
 	const toolName = typeof event.toolName === "string" ? event.toolName : "tool";
-	if (textBlocksFromContent(event.content).length === 0) return undefined;
-	const eventText = textFromContent(event.content);
-	if (isProtectedToolResult(event, toolName) || hasVirtualizerMetadata(event.details)) return undefined;
-	if (isSkillRead(toolName, event.input, options.cwd)) return undefined;
+	if (textBlocks.length === 0) {
+		await finish("skipped", "non_text");
+		return undefined;
+	}
+	if (hasVirtualizerMetadata(event.details)) {
+		await finish("skipped", "already_virtualized");
+		return undefined;
+	}
+	if (isProtectedToolResult(event, toolName)) {
+		await finish("skipped", "protected_result");
+		return undefined;
+	}
+	if (isSkillRead(toolName, event.input, options.cwd)) {
+		await finish("skipped", "skill_read");
+		return undefined;
+	}
 	const shouldReplaceContent = shouldVirtualize(event, toolName, eventText);
 	const originalDetailsText = serializedDetails(event.details);
-	const originalDetailsBytes = originalDetailsText === undefined ? 0 : byteLength(originalDetailsText);
-	const shouldStoreOriginalDetails = originalDetailsText !== undefined && (originalDetailsBytes >= DETAILS_BYTE_THRESHOLD || truncationContentBytes(event.details) >= DETAILS_BYTE_THRESHOLD);
-	if (!shouldReplaceContent && !shouldStoreOriginalDetails) return undefined;
+	const originalDetailsBytes =
+		originalDetailsText === undefined ? 0 : byteLength(originalDetailsText);
+	const shouldStoreOriginalDetails =
+		originalDetailsText !== undefined &&
+		(originalDetailsBytes >= DETAILS_BYTE_THRESHOLD ||
+			truncationContentBytes(event.details) >= DETAILS_BYTE_THRESHOLD);
+	if (!shouldReplaceContent && !shouldStoreOriginalDetails) {
+		await finish("skipped", "below_threshold");
+		return undefined;
+	}
 	const capture = await captureText(event, toolName, eventText, options);
 	const sourceInput: {
 		toolName: string;
 		text: string;
 		captureStatus: typeof capture.captureStatus;
 		storageKind: "content" | "details";
+		provenance?: CaptureProvenance;
 		toolCallId?: string;
 		inputSummary?: string;
 		originalPath?: string;
@@ -388,26 +565,56 @@ export async function virtualizeToolResult(
 		captureStatus: capture.captureStatus,
 		storageKind: shouldReplaceContent ? "content" : "details",
 	};
-	if (typeof event.toolCallId === "string") sourceInput.toolCallId = event.toolCallId;
+	if (options.provenance !== undefined)
+		sourceInput.provenance = options.provenance;
+	if (typeof event.toolCallId === "string")
+		sourceInput.toolCallId = event.toolCallId;
 	const inputSummary = compactInputSummary(toolName, event.input);
 	if (inputSummary !== undefined) sourceInput.inputSummary = inputSummary;
-	if (capture.originalPath !== undefined) sourceInput.originalPath = capture.originalPath;
-	if (capture.originalFullOutputPath !== undefined) sourceInput.originalFullOutputPath = capture.originalFullOutputPath;
-	if (shouldStoreOriginalDetails) sourceInput.originalDetailsText = originalDetailsText;
+	if (capture.originalPath !== undefined)
+		sourceInput.originalPath = capture.originalPath;
+	if (capture.originalFullOutputPath !== undefined)
+		sourceInput.originalFullOutputPath = capture.originalFullOutputPath;
+	if (shouldStoreOriginalDetails)
+		sourceInput.originalDetailsText = originalDetailsText;
 	try {
 		const stored = await store.storeSource(sourceInput);
-		const receipt = buildReceipt(stored, capture.text);
+		const decisionCard = createReceiptDecisionCard(
+			resultRefFromMetadata(stored),
+			options.delegationAvailable === true,
+		);
+		const receipt = buildReceipt(stored, capture.text, decisionCard);
 		const visibleText = shouldReplaceContent ? receipt : eventText;
+		await finish(
+			"stored",
+			shouldReplaceContent ? "content_threshold" : "details_threshold",
+			byteLength(visibleText),
+			stored.byteCount + (stored.originalDetailsByteCount ?? 0),
+		);
 		return {
 			content: visibleContent(event.content, visibleText, shouldReplaceContent),
-			details: compactDetails(event.details, stored, byteLength(visibleText), shouldReplaceContent),
+			details: compactDetails(
+				event.details,
+				stored,
+				decisionCard,
+				byteLength(visibleText),
+				shouldReplaceContent,
+			),
 		};
 	} catch {
 		if (!shouldReplaceContent && !shouldStoreOriginalDetails) return undefined;
-		const visibleText = shouldReplaceContent ? buildFailureReceipt(toolName, capture.text) : eventText;
+		const visibleText = shouldReplaceContent
+			? buildFailureReceipt(toolName, capture.text)
+			: eventText;
+		await finish("failed", "storage_failure", byteLength(visibleText));
 		return {
 			content: visibleContent(event.content, visibleText, shouldReplaceContent),
-			details: buildFailureDetails(event.details, toolName, capture.text, byteLength(visibleText)),
+			details: buildFailureDetails(
+				event.details,
+				toolName,
+				capture.text,
+				byteLength(visibleText),
+			),
 		};
 	}
 }

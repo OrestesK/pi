@@ -1,4 +1,4 @@
-import { chmod, mkdir } from "node:fs/promises";
+import { chmod, mkdir, stat } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -13,17 +13,30 @@ type IndexRow = {
 	sha256: string;
 };
 
+export type SearchIndexInspection = {
+	status: "missing" | "healthy" | "mismatch" | "unavailable";
+	mismatchSourceIds: string[];
+};
+
 const SEARCH_INDEX_FILE = "search-index.sqlite";
 const SCHEMA_VERSION = 2;
 
-function stringField(row: Record<string, unknown>, key: string): string | undefined {
+function stringField(
+	row: Record<string, unknown>,
+	key: string,
+): string | undefined {
 	const value = row[key];
 	return typeof value === "string" ? value : undefined;
 }
 
-function numberField(row: Record<string, unknown>, key: string): number | undefined {
+function numberField(
+	row: Record<string, unknown>,
+	key: string,
+): number | undefined {
 	const value = row[key];
-	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+	return typeof value === "number" && Number.isFinite(value)
+		? value
+		: undefined;
 }
 
 function quoteFtsPhrase(query: string): string {
@@ -34,7 +47,8 @@ function toIndexRow(row: Record<string, unknown>): IndexRow | undefined {
 	const id = numberField(row, "id");
 	const sourceId = stringField(row, "source_id");
 	const sha256 = stringField(row, "sha256");
-	if (id === undefined || sourceId === undefined || sha256 === undefined) return undefined;
+	if (id === undefined || sourceId === undefined || sha256 === undefined)
+		return undefined;
 	return { id, sourceId, sha256 };
 }
 
@@ -45,6 +59,64 @@ export class SearchIndex {
 	private constructor(db: DatabaseSync, path: string) {
 		this.db = db;
 		this.path = path;
+	}
+
+	static async inspect(
+		root: string,
+		entries: StoredSourceMetadata[],
+	): Promise<SearchIndexInspection> {
+		const dbPath = join(root, SEARCH_INDEX_FILE);
+		try {
+			await stat(dbPath);
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				"code" in error &&
+				error.code === "ENOENT"
+			) {
+				return { status: "missing", mismatchSourceIds: [] };
+			}
+			throw error;
+		}
+		let sqlite: SqliteModule;
+		try {
+			sqlite = await import("node:sqlite");
+		} catch {
+			return { status: "unavailable", mismatchSourceIds: [] };
+		}
+		let db: DatabaseSync | undefined;
+		try {
+			db = new sqlite.DatabaseSync(dbPath, { readOnly: true });
+			const rows = db
+				.prepare(
+					"SELECT id, source_id, sha256 FROM indexed_sources ORDER BY id",
+				)
+				.all()
+				.map(toIndexRow)
+				.filter((row) => row !== undefined);
+			const rowsBySourceId = new Map(rows.map((row) => [row.sourceId, row]));
+			const ftsRowIds = new Set(
+				db
+					.prepare("SELECT rowid FROM sources_fts")
+					.all()
+					.map((row) => numberField(row, "rowid"))
+					.filter((rowId) => rowId !== undefined),
+			);
+			const mismatchSourceIds = entries.flatMap((entry) => {
+				const row = rowsBySourceId.get(entry.sourceId);
+				return row && row.sha256 === entry.sha256 && ftsRowIds.has(row.id)
+					? []
+					: [entry.sourceId];
+			});
+			return {
+				status: mismatchSourceIds.length === 0 ? "healthy" : "mismatch",
+				mismatchSourceIds,
+			};
+		} catch {
+			return { status: "unavailable", mismatchSourceIds: [] };
+		} finally {
+			db?.close();
+		}
 	}
 
 	static async create(root: string): Promise<SearchIndex | undefined> {
@@ -86,12 +158,16 @@ export class SearchIndex {
 
 	candidateSourceIds(query: string, entries: StoredSourceMetadata[]): string[] {
 		this.sync(entries);
-		const rows = this.db.prepare([
-			"SELECT indexed_sources.source_id AS source_id",
-			"FROM sources_fts",
-			"JOIN indexed_sources ON indexed_sources.id = sources_fts.rowid",
-			"WHERE sources_fts MATCH ?",
-		].join(" ")).all(quoteFtsPhrase(query));
+		const rows = this.db
+			.prepare(
+				[
+					"SELECT indexed_sources.source_id AS source_id",
+					"FROM sources_fts",
+					"JOIN indexed_sources ON indexed_sources.id = sources_fts.rowid",
+					"WHERE sources_fts MATCH ?",
+				].join(" "),
+			)
+			.all(quoteFtsPhrase(query));
 		const ids: string[] = [];
 		for (const row of rows) {
 			const sourceId = stringField(row, "source_id");
@@ -116,61 +192,78 @@ export class SearchIndex {
 
 	private initialize(): void {
 		this.ensureSchema();
-		this.db.exec("CREATE VIRTUAL TABLE __trigram_probe USING fts5(value, tokenize='trigram')");
+		this.db.exec(
+			"CREATE VIRTUAL TABLE __trigram_probe USING fts5(value, tokenize='trigram')",
+		);
 		this.db.exec("DROP TABLE __trigram_probe");
 	}
 
 	private ensureSchema(): void {
 		const version = this.schemaVersion();
 		if (version !== 0 && version !== SCHEMA_VERSION) this.dropSchema();
-		this.db.exec([
-			"PRAGMA journal_mode=DELETE;",
-			"PRAGMA synchronous=NORMAL;",
-			"PRAGMA temp_store=MEMORY;",
-			"PRAGMA busy_timeout=2000;",
-			"CREATE TABLE IF NOT EXISTS indexed_sources (",
-			"id INTEGER PRIMARY KEY,",
-			"source_id TEXT UNIQUE NOT NULL,",
-			"sha256 TEXT NOT NULL",
-			");",
-			"CREATE VIRTUAL TABLE IF NOT EXISTS sources_fts USING fts5(text, content='', tokenize='trigram');",
-			`PRAGMA user_version=${SCHEMA_VERSION};`,
-		].join("\n"));
+		this.db.exec(
+			[
+				"PRAGMA journal_mode=DELETE;",
+				"PRAGMA synchronous=NORMAL;",
+				"PRAGMA temp_store=MEMORY;",
+				"PRAGMA busy_timeout=2000;",
+				"CREATE TABLE IF NOT EXISTS indexed_sources (",
+				"id INTEGER PRIMARY KEY,",
+				"source_id TEXT UNIQUE NOT NULL,",
+				"sha256 TEXT NOT NULL",
+				");",
+				"CREATE VIRTUAL TABLE IF NOT EXISTS sources_fts USING fts5(text, content='', tokenize='trigram');",
+				`PRAGMA user_version=${SCHEMA_VERSION};`,
+			].join("\n"),
+		);
 	}
 
 	private schemaVersion(): number {
 		const row = this.db.prepare("PRAGMA user_version").get();
-		return row === undefined ? 0 : numberField(row, "user_version") ?? 0;
+		return row === undefined ? 0 : (numberField(row, "user_version") ?? 0);
 	}
 
 	private dropSchema(): void {
-		this.db.exec([
-			"DROP TABLE IF EXISTS sources_fts;",
-			"DROP TABLE IF EXISTS indexed_sources;",
-			"PRAGMA user_version=0;",
-		].join("\n"));
+		this.db.exec(
+			[
+				"DROP TABLE IF EXISTS sources_fts;",
+				"DROP TABLE IF EXISTS indexed_sources;",
+				"PRAGMA user_version=0;",
+			].join("\n"),
+		);
 	}
 
 	private indexRows(): IndexRow[] {
-		const rows = this.db.prepare("SELECT id, source_id, sha256 FROM indexed_sources ORDER BY id").all();
+		const rows = this.db
+			.prepare("SELECT id, source_id, sha256 FROM indexed_sources ORDER BY id")
+			.all();
 		return rows.map(toIndexRow).filter((row) => row !== undefined);
 	}
 
-	private matchesPrefix(rows: IndexRow[], entries: StoredSourceMetadata[]): boolean {
+	private matchesPrefix(
+		rows: IndexRow[],
+		entries: StoredSourceMetadata[],
+	): boolean {
 		if (rows.length > entries.length) return false;
 		return rows.every((row, index) => {
 			const entry = entries[index];
-			return entry !== undefined
-				&& row.id === index + 1
-				&& row.sourceId === entry.sourceId
-				&& row.sha256 === entry.sha256;
+			return (
+				entry !== undefined &&
+				row.id === index + 1 &&
+				row.sourceId === entry.sourceId &&
+				row.sha256 === entry.sha256
+			);
 		});
 	}
 
 	private matchesFtsRows(rows: IndexRow[]): boolean {
-		const ftsRows = this.db.prepare("SELECT rowid FROM sources_fts ORDER BY rowid").all();
+		const ftsRows = this.db
+			.prepare("SELECT rowid FROM sources_fts ORDER BY rowid")
+			.all();
 		if (ftsRows.length !== rows.length) return false;
-		return ftsRows.every((row, index) => numberField(row, "rowid") === rows[index]?.id);
+		return ftsRows.every(
+			(row, index) => numberField(row, "rowid") === rows[index]?.id,
+		);
 	}
 
 	private rebuild(entries: StoredSourceMetadata[]): void {
@@ -180,7 +273,10 @@ export class SearchIndex {
 		this.indexEntries(entries, 0);
 	}
 
-	private indexEntries(entries: StoredSourceMetadata[], startIndex: number): void {
+	private indexEntries(
+		entries: StoredSourceMetadata[],
+		startIndex: number,
+	): void {
 		if (startIndex >= entries.length) return;
 		this.db.exec("BEGIN");
 		try {
@@ -196,12 +292,20 @@ export class SearchIndex {
 		}
 	}
 
-	private indexEntry(entry: StoredSourceMetadata, text: string, rowid: number): void {
-		const insertSource = this.db.prepare([
-			"INSERT INTO indexed_sources(id, source_id, sha256)",
-			"VALUES (?, ?, ?)",
-		].join(" "));
-		const insertFts = this.db.prepare("INSERT INTO sources_fts(rowid, text) VALUES (?, ?)");
+	private indexEntry(
+		entry: StoredSourceMetadata,
+		text: string,
+		rowid: number,
+	): void {
+		const insertSource = this.db.prepare(
+			[
+				"INSERT INTO indexed_sources(id, source_id, sha256)",
+				"VALUES (?, ?, ?)",
+			].join(" "),
+		);
+		const insertFts = this.db.prepare(
+			"INSERT INTO sources_fts(rowid, text) VALUES (?, ?)",
+		);
 		insertSource.run(rowid, entry.sourceId, entry.sha256);
 		insertFts.run(rowid, text);
 	}
