@@ -95,7 +95,6 @@
         "ctx-doctor"
       ]
     },
-    "npm:pi-intercom",
     "packages/pi-slipstream-compact",
     "packages/pi-goal-supervisor",
     "packages/pisesh",
