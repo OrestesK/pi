@@ -14,8 +14,8 @@ import { createToolNamer } from "./core/tool-naming.mjs";
 // ── Factory functions ─────────────────────────────────────
 
 export function createRoutingBlock(t, options = {}) {
-  const { includeCommands = true } = options;
-  return `
+	const { includeCommands = true } = options;
+	return `
 <context_window_protection>
   <priority_instructions>
     Raw tool output floods context window. MUST use context-mode MCP tools. Keep raw data in sandbox.
@@ -57,21 +57,27 @@ export function createRoutingBlock(t, options = {}) {
       Auto-expand for: security warnings, irreversible actions, user confusion.
     </communication_style>
     <artifact_policy>
-      Write artifacts (code, configs, PRDs) to FILES. NEVER inline.
-      Return only: file path + 1-line description.
+      Write full artifacts (code, configs, PRDs, plans, specs) to FILES; do not inline the entire artifact.
+      For every plan or proposal, also present the best concise, self-contained, decision-ready summary in chat.
+      The user must be able to review it without opening the file. Choose the structure and emphasis that best fit
+      the plan, but do not omit material assumptions, uncertainties, or anything that could change approval.
+      The file path is optional drill-down, never the presentation itself.
     </artifact_policy>
     <response_format>
-      Concise summary:
+      Default concise summary:
       - Actions taken (2-3 bullets)
       - File paths created/modified
       - Key findings
+      For plans/proposals, present the decision-ready chat summary above; never use a path-only handoff.
     </response_format>
   </output_constraints>
   <session_continuity>
     Skills, roles, and decisions set during this session remain active until the user revokes them.
     Do not drop behavioral directives as context grows.
   </session_continuity>
-${includeCommands ? `
+${
+	includeCommands
+		? `
   <ctx_commands>
     "ctx stats" | "ctx-stats" | "/ctx-stats" | context savings question
     → Call stats MCP tool, display full output verbatim.
@@ -87,20 +93,36 @@ ${includeCommands ? `
 
     After /clear or /compact: knowledge base preserved. Tell user: "context-mode knowledge base preserved. Use \`ctx purge\` to start fresh."
   </ctx_commands>
-` : ''}
+`
+		: ""
+}
 </context_window_protection>`;
 }
 
 export function createReadGuidance(t) {
-  return '<context_guidance>\n  <tip>\n    Reading to Edit? Read is correct — Edit needs content in context.\n    Reading to analyze/explore? Use ' + t("ctx_execute_file") + '(path, language, code) — only printed summary enters context.\n  </tip>\n</context_guidance>';
+	return (
+		"<context_guidance>\n  <tip>\n    Reading to Edit? Read is correct — Edit needs content in context.\n    Reading to analyze/explore? Use " +
+		t("ctx_execute_file") +
+		"(path, language, code) — only printed summary enters context.\n  </tip>\n</context_guidance>"
+	);
 }
 
 export function createGrepGuidance(t) {
-  return '<context_guidance>\n  <tip>\n    May flood context. Use ' + t("ctx_execute") + '(language: "shell", code: "...") to run searches in sandbox. Only printed summary enters context.\n  </tip>\n</context_guidance>';
+	return (
+		"<context_guidance>\n  <tip>\n    May flood context. Use " +
+		t("ctx_execute") +
+		'(language: "shell", code: "...") to run searches in sandbox. Only printed summary enters context.\n  </tip>\n</context_guidance>'
+	);
 }
 
 export function createBashGuidance(t) {
-  return '<context_guidance>\n  <tip>\n    May produce large output. Use ' + t("ctx_batch_execute") + '(commands, queries) for multiple commands, ' + t("ctx_execute") + '(language: "shell", code: "...") for single. Only printed summary enters context. Bash only for: git, mkdir, rm, mv, navigation.\n  </tip>\n</context_guidance>';
+	return (
+		"<context_guidance>\n  <tip>\n    May produce large output. Use " +
+		t("ctx_batch_execute") +
+		"(commands, queries) for multiple commands, " +
+		t("ctx_execute") +
+		'(language: "shell", code: "...") for single. Only printed summary enters context. Bash only for: git, mkdir, rm, mv, navigation.\n  </tip>\n</context_guidance>'
+	);
 }
 
 // ── Backward compat: static exports defaulting to claude-code ──

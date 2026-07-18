@@ -30,3 +30,6 @@ mcp-onboarding.json
 /pisesh-meta.json
 /benchmarks
 /.pi-subagents/artifacts
+/skills/pensar-security
+/skills/pi-cleanup
+/skills/pi-memory-curation

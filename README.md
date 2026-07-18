@@ -4,7 +4,6 @@ Personal configuration for the Pi coding agent.
 
 - New to this setup: [How to use Pi](USAGE.md)
 - Maintaining the config: start with the file map below
-- Why it is structured this way: [Design decisions](DESIGN.md)
 - Source provenance: [Attributions](ATTRIBUTIONS.md)
 
 ## File map
@@ -18,7 +17,7 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 | [`settings.json`](settings.json) | Runtime config | Models, packages, UI, memory, and compaction |
 | [`models.json`](models.json) | Runtime config | Custom model definitions |
 | [`mcp.json`](mcp.json) | Runtime config | MCP server registry |
-| [`permissions.json`](permissions.json) | Runtime config | Permission mode |
+| [`permissions.json`](permissions.json) | Inactive artifact | Not consumed by Pi 0.80.6 or the loaded extensions |
 | [`keybindings.json`](keybindings.json) | Runtime config | Terminal keybindings |
 | [`agents/`](agents/) | Executable prompts | Local subagent roles; same-name files override packaged builtins |
 | [`skills/`](skills/) | Executable workflows | Instructions loaded on demand |
@@ -26,7 +25,6 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 | [`mcp-servers/`](mcp-servers/) | Runtime code | Local MCP implementations |
 | [`themes/`](themes/) | Runtime config | TUI themes |
 | [`USAGE.md`](USAGE.md) | Human guide | Quick start and common workflows |
-| [`DESIGN.md`](DESIGN.md) | Rationale | Stable design decisions |
 | [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md) | Provenance | Copied, adapted, and influential sources |
 
 ## Runtime at a glance
@@ -37,7 +35,8 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 - Skills expose short descriptions and load their full instructions only when needed.
 - Extensions under [`extensions/`](extensions/) are auto-discovered.
 - Memory is supplied by `pi-memory-md`.
-- Safety combines prompt policy with configured guardrails. `permissions.json` uses `yolo`, so prompt-required approvals are not universal runtime confirmation dialogs.
+- Safety combines prompt policy with configured guardrails. `permissions.json` is
+  retained as an inactive artifact and does not control Pi 0.80.6 permissions.
 
 ## MCP servers
 
@@ -50,7 +49,9 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 | `notion` | lazy remote OAuth | Notion access |
 | `google_docs` | lazy local OAuth | Google Docs and Drive-capable operations |
 | `slack` | lazy local OAuth | Slack access through the patched local server |
-| `retool` | lazy remote/direct tools | Retool apps, resources, and organization access |
+| `retool` | lazy remote | Retool apps, resources, and organization access through the MCP proxy |
+| `excalidraw-local` | lazy local | Excalidraw diagrams |
+| `docent` | lazy local | Agent-run analysis and reports |
 
 OAuth environment and token files are ignored. External/private MCP access and mutations are governed by [`AGENTS.md`](AGENTS.md).
 

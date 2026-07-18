@@ -53,8 +53,7 @@
   "pi-memory-md": {
     "enabled": true,
     "memoryDir": {
-      "localPath": "~/.pi/memory-md",
-      "globalMemory": "common"
+      "localPath": "~/.pi/memory-md"
     },
     "delivery": "message-append",
     "hooks": {
