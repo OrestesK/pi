@@ -12,3 +12,5 @@
 	branch = ok/local
 [submodule "packages/pi-slipstream-compact"]
 	path = packages/pi-slipstream-compact
+	url = git@github.com:OrestesK/pi-slipstream-compact.git
+	branch = main
