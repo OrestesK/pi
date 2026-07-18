@@ -52,14 +52,24 @@
     },
     "retool": {
       "url": "https://valsai.retool.com/mcp",
-      "lifecycle": "lazy",
-      "directTools": true
+      "lifecycle": "lazy"
     },
     "excalidraw-local": {
       "command": "pnpm",
       "args": [
         "dlx",
         "mcp-excalidraw-server@1.1.0"
+      ],
+      "lifecycle": "lazy"
+    },
+    "docent": {
+      "command": "uv",
+      "args": [
+        "tool",
+        "run",
+        "--from",
+        "docent-python>=0.1.74",
+        "docent-mcp"
       ],
       "lifecycle": "lazy"
     }
