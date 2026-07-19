@@ -2,7 +2,6 @@
 
 Personal configuration for the Pi coding agent.
 
-- New to this setup: [How to use Pi](USAGE.md)
 - Maintaining the config: start with the file map below
 - Source provenance: [Attributions](ATTRIBUTIONS.md)
 
@@ -24,7 +23,6 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 | [`extensions/`](extensions/) | Runtime code/config | Commands, UI helpers, todos, and guardrails |
 | [`mcp-servers/`](mcp-servers/) | Runtime code | Local MCP implementations |
 | [`themes/`](themes/) | Runtime config | TUI themes |
-| [`USAGE.md`](USAGE.md) | Human guide | Quick start and common workflows |
 | [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md) | Provenance | Copied, adapted, and influential sources |
 
 ## Runtime at a glance
@@ -59,21 +57,31 @@ The patched Slack server supports reduced scopes. The intended setup uses `SLACK
 
 ## Setup
 
-Prerequisites:
+Required:
 
-- Pi coding agent
-- Node.js/npm
-- `uv` and `uvx`
-- `context7-mcp` on `PATH`
+- Git and Bash
+- Pi coding agent (tested with 0.80.6)
+- Node.js 22.19 or later with npm
 - `ast-grep` on `PATH`
 
+Optional integrations use additional commands:
+
+- `pnpm` for the local Excalidraw MCP server
+- `uv` for Docent
+- `chafa` and a SIXEL-capable terminal for image previews
+- `wl-paste` for Wayland clipboard images
+
+Clone the repository and point Pi at it with the supported config-directory environment variable:
+
 ```bash
-cd ~/.config/pi
-chmod +x setup.sh
-./setup.sh
+git clone --recurse-submodules https://github.com/OrestesK/pi.git ~/.config/pi
+export PI_CODING_AGENT_DIR="$HOME/.config/pi"
+~/.config/pi/setup.sh
 ```
 
-`setup.sh` links this repository to `~/.pi/agent`. If that path is already a symlink, the script repoints it to this checkout.
+Persist `PI_CODING_AGENT_DIR` in your shell startup file before opening Pi. Run `setup.sh` from a normal terminal outside Pi, then restart Pi; dependency installation replaces local package trees that an active process may have loaded. The script requires the variable to resolve to its own checkout and does not create or modify `~/.pi/agent`.
+
+The script repairs an ordinary non-recursive clone, synchronizes submodule URLs, and installs the locked runtime dependencies for Pi Lens, `pi-memory-md`, `pi-openai-service-tier`, `pi-subagents`, and the local tree-sitter MCP server. It never installs system tools, global npm packages, credentials, OAuth state, or optional integrations.
 
 ## Untracked runtime data
 

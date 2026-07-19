@@ -9,7 +9,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "exec node \"${PI_AGENT_DIR:-$HOME/.pi/agent}/mcp-servers/tree-sitter/index.mjs\""
+        "exec node \"${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/mcp-servers/tree-sitter/index.mjs\""
       ],
       "directTools": [
         "search_symbols",
@@ -22,7 +22,11 @@
       "lifecycle": "keep-alive"
     },
     "context-mode": {
-      "command": "context-mode",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "exec node \"${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/packages/context-mode/cli.bundle.mjs\""
+      ],
       "lifecycle": "lazy"
     },
     "descope": {
@@ -38,7 +42,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "set -e; set -a; source \"${PI_CONFIG_DIR:-$HOME/.config/pi}/mcp-oauth/google_docs/env.sh\"; set +a; export npm_config_ignore_scripts=true; exec npx -y @a-bonus/google-docs-mcp@1.10.0"
+        "set -e; set -a; source \"${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/mcp-oauth/google_docs/env.sh\"; set +a; export npm_config_ignore_scripts=true; exec npx -y @a-bonus/google-docs-mcp@1.10.0"
       ],
       "lifecycle": "lazy"
     },
@@ -46,7 +50,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "set -e; set -a; source \"${PI_CONFIG_DIR:-$HOME/.config/pi}/mcp-oauth/slack/env.sh\"; set +a; exec \"${PI_SLACK_MCP_SERVER_BIN:-$HOME/.local/bin/slack-mcp-server-patched}\" --transport stdio"
+        "set -e; set -a; source \"${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/mcp-oauth/slack/env.sh\"; set +a; exec \"${PI_SLACK_MCP_SERVER_BIN:-$HOME/.local/bin/slack-mcp-server-patched}\" --transport stdio"
       ],
       "lifecycle": "lazy"
     },

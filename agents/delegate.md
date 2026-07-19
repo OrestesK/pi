@@ -2,7 +2,7 @@
 name: delegate
 description: Lightweight focused subagent with no default reads
 tools: read, grep, find, ls, bash, tool_result_outline, tool_result_get, tool_result_search, memory_search, memory_check, contact_supervisor
-extensions: ~/.config/pi/packages/pi-memory-md/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-toolchain/extensions/toolchain/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts, ~/.npm-global/lib/node_modules/pi-openai-service-tier/index.ts
+extensions: ~/.config/pi/packages/pi-memory-md/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts, ~/.config/pi/packages/pi-openai-service-tier/index.ts
 model: openai-codex/gpt-5.6-terra
 fallbackModels: openai-codex/gpt-5.6-sol
 thinking: medium

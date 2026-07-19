@@ -2,7 +2,7 @@
 name: run-monitor
 description: Read-only long-running tmux/log/evidence run monitor that emits concise status events for the parent
 tools: read, grep, find, ls, bash, tool_result_outline, tool_result_get, tool_result_search, contact_supervisor, ack_supervisor_message
-extensions: ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-toolchain/extensions/toolchain/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts, ~/.npm-global/lib/node_modules/pi-openai-service-tier/index.ts
+extensions: ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts, ~/.config/pi/packages/pi-openai-service-tier/index.ts
 model: openai-codex/gpt-5.6-luna
 fallbackModels: openai-codex/gpt-5.6-terra
 thinking: low

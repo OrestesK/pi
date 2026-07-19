@@ -2,7 +2,7 @@
 name: general-purpose
 description: Narrow Context-mode analyst for exact file and indexed search analysis
 tools: read, tool_result_outline, tool_result_get, tool_result_search, contact_supervisor, mcp:context-mode/ctx_execute_file, mcp:context-mode/ctx_search
-extensions: ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-toolchain/extensions/toolchain/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts, ~/.npm-global/lib/node_modules/pi-openai-service-tier/index.ts
+extensions: ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts, ~/.config/pi/packages/pi-openai-service-tier/index.ts
 model: openai-codex/gpt-5.6-terra
 fallbackModels: openai-codex/gpt-5.6-sol
 thinking: medium

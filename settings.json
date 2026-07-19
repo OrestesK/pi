@@ -98,7 +98,7 @@
     "packages/pi-goal-supervisor",
     "packages/pisesh",
     "npm:pi-btw",
-    "npm:pi-openai-service-tier",
+    "packages/pi-openai-service-tier",
     "packages/pi-sixel",
     "npm:@carter-mcalister/pi-codex-image-gen@0.2.0"
   ],

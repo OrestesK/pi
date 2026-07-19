@@ -3,7 +3,6 @@
   "toolDescriptionMode": "compact",
   "asyncByDefault": true,
   "forceTopLevelAsync": true,
-  "defaultSessionDir": "~/.pi/agent/sessions/subagent",
   "maxSubagentDepth": 32,
   "maxSubagentSpawnsPerSession": 20000,
   "globalConcurrencyLimit": 128,

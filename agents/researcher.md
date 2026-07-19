@@ -2,7 +2,7 @@
 name: researcher
 description: Autonomous external-evidence researcher — searches, evaluates, and synthesizes a focused research brief
 tools: read, tool_result_outline, tool_result_get, tool_result_search, memory_search, memory_check, web_search, fetch_content, get_search_content, contact_supervisor, mcp:context7/resolve-library-id, mcp:context7/query-docs
-extensions: ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.npm-global/lib/node_modules/pi-web-access/index.ts, ~/.config/pi/packages/pi-memory-md/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-toolchain/extensions/toolchain/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts, ~/.npm-global/lib/node_modules/pi-openai-service-tier/index.ts
+extensions: ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.npm-global/lib/node_modules/pi-web-access/index.ts, ~/.config/pi/packages/pi-memory-md/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts, ~/.config/pi/packages/pi-openai-service-tier/index.ts
 model: openai-codex/gpt-5.6-terra
 fallbackModels: openai-codex/gpt-5.6-sol
 thinking: medium

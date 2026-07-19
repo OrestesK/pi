@@ -5,12 +5,17 @@ description: Efficiently read and analyze pi agent session JSONL files. Use when
 
 # Read Pi Sessions
 
-Parse pi session JSONL files into readable output. Sessions live in `~/.pi/agent/sessions/<project>/` as `.jsonl` files.
+Parse Pi session JSONL files into readable output. `PI_CODING_AGENT_SESSION_DIR`, when set, is the exact directory containing session files. Otherwise Pi groups sessions by project under `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/sessions`.
 
 ## Step 1: Find the Session
 
 ```bash
-ls -t ~/.pi/agent/sessions/*<project>*/*.jsonl | head -10
+if [[ -n "${PI_CODING_AGENT_SESSION_DIR:-}" ]]; then
+    ls -t "$PI_CODING_AGENT_SESSION_DIR"/*.jsonl | head -10
+else
+    session_root="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/sessions"
+    ls -t "$session_root"/*<project>*/*.jsonl | head -10
+fi
 ```
 
 ## Step 2: Start with Table of Contents
@@ -49,7 +54,7 @@ uv run {baseDir}/scripts/read_session.py <path> --mode turn --turn 7
 ## Mode Reference
 
 | Mode | Shows | Use for |
-|------|-------|---------|
+| ------ | ------- | --------- |
 | `conversation` | User + assistant text only (default) | Reading what happened |
 | `toc` | Numbered exchange list | Navigation, finding the right turn |
 | `turn` | Full detail for one exchange | Drilling into specifics |
@@ -63,7 +68,7 @@ uv run {baseDir}/scripts/read_session.py <path> --mode turn --turn 7
 ## Flags
 
 | Flag | Effect |
-|------|--------|
+| ------ | -------- |
 | `--offset N` | Skip first N exchanges |
 | `--limit N` | Show at most N exchanges |
 | `--turn N` | Exchange number to drill into (with `--mode turn`) |

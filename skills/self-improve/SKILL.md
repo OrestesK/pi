@@ -19,10 +19,10 @@ Only use the `session-reader` skill if you need to review a subagent's session t
 Examine each area below. Skip areas with no findings — only report what's actionable.
 
 | Area | What to Look For |
-|------|-----------------|
+| ------ | ----------------- |
 | **Agent config** | Could AGENTS.md instructions be clearer? Did the agent misunderstand something that better wording would prevent? |
 | **Subagent behavior** | Did subagents struggle, go off-scope, or need repeated correction? Would better task descriptions or agent definitions help? |
-| **Agent definitions** | Check `~/.pi/agent/agents/*.md` — are model choices, skills, or system prompts optimal for what was observed? |
+| **Agent definitions** | Check `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/agents/*.md` — are model choices, skills, or system prompts optimal for what was observed? |
 | **Tests** | Were bugs found that tests should catch? Are existing tests stale or missing coverage for touched code? |
 | **Documentation** | Are READMEs, inline docs, or references out of date after changes made this session? |
 | **Scripts** | Did any scripts fail, produce wrong output, or need manual workarounds? |
@@ -36,8 +36,8 @@ Examine each area below. Skip areas with no findings — only report what's acti
 For each finding, classify its scope:
 
 | Scope | Where It Lives | Example |
-|-------|---------------|---------|
-| **Global** | `~/.pi/agent/` (AGENTS.md, skills, agents) | "Subagent worker should always run tests before committing" |
+| ------- | --------------- | --------- |
+| **Global** | `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/` (AGENTS.md, skills, agents) | "Subagent worker should always run tests before committing" |
 | **Project** | Project's `.claude/`, CLAUDE.md, or codebase | "Add integration test for the auth endpoint we just fixed" |
 
 ## Step 4: Present Suggestions
