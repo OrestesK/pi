@@ -1,6 +1,13 @@
 {
   "waitTool": false,
   "toolDescriptionMode": "compact",
+  "toolExtensions": {
+    "mcp": {
+      "description": "Regular MCP access for research roles",
+      "builtinTools": ["mcp"],
+      "allowedAgents": ["scout", "researcher", "context-builder"]
+    }
+  },
   "asyncByDefault": true,
   "forceTopLevelAsync": true,
   "maxSubagentDepth": 32,
