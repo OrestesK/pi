@@ -405,6 +405,8 @@ If uncertain, classify higher inside `manager-workflow`. If the user says “wai
 ## Subagents
 
 - Use natural-language routing; the user does not need slash commands
+- Parent agents must never call `intercom` for any purpose. Use `subagent(...)` for delegation and `subagent_supervisor(...)` for child communication.
+- In sessions that are not parent agents, reserve `intercom({ action: "ask" })` for explicit cross-session coordination with a known live, idle peer whose reply is immediately required. Never target a busy session or use it as a substitute for subagent dispatch.
 - When launching subagents, pass explicit task-critical context in the dispatch prompt; do not rely on inherited or forked context. If the child must inspect a file such as `context.md`, `plan.md`, or a generated handoff artifact, include it in that child or step's explicit `reads` list; do not rely on agent default reads. Keep detailed dispatch-packet protocol in `packages/pi-subagents/skills/pi-subagents/SKILL.md` and match task prose with runtime flags
 - Prefer async read-only/advisory/recon/review subagents by default for nontrivial tasks, uncertainty, cleanup, planning, verification, and reflection during waits
 - The parent normally implements approved work and applies accepted fixes. Parent implementation is not an exceptional fallback.
