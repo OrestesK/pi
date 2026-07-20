@@ -197,7 +197,7 @@ export function buildToolResultTools(
 			promptSnippet:
 				"Search compactly indexed local tool-result sources by substring",
 			promptGuidelines: [
-				"Use tool_result_search with sourceId or a small sourceIds set for focused evidence; add lineStart/lineLimit when only a bounded range matters.",
+				"Use tool_result_search with the receipt sourceId for one exact fact; start with limit 10 and contextLines 2, then use tool_result_get for cited lines.",
 			],
 			parameters: SEARCH_PARAMS,
 			async execute(_toolCallId, params, _signal, _onUpdate, context) {
@@ -268,11 +268,12 @@ export function buildToolResultTools(
 						name: "tool_result_delegate",
 						label: "Tool Result Delegate",
 						description:
-							"Preflight or explicitly start one bounded asynchronous analyst run for an exact stored source. Dry-run defaults to true.",
+							"Single call: use a bounded asynchronous analyst to synthesize, compare, or extract multiple facts from one exact stored source. The main agent supplies the task.",
 						promptSnippet:
-							"Preflight cited delegated analysis for one exact tool-result source, then set dryRun:false only when the run is explicitly authorized",
+							"Recommended single call for synthesis, comparison, or multi-fact extraction from one exact tool-result source",
 						promptGuidelines: [
-							"Call tool_result_delegate with dryRun omitted or true first. Set dryRun:false only to explicitly authorize the bounded asynchronous analyst run.",
+							"Prefer tool_result_delegate when the answer needs a summary, comparison, or multiple facts from this source; pass the user's actual question as task.",
+							"Use tool_result_search and tool_result_get only for one exact fact.",
 						],
 						parameters: DELEGATE_PARAMS,
 						async execute(
@@ -297,7 +298,6 @@ export function buildToolResultTools(
 								{
 									sourceId: sourceIdParam(params),
 									task,
-									dryRun: optionalBooleanParam(params, "dryRun") ?? true,
 								},
 								context,
 								signal,

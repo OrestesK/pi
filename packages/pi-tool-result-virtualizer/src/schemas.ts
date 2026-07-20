@@ -167,12 +167,6 @@ export const DELEGATE_PARAMS: JsonSchema = {
 			description:
 				"Focused analysis objective. The analyst must return cited findings, uncertainty, residual risks, and access/completion status.",
 		},
-		dryRun: {
-			type: "boolean",
-			default: true,
-			description:
-				"Defaults to true and performs preflight only. Set false to explicitly authorize one bounded asynchronous analyst run.",
-		},
 	},
 };
 

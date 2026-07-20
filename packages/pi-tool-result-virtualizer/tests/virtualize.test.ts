@@ -160,6 +160,33 @@ test("empty visible text still captures bash details.fullOutputPath", async () =
 	assert.equal((await store.readSource(metadata.sourceId)).text, raw);
 });
 
+test("receipt preview adds bounded byte windows for sparse sources", async () => {
+	const { store, dir } = await makeStore();
+	const fullOutputPath = join(dir, "sparse-full.log");
+	const raw = `SPARSE_HEAD ${"🙂".repeat(20_000)} SPARSE_TAIL`;
+	await writeFile(fullOutputPath, raw, "utf8");
+
+	const result = await virtualizeToolResult(
+		{
+			toolName: "bash",
+			toolCallId: "sparse_preview",
+			content: [{ type: "text", text: "truncated" }],
+			details: { fullOutputPath, truncation: { truncated: true } },
+		},
+		store,
+		{ cwd: dir },
+	);
+
+	assert.ok(result);
+	const receipt = result.content[0]?.text ?? "";
+	assert.match(receipt, /## Byte preview/);
+	assert.match(receipt, /SPARSE_HEAD/);
+	assert.match(receipt, /SPARSE_TAIL/);
+	assert.match(receipt, /byte windows are orientation only/i);
+	assert.doesNotMatch(receipt, /\uFFFD/);
+	assert.ok(Buffer.byteLength(receipt, "utf8") < 8_500);
+});
+
 test("receipt preview merges overlapping samples and caps long preview lines", async () => {
 	const { store, dir } = await makeStore();
 	const fullOutputPath = join(dir, "small-full.log");

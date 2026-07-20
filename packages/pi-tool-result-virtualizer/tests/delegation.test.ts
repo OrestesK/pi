@@ -251,7 +251,7 @@ test("RPC ready state requires the complete delegation capability set", () => {
 	assert.equal(client.isReady(), false);
 });
 
-test("dry-run validates capability, package, source, and grant without spawning", async () => {
+test("delegation performs preflight internally and starts one run", async () => {
 	const { dir } = await makeStore();
 	const source = await storedSource(dir);
 	const rpc = new FakeRpc();
@@ -259,35 +259,35 @@ test("dry-run validates capability, package, source, and grant without spawning"
 		{
 			sourceId: source.sourceId,
 			task: "Identify the decisive evidence.",
-			dryRun: true,
 		},
 		{ cwd: dir },
 	);
 
-	assert.equal(status(result), "ready");
-	assert.equal(rpc.spawnCalls.length, 0);
-	await assert.rejects(readdir(join(dir, "grants")), { code: "ENOENT" });
+	assert.equal(status(result), "started");
+	assert.equal(rpc.spawnCalls.length, 1);
+	assert.equal(result.details?.runId, "run-1");
 	assert.deepEqual(result.details?.actions, [
 		{
-			kind: "run",
-			tool: "tool_result_delegate",
-			args: {
-				sourceId: source.sourceId,
-				task: "Identify the decisive evidence.",
-				dryRun: false,
-			},
+			kind: "status",
+			tool: "subagent",
+			args: { action: "status", id: "run-1" },
+		},
+		{
+			kind: "interrupt",
+			tool: "subagent",
+			args: { action: "interrupt", id: "run-1" },
 		},
 	]);
 });
 
-test("preflight returns typed unavailable states and accepts parent possession ids", async () => {
+test("delegation returns typed unavailable states and accepts parent possession ids", async () => {
 	const { dir } = await makeStore();
 	const source = await storedSource(dir);
 
 	const noBridge = new FakeRpc();
 	noBridge.pingError = new SubagentRpcClientError("timeout", "no bridge");
 	const noBridgeResult = await service(dir, noBridge).delegate(
-		{ sourceId: source.sourceId, task: "Summarize", dryRun: true },
+		{ sourceId: source.sourceId, task: "Summarize" },
 		{ cwd: dir },
 	);
 	assert.equal(status(noBridgeResult), "delegation_unavailable");
@@ -299,7 +299,7 @@ test("preflight returns typed unavailable states and accepts parent possession i
 		capabilities: { ...READY_PING.capabilities, interrupt: false },
 	};
 	const noCapabilityResult = await service(dir, noCapability).delegate(
-		{ sourceId: source.sourceId, task: "Summarize", dryRun: true },
+		{ sourceId: source.sourceId, task: "Summarize" },
 		{ cwd: dir },
 	);
 	assert.equal(status(noCapabilityResult), "delegation_unavailable");
@@ -311,15 +311,12 @@ test("preflight returns typed unavailable states and accepts parent possession i
 	const missingPackage = await mkdtemp(join(tmpdir(), "pi-trv-no-agent-"));
 	const packageResult = await service(dir, new FakeRpc(), {
 		packageRoot: missingPackage,
-	}).delegate(
-		{ sourceId: source.sourceId, task: "Summarize", dryRun: true },
-		{ cwd: dir },
-	);
+	}).delegate({ sourceId: source.sourceId, task: "Summarize" }, { cwd: dir });
 	assert.equal(status(packageResult), "delegation_unavailable");
 	assert.equal(packageResult.details?.reasonCode, "analyst_unavailable");
 
 	const missingSourceResult = await service(dir, new FakeRpc()).delegate(
-		{ sourceId: "tr_missing_source", task: "Summarize", dryRun: true },
+		{ sourceId: "tr_missing_source", task: "Summarize" },
 		{ cwd: dir },
 	);
 	assert.equal(status(missingSourceResult), "source_unavailable");
@@ -327,12 +324,9 @@ test("preflight returns typed unavailable states and accepts parent possession i
 	const crossProjectRpc = new FakeRpc();
 	const crossProjectResult = await service(dir, crossProjectRpc, {
 		projectId: "e".repeat(64),
-	}).delegate(
-		{ sourceId: source.sourceId, task: "Summarize", dryRun: true },
-		{ cwd: dir },
-	);
-	assert.equal(status(crossProjectResult), "ready");
-	assert.equal(crossProjectRpc.spawnCalls.length, 0);
+	}).delegate({ sourceId: source.sourceId, task: "Summarize" }, { cwd: dir });
+	assert.equal(status(crossProjectResult), "started");
+	assert.equal(crossProjectRpc.spawnCalls.length, 1);
 
 	const legacy = await new ToolResultStore(dir).storeSource({
 		toolName: "legacy-source",
@@ -340,12 +334,13 @@ test("preflight returns typed unavailable states and accepts parent possession i
 		captureStatus: "event.content",
 	});
 	const legacyRpc = new FakeRpc();
+	legacyRpc.spawnRunId = "run-2";
 	const legacyResult = await service(dir, legacyRpc).delegate(
-		{ sourceId: legacy.sourceId, task: "Summarize", dryRun: true },
+		{ sourceId: legacy.sourceId, task: "Summarize" },
 		{ cwd: dir },
 	);
-	assert.equal(status(legacyResult), "ready");
-	assert.equal(legacyRpc.spawnCalls.length, 0);
+	assert.equal(status(legacyResult), "started");
+	assert.equal(legacyRpc.spawnCalls.length, 1);
 });
 
 test("subagent callers cannot delegate or probe RPC readiness", async () => {
@@ -353,7 +348,7 @@ test("subagent callers cannot delegate or probe RPC readiness", async () => {
 	const source = await storedSource(dir);
 	const rpc = new FakeRpc();
 	const result = await service(dir, rpc, { access: "subagent" }).delegate(
-		{ sourceId: source.sourceId, task: "Summarize", dryRun: true },
+		{ sourceId: source.sourceId, task: "Summarize" },
 		{ cwd: dir },
 	);
 
@@ -367,7 +362,7 @@ test("explicit delegation spawns once, commits the returned run, and exposes typ
 	const source = await storedSource(dir);
 	const rpc = new FakeRpc();
 	const result = await service(dir, rpc).delegate(
-		{ sourceId: source.sourceId, task: "Find the root cause.", dryRun: false },
+		{ sourceId: source.sourceId, task: "Find the root cause." },
 		{ cwd: dir },
 	);
 
@@ -394,6 +389,7 @@ test("explicit delegation spawns once, commits the returned run, and exposes typ
 	assert.deepEqual(spawn?.toolBudget?.block, "*");
 	const task = spawn?.task ?? "";
 	assert.match(task, new RegExp(source.sourceId));
+	assert.match(task, /Objective: Find the root cause\./);
 	assert.match(task, /Access status: complete \| partial \| blocked/);
 	assert.match(task, /Completion status: complete \| incomplete/);
 	assert.match(task, /Findings: concise bullets/);
@@ -418,7 +414,7 @@ test("spawn failure aborts the pending grant and returns typed unavailability", 
 	const rpc = new FakeRpc();
 	rpc.spawnError = new Error("spawn failed");
 	const result = await service(dir, rpc).delegate(
-		{ sourceId: source.sourceId, task: "Summarize", dryRun: false },
+		{ sourceId: source.sourceId, task: "Summarize" },
 		{ cwd: dir },
 	);
 
@@ -433,7 +429,7 @@ test("spawn timeout returns unknown outcome without committing source access", a
 	const rpc = new FakeRpc();
 	rpc.spawnError = new SubagentRpcClientError("timeout", "spawn timeout");
 	const result = await service(dir, rpc).delegate(
-		{ sourceId: source.sourceId, task: "Summarize", dryRun: false },
+		{ sourceId: source.sourceId, task: "Summarize" },
 		{ cwd: dir },
 	);
 
@@ -461,7 +457,7 @@ test("grant commit failure interrupts the spawned run and returns management act
 	);
 	const rpc = new FakeRpc();
 	const result = await service(dir, rpc).delegate(
-		{ sourceId: source.sourceId, task: "Summarize", dryRun: false },
+		{ sourceId: source.sourceId, task: "Summarize" },
 		{ cwd: dir },
 	);
 
@@ -475,7 +471,7 @@ test("grant commit failure interrupts the spawned run and returns management act
 	const failedCleanupRpc = new FakeRpc();
 	failedCleanupRpc.interruptError = new Error("interrupt failed");
 	const failedCleanup = await service(dir, failedCleanupRpc).delegate(
-		{ sourceId: source.sourceId, task: "Summarize", dryRun: false },
+		{ sourceId: source.sourceId, task: "Summarize" },
 		{ cwd: dir },
 	);
 	assert.equal(status(failedCleanup), "delegation_failed");

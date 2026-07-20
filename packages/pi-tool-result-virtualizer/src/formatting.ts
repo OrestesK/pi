@@ -28,7 +28,7 @@ export function byteSafePrefix(text: string, maxBytes: number): string {
 	return text.slice(0, low);
 }
 
-function byteSafeSuffix(text: string, maxBytes: number): string {
+export function byteSafeSuffix(text: string, maxBytes: number): string {
 	if (maxBytes <= 0) return "";
 	if (byteLength(text) <= maxBytes) return text;
 	let low = 0;

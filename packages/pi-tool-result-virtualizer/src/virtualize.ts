@@ -470,13 +470,19 @@ function buildReceipt(
 		preview.text,
 		"",
 		"## Decision card",
+		...(delegateAction === undefined
+			? []
+			: [
+					"Recommended: for synthesis, comparison, or multi-fact questions, call tool_result_delegate once with task set to the user's actual question.",
+				]),
+		"Choose based on the task: delegate synthesis, comparison, or multi-fact extraction; search then get one exact fact.",
 		`Known fact: call tool_result_search with sourceId "${stored.sourceId}" and your actual fact or phrase as query.`,
 		`1. Unknown shape: tool_result_outline ${JSON.stringify(outlineAction.args)}`,
 		`2. Exact range: tool_result_get ${JSON.stringify(exactRangeAction.args)}`,
 		...(delegateAction === undefined
 			? []
 			: [
-					`3. Delegate preflight: tool_result_delegate ${JSON.stringify(delegateAction.args)}`,
+					`3. Delegate analysis (single call): tool_result_delegate ${JSON.stringify(delegateAction.args)}`,
 				]),
 		`Decision card: ${JSON.stringify(decisionCard)}`,
 		`${retrievalLabel(stored)}: ${retrievalDescription(stored)}. Use multiple bounded calls when one response is capped.`,

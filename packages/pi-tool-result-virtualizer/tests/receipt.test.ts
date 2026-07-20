@@ -105,7 +105,7 @@ test("parses the typed receipt decision card with executable retrieval actions",
 	assert.deepEqual(parsed.decisionCard, decisionCard);
 });
 
-test("parses a capability-valid single-source delegation preflight action", () => {
+test("parses a capability-valid single-source delegation action", () => {
 	const delegated = createReceiptDecisionCard(decisionCard.resultRef, true);
 	const receipt = `${storedReceipt}\n\nDecision card: ${JSON.stringify(delegated)}`;
 	const parsed = parseToolResultVirtualizerReceipt(receipt);
@@ -119,8 +119,7 @@ test("parses a capability-valid single-source delegation preflight action", () =
 			toolName: "tool_result_delegate",
 			args: {
 				sourceId: "tr_mock",
-				task: "Synthesize the decisive findings with line citations.",
-				dryRun: true,
+				task: "Identify the decisive findings in this source with line citations; state uncertainty and residual risks.",
 			},
 		},
 	);

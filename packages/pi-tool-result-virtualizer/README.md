@@ -31,12 +31,12 @@ A receipt is orientation, not evidence for hidden content. Retrieve cited lines 
 
 ## Retrieve a result
 
-1. Call `tool_result_search` with a focused query and one `sourceId`, or up to 10 explicit `sourceIds`; use `lineStart` and `lineLimit` to restrict each source.
-2. Call `tool_result_get` with the cited `lineStart` and `lineLimit`.
+1. For synthesis, comparison, or multi-fact extraction, call `tool_result_delegate` with one `sourceId` and a focused task.
+2. For one exact fact, call `tool_result_search` with a focused query and one `sourceId`, then call `tool_result_get` with the cited range.
 3. Optionally call `tool_result_outline` for deterministic triage when the result shape is unclear.
 4. Continue with consecutive `tool_result_get` windows when one bounded response is insufficient.
 
-Search results cite exact `[sourceId:startLine-endLine]` ranges. The receipt preview samples the first, middle, and last 10 lines, merges overlaps, and byte-caps each line.
+Search results cite exact `[sourceId:startLine-endLine]` ranges. Normal receipts sample the first, middle, and last 10 lines, merge overlaps, and byte-cap each line. Sparse receipts also include bounded UTF-8-safe head and tail byte windows for orientation.
 
 ### Scope and legacy captures
 
@@ -55,12 +55,12 @@ Retrieval, discovery, diagnostics, and retention-preview tools accept optional `
 | `tool_result_outline` | Show deterministic samples, broad keyword hits, and omissions |
 | `tool_result_get` | Read a bounded, byte-capped line window |
 | `tool_result_search` | Search one or up to 10 explicit sources with optional line bounds and cited context windows |
-| `tool_result_delegate` | Preflight or explicitly start one bounded, single-source analyst run |
+| `tool_result_delegate` | Start one bounded, single-source analyst run for synthesis or multi-fact analysis |
 | `tool_result_list` | List recent sources and compact metadata |
 | `tool_result_diagnostics` | Show bounded, scope-filtered store and index health without source text or paths |
 | `tool_result_retention_preview` | Preview count- or age-based cleanup without deleting data |
 
-Receipt decision cards always include executable outline and exact-range actions. Receipt text separately directs known-fact lookup through `tool_result_search` with the model's actual fact or phrase. Cards include a `tool_result_delegate` dry-run action only when the packaged analyst and RPC capability are ready.
+Receipt decision cards always include executable outline and exact-range actions. Receipt text separately directs known-fact lookup through `tool_result_search` with the model's actual fact or phrase. Cards include a directly executable `tool_result_delegate` action only when the packaged analyst and RPC capability are ready; use it for synthesis or multi-fact analysis.
 
 ## Delegated analysis
 
@@ -68,8 +68,8 @@ The package ships `agents/result-analyst.md`, a fresh-context analyst with no in
 
 `tool_result_delegate` is parent-only and single-source:
 
-1. The default `dryRun: true` checks the source, packaged analyst, RPC capabilities, and grant feasibility. It creates no grant and spawns no analyst.
-2. Re-run with `dryRun: false` to explicitly authorize one asynchronous run. The result returns its run ID plus typed `subagent` status and interrupt actions.
+1. The main agent supplies a focused task, such as a summary, comparison, or multi-fact extraction.
+2. The tool performs source, packaged-analyst, RPC, and grant checks internally, then starts one asynchronous run. The result returns its run ID plus typed `subagent` status and interrupt actions.
 3. Retrieval authority is committed only after spawn to the runner-generated run ID. It is bound to the exact analyst identity, source, operations, call/byte budget, and expiry. A `sourceId` alone is not authorization.
 
 Each run is limited to 8 retrieval calls, 64 KiB of retrieved evidence, a 4-minute runtime, a 5-minute grant lifetime, and an 8 KiB/200-line final response. The analyst must return access/completion status, cited findings, uncertainty, and residual risks.
@@ -110,7 +110,7 @@ Events contain allowlisted sizes, counts, decisions, operation/outcome names, an
 - No destructive retention apply, pin/lease expiry, arbitrary export, network access, or external content movement.
 - No structured JSON/JSONL/log/CSV query language, exact diff tool, cursors, rich list filters, regex, joins, map/reduce, or arbitrary code execution.
 - No semantic search, OCR, archive processing, compression/content-addressed migration, or FTS redesign/recent-only indexing.
-- No general-purpose subagent spawning: delegation is limited to the packaged analyst and requires explicit `dryRun: false` authorization.
+- No general-purpose subagent spawning: delegation is limited to the packaged analyst and one exact stored source.
 - No non-text or image storage, SQLite server, Docker service, or native npm dependency.
 - Does not replace Slipstream compaction or context-mode output handling, override built-in `bash` or `read`, rewrite persisted assistant tool-call arguments/session JSONL, or compact arguments outside `tool_result_*`.
 

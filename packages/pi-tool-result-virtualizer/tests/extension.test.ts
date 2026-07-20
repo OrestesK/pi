@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import {
 	mkdir,
 	mkdtemp,
-	readdir,
 	readFile,
 	stat,
 	symlink,
@@ -311,9 +310,9 @@ test("packaged analyst exposes only exact retrieval tools and no inherited conte
 	assert.deepEqual(packageJson.pi?.subagents?.agents, ["./agents"]);
 });
 
-test("delegate tool defaults to no-spawn preflight and receipts advertise only ready capability", async () => {
+test("delegate tool starts one bounded run and receipts advertise it only when ready", async () => {
 	await withRegisteredExtension(
-		async ({ dir, events, tools, runToolResult, runTool }) => {
+		async ({ events, tools, runToolResult, runTool }) => {
 			const capability = {
 				version: SUBAGENT_RPC_PROTOCOL_VERSION,
 				methods: ["ping", "status", "spawn", "interrupt", "stop"],
@@ -365,7 +364,20 @@ test("delegate tool defaults to no-spawn preflight and receipts advertise only r
 			};
 			const sourceId = patch.details.toolResultVirtualizer.sourceId;
 			const receiptText = patch.content[0]?.text ?? "";
-			assert.match(receiptText, /Delegate preflight/);
+			assert.match(receiptText, /Delegate analysis/);
+			assert.match(
+				receiptText,
+				/Recommended: for synthesis, comparison, or multi-fact questions, call tool_result_delegate once with task set to the user's actual question\./,
+			);
+			const recommendationIndex = receiptText.indexOf("Recommended:");
+			const knownFactIndex = receiptText.indexOf("Known fact:");
+			assert.ok(
+				recommendationIndex >= 0 && recommendationIndex < knownFactIndex,
+			);
+			assert.match(
+				receiptText,
+				/Choose based on the task: delegate synthesis, comparison, or multi-fact extraction; search then get one exact fact\./,
+			);
 			assert.match(
 				receiptText,
 				/Known fact: call tool_result_search with sourceId "tr_[^"]+" and your actual fact or phrase as query\./,
@@ -385,14 +397,13 @@ test("delegate tool defaults to no-spawn preflight and receipts advertise only r
 			for (const action of parsedReceipt.decisionCard.actions) {
 				const result = await runTool(action.toolName, action.args);
 				if (action.intent === "delegate_analysis") {
-					assert.equal(result.details?.status, "ready");
+					assert.equal(result.details?.status, "started");
 				} else {
 					assert.equal(result.details?.sourceId, sourceId);
 					assert.match(result.content[0]?.text ?? "", /DELEGATE_TARGET/);
 				}
 			}
-			assert.equal(spawnCalls, 0);
-			await assert.rejects(readdir(join(dir, "grants")), { code: "ENOENT" });
+			assert.equal(spawnCalls, 1);
 
 			const childEnvironment = {
 				PI_SUBAGENT_CHILD: process.env.PI_SUBAGENT_CHILD,
@@ -425,7 +436,7 @@ test("delegate tool defaults to no-spawn preflight and receipts advertise only r
 					};
 					assert.doesNotMatch(
 						childPatch.content[0]?.text ?? "",
-						/Delegate preflight/,
+						/Delegate analysis/,
 						name,
 					);
 					assert.equal(
@@ -443,12 +454,12 @@ test("delegate tool defaults to no-spawn preflight and receipts advertise only r
 
 			const delegate = tools.get("tool_result_delegate");
 			assert.ok(delegate);
-			assert.deepEqual(schemaProperties(delegate).dryRun, {
-				type: "boolean",
-				default: true,
-				description:
-					"Defaults to true and performs preflight only. Set false to explicitly authorize one bounded asynchronous analyst run.",
-			});
+			assert.equal(schemaProperties(delegate).dryRun, undefined);
+			assert.match(delegate.description, /single call/i);
+			assert.match(
+				(delegate.promptGuidelines ?? []).join(" "),
+				/actual question/i,
+			);
 			await assert.rejects(
 				runTool("tool_result_delegate", {
 					sourceId,
@@ -457,26 +468,7 @@ test("delegate tool defaults to no-spawn preflight and receipts advertise only r
 				}),
 				/use one sourceId/i,
 			);
-			const dryRun = await runTool("tool_result_delegate", {
-				sourceId,
-				task: "Identify the decisive evidence.",
-			});
-			assert.equal(dryRun.details?.status, "ready");
-			assert.equal(spawnCalls, 0);
-			await assert.rejects(readdir(join(dir, "grants")), { code: "ENOENT" });
-
-			const started = await runTool("tool_result_delegate", {
-				sourceId,
-				task: "Identify the decisive evidence.",
-				dryRun: false,
-			});
-			assert.equal(started.details?.status, "started");
-			assert.equal(started.details?.runId, "extension-run-1");
-			assert.equal(spawnCalls, 1);
-			assert.doesNotMatch(JSON.stringify(started), new RegExp(sourceId));
 			assert.deepEqual(requestSources, [
-				{ extension: "pi-tool-result-virtualizer" },
-				{ extension: "pi-tool-result-virtualizer" },
 				{ extension: "pi-tool-result-virtualizer" },
 				{ extension: "pi-tool-result-virtualizer" },
 			]);
@@ -501,7 +493,7 @@ test("delegate tool defaults to no-spawn preflight and receipts advertise only r
 			};
 			assert.doesNotMatch(
 				unavailablePatch.content[0]?.text ?? "",
-				/Delegate preflight/,
+				/Delegate analysis/,
 			);
 			assert.equal(
 				unavailablePatch.details.toolResultVirtualizer.actions.length,

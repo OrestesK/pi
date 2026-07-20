@@ -16,7 +16,7 @@ type ExactRangeAction = {
 type DelegateAnalysisAction = {
 	intent: "delegate_analysis";
 	toolName: "tool_result_delegate";
-	args: { sourceId: string; task: string; dryRun: true };
+	args: { sourceId: string; task: string };
 };
 
 export type ReceiptAction =
@@ -92,8 +92,7 @@ export function createReceiptDecisionCard(
 						toolName: "tool_result_delegate",
 						args: {
 							sourceId: resultRef.sourceId,
-							task: "Synthesize the decisive findings with line citations.",
-							dryRun: true,
+							task: "Identify the decisive findings in this source with line citations; state uncertainty and residual risks.",
 						},
 					},
 				]
@@ -178,8 +177,7 @@ function isReceiptAction(
 		value.toolName === "tool_result_delegate"
 	)
 		return (
-			argumentKeys === "dryRun,sourceId,task" &&
-			value.args.dryRun === true &&
+			argumentKeys === "sourceId,task" &&
 			typeof value.args.task === "string" &&
 			value.args.task.trim().length > 0 &&
 			value.args.task.length <= 2_000

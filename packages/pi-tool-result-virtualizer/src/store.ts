@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { join } from "node:path";
 
 import type { StoreLimits } from "./config.ts";
 import { inspectStoreConsistency } from "./diagnostics.ts";
@@ -11,6 +11,13 @@ import type {
 	CaptureScope,
 	ScopeFailure,
 } from "./provenance.ts";
+import { SearchCoordinator } from "./search-coordinator.ts";
+import {
+	StoreCatalog,
+	countLines,
+	searchSources,
+	splitLinesWithEndings,
+} from "./store-catalog.ts";
 import { SearchIndex } from "./search-index.ts";
 import { StoreWriteLock } from "./write-lock.ts";
 
@@ -215,7 +222,6 @@ export type RetentionPreview = {
 const INDEX_FILE = "index.jsonl";
 const SOURCES_DIR = "sources";
 const DETAILS_DIR = "details";
-const FTS_QUERY_BYTE_LIMIT = 512;
 const SYSTEM_ACCESS: StoreAccessContext = { actor: "system" };
 
 export type SearchIndexFactory = (
@@ -267,26 +273,6 @@ export class StoreQuotaError extends Error {
 	}
 }
 
-type IndexRead = {
-	entries: StoredSourceMetadata[];
-	indexLineCount: number;
-	invalidIndexLineCount: number;
-};
-
-function splitLinesWithEndings(text: string): string[] {
-	const matches = text.match(/[^\n]*(?:\n|$)/g) ?? [];
-	if (matches.at(-1) === "") matches.pop();
-	return matches;
-}
-
-function lineWithoutEnding(line: string): string {
-	return line.endsWith("\n") ? line.slice(0, -1) : line;
-}
-
-function countLines(text: string): number {
-	return splitLinesWithEndings(text).length;
-}
-
 function makeSourceId(): string {
 	return `tr_${Date.now().toString(36)}_${randomBytes(16).toString("hex")}`;
 }
@@ -312,247 +298,6 @@ function detailsByteCount(source: StoredSourceMetadata): number {
 	return source.originalDetailsByteCount ?? 0;
 }
 
-function isWithinPath(filePath: string, dir: string): boolean {
-	const pathRelativeToDir = relative(dir, filePath);
-	return (
-		pathRelativeToDir === "" ||
-		(!pathRelativeToDir.startsWith("..") && !isAbsolute(pathRelativeToDir))
-	);
-}
-
-function managedStorePath(
-	root: string,
-	directory: string,
-	filePath: string,
-): string | undefined {
-	const resolvedPath = resolve(filePath);
-	const resolvedDirectory = resolve(root, directory);
-	return isWithinPath(resolvedPath, resolvedDirectory)
-		? resolvedPath
-		: undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isCaptureStatus(value: unknown): value is CaptureStatus {
-	return (
-		value === "details.fullOutputPath" ||
-		value === "read.input.path" ||
-		value === "event.content"
-	);
-}
-
-function isScopeFailure(value: unknown): value is ScopeFailure {
-	return value === "cwd_unavailable" || value === "scope_key_unavailable";
-}
-
-function finiteNumberField(
-	record: Record<string, unknown>,
-	key: string,
-): number | undefined {
-	const value = record[key];
-	return typeof value === "number" && Number.isFinite(value)
-		? value
-		: undefined;
-}
-
-function stringField(
-	record: Record<string, unknown>,
-	key: string,
-): string | undefined {
-	const value = record[key];
-	return typeof value === "string" ? value : undefined;
-}
-
-type StoredProvenanceFields = Pick<
-	StoredSourceMetadata,
-	| "metadataVersion"
-	| "scope"
-	| "classification"
-	| "projectId"
-	| "scopeFailure"
-	| "sessionId"
-	| "subagentRunId"
-	| "agentName"
->;
-
-function storedProvenanceFields(
-	record: Record<string, unknown>,
-): StoredProvenanceFields | undefined {
-	if (record.metadataVersion !== 2) {
-		return {
-			metadataVersion: 1,
-			scope: "legacy",
-			classification: "legacy-unclassified",
-		};
-	}
-	if (record.scope !== "project" && record.scope !== "unscoped")
-		return undefined;
-	if (record.classification !== "unclassified-local") return undefined;
-	const projectId = stringField(record, "projectId");
-	const scopeFailure = isScopeFailure(record.scopeFailure)
-		? record.scopeFailure
-		: undefined;
-	if (record.scopeFailure !== undefined && scopeFailure === undefined)
-		return undefined;
-	if (
-		record.scope === "project" &&
-		(projectId === undefined ||
-			!/^[a-f0-9]{64}$/.test(projectId) ||
-			scopeFailure !== undefined)
-	)
-		return undefined;
-	if (
-		record.scope === "unscoped" &&
-		(projectId !== undefined ||
-			(scopeFailure !== "cwd_unavailable" &&
-				scopeFailure !== "scope_key_unavailable"))
-	)
-		return undefined;
-	const fields: StoredProvenanceFields = {
-		metadataVersion: 2,
-		scope: record.scope,
-		classification: record.classification,
-	};
-	if (projectId !== undefined) fields.projectId = projectId;
-	if (scopeFailure !== undefined) fields.scopeFailure = scopeFailure;
-	const sessionId = stringField(record, "sessionId");
-	const subagentRunId = stringField(record, "subagentRunId");
-	const agentName = stringField(record, "agentName");
-	if (sessionId !== undefined) fields.sessionId = sessionId;
-	if (subagentRunId !== undefined) fields.subagentRunId = subagentRunId;
-	if (agentName !== undefined) fields.agentName = agentName;
-	return fields;
-}
-
-function parseStoredSourceMetadata(
-	line: string,
-	root: string,
-): StoredSourceMetadata | undefined {
-	let value: unknown;
-	try {
-		value = JSON.parse(line);
-	} catch {
-		return undefined;
-	}
-	if (!isRecord(value) || !isCaptureStatus(value.captureStatus))
-		return undefined;
-	const sourceId = stringField(value, "sourceId");
-	const toolName = stringField(value, "toolName");
-	const storageKind = value.storageKind === "details" ? "details" : "content";
-	const createdAt = finiteNumberField(value, "createdAt");
-	const byteCount = finiteNumberField(value, "byteCount");
-	const lineCount = finiteNumberField(value, "lineCount");
-	const sha256 = stringField(value, "sha256");
-	const rawTextPath = stringField(value, "textPath");
-	if (
-		sourceId === undefined ||
-		toolName === undefined ||
-		createdAt === undefined ||
-		byteCount === undefined ||
-		lineCount === undefined ||
-		sha256 === undefined ||
-		rawTextPath === undefined
-	) {
-		return undefined;
-	}
-	const textPath = managedStorePath(root, SOURCES_DIR, rawTextPath);
-	if (textPath === undefined) return undefined;
-	const provenance = storedProvenanceFields(value);
-	if (provenance === undefined) return undefined;
-	const metadata: StoredSourceMetadata = {
-		...provenance,
-		sourceId,
-		toolName,
-		captureStatus: value.captureStatus,
-		storageKind,
-		createdAt,
-		byteCount,
-		lineCount,
-		sha256,
-		textPath,
-	};
-	const toolCallId = stringField(value, "toolCallId");
-	const inputSummary = stringField(value, "inputSummary");
-	const originalPath = stringField(value, "originalPath");
-	const originalFullOutputPath = stringField(value, "originalFullOutputPath");
-	const rawOriginalDetailsPath = stringField(value, "originalDetailsPath");
-	const originalDetailsPath =
-		rawOriginalDetailsPath === undefined
-			? undefined
-			: managedStorePath(root, DETAILS_DIR, rawOriginalDetailsPath);
-	if (rawOriginalDetailsPath !== undefined && originalDetailsPath === undefined)
-		return undefined;
-	const originalDetailsByteCount = finiteNumberField(
-		value,
-		"originalDetailsByteCount",
-	);
-	const originalDetailsSha256 = stringField(value, "originalDetailsSha256");
-	if (toolCallId !== undefined) metadata.toolCallId = toolCallId;
-	if (inputSummary !== undefined) metadata.inputSummary = inputSummary;
-	if (originalPath !== undefined) metadata.originalPath = originalPath;
-	if (originalFullOutputPath !== undefined)
-		metadata.originalFullOutputPath = originalFullOutputPath;
-	if (originalDetailsPath !== undefined)
-		metadata.originalDetailsPath = originalDetailsPath;
-	if (originalDetailsByteCount !== undefined)
-		metadata.originalDetailsByteCount = originalDetailsByteCount;
-	if (originalDetailsSha256 !== undefined)
-		metadata.originalDetailsSha256 = originalDetailsSha256;
-	return metadata;
-}
-
-function unicodeLength(text: string): number {
-	return [...text].length;
-}
-
-function isAscii(text: string): boolean {
-	return /^[\u0000-\u007f]*$/.test(text);
-}
-
-async function searchSources(
-	query: string,
-	sources: StoredSourceMetadata[],
-	limit: number,
-	contextLines: number,
-	lineStart: number,
-	lineLimit: number | undefined,
-): Promise<SearchMatch[]> {
-	const normalizedQuery = query.toLowerCase();
-	const matches: SearchMatch[] = [];
-	for (const source of sources) {
-		const text = await readFile(source.textPath, "utf8");
-		const lines = splitLinesWithEndings(text);
-		const searchStart = Math.min(lineStart - 1, lines.length);
-		const searchEnd =
-			lineLimit === undefined
-				? lines.length
-				: Math.min(searchStart + lineLimit, lines.length);
-		for (let index = searchStart; index < searchEnd; index += 1) {
-			const line = lineWithoutEnding(lines[index] ?? "");
-			const matchStartColumn = line.toLowerCase().indexOf(normalizedQuery);
-			if (matchStartColumn === -1) continue;
-			const contextStart = Math.max(searchStart, index - contextLines);
-			const contextEndExclusive = Math.min(searchEnd, index + contextLines + 1);
-			matches.push({
-				sourceId: source.sourceId,
-				toolName: source.toolName,
-				lineNumber: index + 1,
-				line,
-				matchStartColumn,
-				matchEndColumn: matchStartColumn + query.length,
-				contextStartLine: contextStart + 1,
-				contextEndLine: contextEndExclusive,
-				context: lines.slice(contextStart, contextEndExclusive).join(""),
-			});
-			if (matches.length >= limit) return matches;
-		}
-	}
-	return matches;
-}
-
 export class ToolResultStore {
 	readonly root: string;
 	readonly sourcesDir: string;
@@ -561,11 +306,10 @@ export class ToolResultStore {
 	private readonly writeLock: StoreWriteLock;
 	private readonly limits: StoreLimits;
 	private readonly failureInjector: StoreFailureInjector | undefined;
-	private readonly searchIndexFactory: SearchIndexFactory;
+	private readonly catalog: StoreCatalog;
+	private readonly searchCoordinator: SearchCoordinator;
 	private recoveryPromise: Promise<void> | undefined;
 	private writeQueue: Promise<void> = Promise.resolve();
-	private searchIndexPromise?: Promise<SearchIndex | undefined>;
-	private searchIndexDisabled = false;
 
 	constructor(root: string, options: ToolResultStoreOptions = {}) {
 		this.root = root;
@@ -575,7 +319,18 @@ export class ToolResultStore {
 		this.writeLock = new StoreWriteLock(root);
 		this.limits = options.limits ?? {};
 		this.failureInjector = options.failureInjector;
-		this.searchIndexFactory = options.searchIndexFactory ?? SearchIndex.create;
+		const searchIndexFactory = options.searchIndexFactory ?? SearchIndex.create;
+		this.catalog = new StoreCatalog({
+			root: this.root,
+			sourcesDir: this.sourcesDir,
+			detailsDir: join(root, DETAILS_DIR),
+			indexPath: this.indexPath,
+			recover: () => this.ensureRecovered(),
+		});
+		this.searchCoordinator = new SearchCoordinator(
+			this.root,
+			searchIndexFactory,
+		);
 	}
 
 	private async injectFailure(point: StoreFailurePoint): Promise<void> {
@@ -655,7 +410,7 @@ export class ToolResultStore {
 			});
 			await this.injectFailure("afterMetadataAppend");
 			await this.injectFailure("beforeFtsAppend");
-			await this.appendSearchIndex(metadata, input.text);
+			await this.searchCoordinator.append(metadata, input.text);
 			await this.injectFailure("afterFtsAppend");
 			await this.journal.commit(transaction).catch(() => undefined);
 			return metadata;
@@ -781,7 +536,7 @@ export class ToolResultStore {
 		limit = 20,
 		accessContext: StoreAccessContext = SYSTEM_ACCESS,
 	): Promise<StoredSourceMetadata[]> {
-		const entries = this.discoveryEntries(
+		const entries = this.catalog.discoveryEntries(
 			await this.readIndex(),
 			accessContext,
 		);
@@ -795,7 +550,7 @@ export class ToolResultStore {
 		accessContext: StoreAccessContext = SYSTEM_ACCESS,
 	): Promise<StoreStats> {
 		const index = await this.readIndexReport();
-		const entries = this.discoveryEntries(index.entries, accessContext);
+		const entries = this.catalog.discoveryEntries(index.entries, accessContext);
 		const totalBytes = entries.reduce((sum, entry) => sum + entry.byteCount, 0);
 		const totalOriginalDetailsBytes = entries.reduce(
 			(sum, entry) => sum + detailsByteCount(entry),
@@ -830,7 +585,10 @@ export class ToolResultStore {
 			sourcesDir: this.sourcesDir,
 			indexPath: this.indexPath,
 			allEntries: index.entries,
-			visibleEntries: this.discoveryEntries(index.entries, accessContext),
+			visibleEntries: this.catalog.discoveryEntries(
+				index.entries,
+				accessContext,
+			),
 			indexLineCount: index.indexLineCount,
 			invalidIndexLineCount: index.invalidIndexLineCount,
 			journal: await this.journal.inspect(),
@@ -844,7 +602,7 @@ export class ToolResultStore {
 		options: RetentionPreviewOptions = {},
 		accessContext: StoreAccessContext = SYSTEM_ACCESS,
 	): Promise<RetentionPreview> {
-		const entries = this.discoveryEntries(
+		const entries = this.catalog.discoveryEntries(
 			await this.readIndex(),
 			accessContext,
 		);
@@ -912,16 +670,16 @@ export class ToolResultStore {
 		sourceId: string,
 		accessContext: StoreAccessContext = SYSTEM_ACCESS,
 	): Promise<SourceRead> {
-		const metadata = await this.findSource(sourceId, accessContext);
+		const metadata = await this.catalog.findSource(sourceId, accessContext);
 		const text = await readFile(metadata.textPath, "utf8");
 		return { metadata, text };
 	}
 
-	async getSourceMetadata(
+	getSourceMetadata(
 		sourceId: string,
 		accessContext: StoreAccessContext = SYSTEM_ACCESS,
 	): Promise<StoredSourceMetadata> {
-		return this.findSource(sourceId, accessContext);
+		return this.catalog.findSource(sourceId, accessContext);
 	}
 
 	async getLineWindow(
@@ -984,7 +742,7 @@ export class ToolResultStore {
 		if (options.sourceId !== undefined)
 			return searchSources(
 				query,
-				[await this.findSource(options.sourceId, accessContext)],
+				[await this.catalog.findSource(options.sourceId, accessContext)],
 				limit,
 				contextLines,
 				lineStart,
@@ -993,7 +751,7 @@ export class ToolResultStore {
 		if (options.sourceIds !== undefined) {
 			const sources: StoredSourceMetadata[] = [];
 			for (const sourceId of options.sourceIds)
-				sources.push(await this.findSource(sourceId, accessContext));
+				sources.push(await this.catalog.findSource(sourceId, accessContext));
 			return searchSources(
 				query,
 				sources,
@@ -1003,11 +761,11 @@ export class ToolResultStore {
 				lineLimit,
 			);
 		}
-		const entries = this.discoveryEntries(
+		const entries = this.catalog.discoveryEntries(
 			await this.readIndex(),
 			accessContext,
 		);
-		const indexedCandidates = await this.indexedCandidateSources(
+		const indexedCandidates = await this.searchCoordinator.candidateSources(
 			query,
 			entries,
 		);
@@ -1021,132 +779,16 @@ export class ToolResultStore {
 		);
 	}
 
-	private async indexedCandidateSources(
-		query: string,
-		entries: StoredSourceMetadata[],
-	): Promise<StoredSourceMetadata[] | undefined> {
-		if (
-			this.searchIndexDisabled ||
-			unicodeLength(query) < 3 ||
-			!isAscii(query) ||
-			Buffer.byteLength(query, "utf8") > FTS_QUERY_BYTE_LIMIT
-		)
-			return undefined;
-		try {
-			const searchIndex = await this.getSearchIndex();
-			if (searchIndex === undefined) return undefined;
-			const candidateIds = new Set(
-				searchIndex.candidateSourceIds(query, entries),
-			);
-			return [...entries]
-				.reverse()
-				.filter((entry) => candidateIds.has(entry.sourceId));
-		} catch {
-			this.searchIndexDisabled = true;
-			return undefined;
-		}
-	}
-
-	private async appendSearchIndex(
-		metadata: StoredSourceMetadata,
-		text: string,
-	): Promise<void> {
-		if (this.searchIndexDisabled || this.searchIndexPromise === undefined)
-			return;
-		try {
-			const searchIndex = await this.getSearchIndex();
-			searchIndex?.append(metadata, text);
-		} catch {
-			this.searchIndexDisabled = true;
-		}
-	}
-
-	private async getSearchIndex(): Promise<SearchIndex | undefined> {
-		if (this.searchIndexDisabled) return undefined;
-		this.searchIndexPromise ??= this.searchIndexFactory(this.root);
-		const searchIndex = await this.searchIndexPromise;
-		if (searchIndex === undefined) this.searchIndexDisabled = true;
-		return searchIndex;
-	}
-
 	private async ensurePrivateRoot(): Promise<void> {
 		await mkdir(this.root, { recursive: true, mode: 0o700 });
 		await chmod(this.root, 0o700);
 	}
 
-	private discoveryEntries(
-		entries: StoredSourceMetadata[],
-		accessContext: StoreAccessContext,
-	): StoredSourceMetadata[] {
-		if (accessContext.actor === "system") return entries;
-		if (accessContext.actor === "subagent") return [];
-		return entries.filter((entry) => {
-			if (entry.scope === "project")
-				return (
-					accessContext.includeGlobal === true ||
-					(accessContext.projectId !== undefined &&
-						entry.projectId === accessContext.projectId)
-				);
-			return entry.scope === "legacy" && accessContext.includeLegacy === true;
-		});
+	private readIndex(): Promise<StoredSourceMetadata[]> {
+		return this.catalog.readIndex();
 	}
 
-	private hasExactAccess(
-		entry: StoredSourceMetadata,
-		accessContext: StoreAccessContext,
-	): boolean {
-		if (accessContext.actor === "system") return true;
-		if (accessContext.actor === "subagent")
-			return accessContext.grantedSourceIds?.has(entry.sourceId) === true;
-		return true;
-	}
-
-	private async findSource(
-		sourceId: string,
-		accessContext: StoreAccessContext = SYSTEM_ACCESS,
-	): Promise<StoredSourceMetadata> {
-		const entries = await this.readIndex();
-		for (let index = entries.length - 1; index >= 0; index -= 1) {
-			const entry = entries[index];
-			if (
-				entry?.sourceId === sourceId &&
-				this.hasExactAccess(entry, accessContext)
-			)
-				return entry;
-		}
-		throw new Error(
-			`Unknown tool-result source (source not found or unavailable): ${sourceId}`,
-		);
-	}
-
-	private async readIndex(): Promise<StoredSourceMetadata[]> {
-		await this.ensureRecovered();
-		return (await this.readIndexReport()).entries;
-	}
-
-	private async readIndexReport(): Promise<IndexRead> {
-		let raw = "";
-		try {
-			raw = await readFile(this.indexPath, "utf8");
-		} catch (error) {
-			const code =
-				error instanceof Error && "code" in error
-					? String((error as { code: unknown }).code)
-					: "";
-			if (code === "ENOENT")
-				return { entries: [], indexLineCount: 0, invalidIndexLineCount: 0 };
-			throw error;
-		}
-		const entries: StoredSourceMetadata[] = [];
-		let indexLineCount = 0;
-		let invalidIndexLineCount = 0;
-		for (const line of raw.split("\n")) {
-			if (line.length === 0) continue;
-			indexLineCount += 1;
-			const metadata = parseStoredSourceMetadata(line, this.root);
-			if (metadata === undefined) invalidIndexLineCount += 1;
-			else entries.push(metadata);
-		}
-		return { entries, indexLineCount, invalidIndexLineCount };
+	private readIndexReport() {
+		return this.catalog.readIndexReport();
 	}
 }

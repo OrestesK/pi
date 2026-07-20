@@ -1,7 +1,9 @@
 import type { SourceRead } from "./store.ts";
-import { byteLength, byteSafePrefix } from "./formatting.ts";
+import { byteLength, byteSafePrefix, byteSafeSuffix } from "./formatting.ts";
 
 const OUTLINE_SAMPLE_LINE_BYTE_LIMIT = 256;
+const SPARSE_PREVIEW_MAX_LINES = 3;
+const SPARSE_PREVIEW_WINDOW_BYTES = 2 * 1024;
 const OUTLINE_KEYWORDS = [
 	"error",
 	"warn",
@@ -71,6 +73,19 @@ function formatNumberedLine(
 	byteLimit = OUTLINE_SAMPLE_LINE_BYTE_LIMIT,
 ): string {
 	return `${index + 1}: ${capSampleLine(lines[index] ?? "", byteLimit)}`;
+}
+
+function formatSparseBytePreview(text: string): string {
+	const head = byteSafePrefix(text, SPARSE_PREVIEW_WINDOW_BYTES);
+	const tail = byteSafeSuffix(text, SPARSE_PREVIEW_WINDOW_BYTES);
+	return [
+		"## Byte preview",
+		"Byte windows are orientation only; use cited line retrieval for evidence.",
+		`### First ${byteLength(head)} bytes`,
+		head,
+		`### Last ${byteLength(tail)} bytes`,
+		tail,
+	].join("\n");
 }
 
 function sampleLineBlock(
@@ -223,6 +238,9 @@ export function formatSourcePreview(
 	const omittedAfter = preview.lineCount - previousEndLine;
 	if (omittedAfter > 0)
 		lines.push(`[omitted ${omittedAfter} lines after samples]`);
+	if (preview.lineCount <= SPARSE_PREVIEW_MAX_LINES) {
+		lines.push("", formatSparseBytePreview(text));
+	}
 	return { ...preview, text: lines.join("\n") };
 }
 

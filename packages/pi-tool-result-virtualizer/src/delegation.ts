@@ -29,7 +29,6 @@ const ANALYST_MANIFEST_PATH = "agents/result-analyst.md";
 export type DelegationInput = {
 	sourceId: string;
 	task: string;
-	dryRun: boolean;
 };
 
 export type DelegationRpc = {
@@ -169,29 +168,6 @@ export class ResultDelegationService {
 	): Promise<DelegationResult> {
 		const preflight = await this.#preflight(input, context, signal);
 		if (!preflight.ok) return preflight.result;
-		if (input.dryRun) {
-			return {
-				content: [
-					{
-						type: "text",
-						text: "Delegation preflight passed. No analyst was spawned. Re-run with dryRun:false to authorize the bounded asynchronous run.",
-					},
-				],
-				details: {
-					kind: "tool_result_delegation",
-					status: "ready",
-					dryRun: true,
-					actions: [
-						{
-							kind: "run",
-							tool: "tool_result_delegate",
-							args: { ...input, dryRun: false },
-						},
-					],
-				},
-			};
-		}
-
 		const pending = this.#grants.prepare(preflight.grant);
 		let runId: string;
 		try {
@@ -246,7 +222,6 @@ export class ResultDelegationService {
 			details: {
 				kind: "tool_result_delegation",
 				status: "started",
-				dryRun: false,
 				runId,
 				actions: managementActions(runId),
 			},
