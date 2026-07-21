@@ -6,6 +6,84 @@
     "pathAccess": false
   },
   "permissionGate": {
+    "patterns": [
+      {
+        "pattern": "rm -rf",
+        "description": "recursive force delete"
+      },
+      {
+        "pattern": "sudo",
+        "description": "superuser command"
+      },
+      {
+        "pattern": "dd of=",
+        "description": "disk write operation"
+      },
+      {
+        "pattern": "mkfs.",
+        "description": "filesystem format"
+      },
+      {
+        "pattern": "chmod -R 777",
+        "description": "insecure recursive permissions"
+      },
+      {
+        "pattern": "chown -R",
+        "description": "recursive ownership change"
+      },
+      {
+        "pattern": "doas",
+        "description": "privileged command execution"
+      },
+      {
+        "pattern": "pkexec",
+        "description": "privileged command execution"
+      },
+      {
+        "pattern": "shred",
+        "description": "secure file overwrite"
+      },
+      {
+        "pattern": "wipefs",
+        "description": "filesystem signature wipe"
+      },
+      {
+        "pattern": "blkdiscard",
+        "description": "block device discard"
+      },
+      {
+        "pattern": "fdisk",
+        "description": "disk partitioning"
+      },
+      {
+        "pattern": "parted",
+        "description": "disk partitioning"
+      },
+      {
+        "pattern": "docker run --privileged",
+        "description": "container with privileged mode"
+      },
+      {
+        "pattern": "(?:^|[;&|()])\\s*(?:(?:(?:env\\s+(?:(?:-[A-Za-z]+|--[A-Za-z0-9-]+(?:=\\S+)?|\\S+=\\S+)\\s+)*)|(?:command\\s+)))*(?:(?:/usr)?/bin/|/usr/local/bin/)?git\\b(?:\\s+(?:(?:-C|-c|--git-dir|--work-tree|--namespace)\\s+\\S+|(?:--git-dir|--work-tree|--namespace)=\\S+|-[A-Za-z]+|--[A-Za-z0-9-]+))*\\s+(?:add|am|apply|bisect|branch|checkout|cherry-pick|clean|clone|commit|fetch|init|merge|mv|pull|push|rebase|reflog|remote|reset|restore|revert|rm|stash|submodule|switch|tag|worktree)\\b",
+        "regex": true,
+        "description": "Git repository mutation"
+      },
+      {
+        "pattern": "(?:^|[;&|()])\\s*(?:(?:(?:env\\s+(?:(?:-[A-Za-z]+|--[A-Za-z0-9-]+(?:=\\S+)?|\\S+=\\S+)\\s+)*)|(?:command\\s+)))*(?:(?:/usr)?/bin/|/usr/local/bin/)?git\\b(?:\\s+(?:(?:-C|-c|--git-dir|--work-tree|--namespace)\\s+\\S+|(?:--git-dir|--work-tree|--namespace)=\\S+|-[A-Za-z]+|--[A-Za-z0-9-]+))*\\s+(?:config\\b(?=(?:(?![;&|()]).)*?(?:\\s(?:--add|--replace-all|--unset(?:-all)?|--rename-section|--remove-section)\\b|\\s+[A-Za-z0-9_][A-Za-z0-9_.-]*\\s+\\S+))(?![^;&|()]*\\s(?:--get|--get-all|--get-regexp|--list|-l)\\b)|notes\\s+(?:add|append|copy|edit|merge|prune|remove)\\b|credential\\s+(?:approve|reject)\\b)",
+        "regex": true,
+        "description": "Git metadata or credential mutation"
+      },
+      {
+        "pattern": "(?:^|[;&|()])\\s*(?:(?:(?:env\\s+(?:(?:-[A-Za-z]+|--[A-Za-z0-9-]+(?:=\\S+)?|\\S+=\\S+)\\s+)*)|(?:command\\s+)))*(?:(?:/usr)?/bin/|/usr/local/bin/)?git\\b(?:\\s+(?:(?:-C|-c|--git-dir|--work-tree|--namespace)\\s+\\S+|(?:--git-dir|--work-tree|--namespace)=\\S+|-[A-Za-z]+|--[A-Za-z0-9-]+))*\\s+push\\b[^;&|()]*(?:--force|-f)\\b",
+        "regex": true,
+        "description": "Git force push"
+      },
+      {
+        "pattern": "(^|[;&|()\\s])gs\\s+(?:(?:upstack|downstack|branch|stack|repo|commit)\\s+)?(?:absorb|amend|checkout|continue|create|delete|onto|rename|rebase|restack|submit|sync)\\b",
+        "regex": true,
+        "description": "git-spice repository mutation"
+      }
+    ],
     "autoDenyPatterns": [
       {
         "pattern": "(?:^|[;&|()])\\s*rm\\b(?=[^;&|()]*\\s(?:-[A-Za-z]*[rR][A-Za-z]*|--recursive)\\b)(?=[^;&|()]*\\s(?:-[A-Za-z]*[fF][A-Za-z]*|--force)\\b)[^;&|()]*\\s(?:--\\s+)?(?:/|~/?|\\./?)(?=\\s|$|[;&|()])",
@@ -20,22 +98,6 @@
       },
       {
         "pattern": "mkfs"
-      },
-      {
-        "pattern": "(?:^|[;&|()])\\s*(?:(?:(?:env\\s+(?:(?:-[A-Za-z]+|--[A-Za-z0-9-]+(?:=\\S+)?|\\S+=\\S+)\\s+)*)|(?:command\\s+)))*(?:(?:/usr)?/bin/|/usr/local/bin/)?git\\b(?:\\s+(?:(?:-C|-c|--git-dir|--work-tree|--namespace)\\s+\\S+|(?:--git-dir|--work-tree|--namespace)=\\S+|-[A-Za-z]+|--[A-Za-z0-9-]+))*\\s+(?:add|am|apply|bisect|branch|checkout|cherry-pick|clean|clone|commit|fetch|init|merge|mv|pull|push|rebase|reflog|remote|reset|restore|revert|rm|stash|submodule|switch|tag|worktree)\\b",
-        "regex": true
-      },
-      {
-        "pattern": "(?:^|[;&|()])\\s*(?:(?:(?:env\\s+(?:(?:-[A-Za-z]+|--[A-Za-z0-9-]+(?:=\\S+)?|\\S+=\\S+)\\s+)*)|(?:command\\s+)))*(?:(?:/usr)?/bin/|/usr/local/bin/)?git\\b(?:\\s+(?:(?:-C|-c|--git-dir|--work-tree|--namespace)\\s+\\S+|(?:--git-dir|--work-tree|--namespace)=\\S+|-[A-Za-z]+|--[A-Za-z0-9-]+))*\\s+(?:config\\b(?=(?:(?![;&|()]).)*?(?:\\s(?:--add|--replace-all|--unset(?:-all)?|--rename-section|--remove-section)\\b|\\s+[A-Za-z0-9_][A-Za-z0-9_.-]*\\s+\\S+))(?![^;&|()]*\\s(?:--get|--get-all|--get-regexp|--list|-l)\\b)|notes\\s+(?:add|append|copy|edit|merge|prune|remove)\\b|credential\\s+(?:approve|reject)\\b)",
-        "regex": true
-      },
-      {
-        "pattern": "(?:^|[;&|()])\\s*(?:(?:(?:env\\s+(?:(?:-[A-Za-z]+|--[A-Za-z0-9-]+(?:=\\S+)?|\\S+=\\S+)\\s+)*)|(?:command\\s+)))*(?:(?:/usr)?/bin/|/usr/local/bin/)?git\\b(?:\\s+(?:(?:-C|-c|--git-dir|--work-tree|--namespace)\\s+\\S+|(?:--git-dir|--work-tree|--namespace)=\\S+|-[A-Za-z]+|--[A-Za-z0-9-]+))*\\s+push\\b[^;&|()]*(?:--force|-f)\\b",
-        "regex": true
-      },
-      {
-        "pattern": "(^|[;&|()\\s])gs\\s+(?:(?:upstack|downstack|branch|stack|repo|commit)\\s+)?(?:absorb|amend|checkout|continue|create|delete|onto|rename|rebase|restack|submit|sync)\\b",
-        "regex": true
       },
       {
         "pattern": "(^|[;&|()\\s])sudo\\b",
