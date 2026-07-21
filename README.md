@@ -81,7 +81,7 @@ export PI_CODING_AGENT_DIR="$HOME/.config/pi"
 
 Persist `PI_CODING_AGENT_DIR` in your shell startup file before opening Pi. Run `setup.sh` from a normal terminal outside Pi, then restart Pi; dependency installation replaces local package trees that an active process may have loaded. The script requires the variable to resolve to its own checkout and does not create or modify `~/.pi/agent`.
 
-The script repairs an ordinary non-recursive clone, synchronizes submodule URLs, and installs the locked runtime dependencies for Pi Lens, `pi-memory-md`, `pi-openai-service-tier`, `pi-subagents`, and the local tree-sitter MCP server. It never installs system tools, global npm packages, credentials, OAuth state, or optional integrations.
+The script repairs an ordinary non-recursive clone, synchronizes submodule URLs, installs the locked runtime dependencies for Pi Lens, `pi-memory-md`, `pi-openai-service-tier`, `pi-subagents`, and the local tree-sitter MCP server, then runs each checked-in `profiles/*/setup.sh` hook. It never installs system tools, global npm packages, credentials, OAuth state, or optional integrations.
 
 ## Untracked runtime data
 

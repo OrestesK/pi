@@ -7,6 +7,7 @@ OPTIONAL_COMMANDS=(pnpm uv chafa wl-paste)
 INSTALL_ROOTS=(
 	"npm"
 	"mcp-servers/tree-sitter"
+	"packages/pi-lens"
 	"packages/pi-memory-md"
 	"packages/pi-openai-service-tier"
 	"packages/pi-subagents"
@@ -70,6 +71,15 @@ for relative_root in "${INSTALL_ROOTS[@]}"; do
 	package_root="$CONFIG_DIR/$relative_root"
 	echo "Installing runtime dependencies: $relative_root"
 	npm ci --prefix "$package_root" --omit=dev --ignore-scripts
+done
+
+shopt -s nullglob
+profile_setups=("$CONFIG_DIR"/profiles/*/setup.sh)
+shopt -u nullglob
+for profile_setup in "${profile_setups[@]}"; do
+	profile_name="$(basename "$(dirname "$profile_setup")")"
+	echo "Installing profile: $profile_name"
+	bash "$profile_setup"
 done
 
 echo "Bootstrap complete: $CONFIG_DIR"
