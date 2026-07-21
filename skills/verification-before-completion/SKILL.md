@@ -19,6 +19,17 @@ Before saying work is done, fixed, passing, ready, clean, or complete:
 
 If you cannot run a check, say so. Do not convert inability to verify into confidence.
 
+## Claim Binding
+
+Bind every completion claim to the exact thing being completed:
+
+- current approved task intent or contract and requested behavior,
+- final repository root/worktree and changed paths,
+- current observable implementation route when it is material to the claim,
+- evidence captured after the latest relevant edit or correction.
+
+Evidence from a superseded direction, different checkout, replaced implementation path, or pre-fix run is stale. A passing test proves only the behavior it exercises; it does not justify unrelated work. Return `INCONCLUSIVE` when the claim cannot be bound to the current requested behavior and final target.
+
 ## Claim Verification
 
 When the user asks to verify a specific claim, restate it in falsifiable form before testing it.
@@ -45,6 +56,7 @@ Do not use claim verification for vague claims such as “cleaner” or “bette
 | CLI/TUI behavior        | Repo-native harness, tmux/PTY transcript, or screen capture showing the expected state change |
 | Subagent completed task | Parent inspected subagent summary, diff, and verification                                     |
 | Config/skill valid      | Frontmatter/path/reference validation or explicit inspection                                  |
+| Scope preserved         | Final diff showing each changed path/hunk directly supports the requested outcome or is reported as material expansion |
 | No behavior change      | Diff inspection showing prompt/docs/config-only change                                        |
 
 For interactive CLI/TUI claims, prefer the repo's own harness first. If none exists, use a bounded tmux or PTY probe: capture the screen before acting, send one action, wait for a concrete prompt or screen pattern, then capture the result. Prefer deterministic waits over sleeps.
@@ -67,6 +79,7 @@ If parent cannot verify directly, report “worker reported X; I did not indepen
 Use this shape:
 
 ```text
+Contract: <revision/approved behavior or not applicable>
 Changed: <files/areas>
 Verification: <commands/evidence and results>
 Review: <review status or not run>

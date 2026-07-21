@@ -45,9 +45,33 @@ Before the first mutating tool call, internally verify:
 - [ ] Is there any placement/design decision?
 - [ ] Will this touch tests/docs/config?
 - [ ] Did the user explicitly approve if Tier 2+?
+- [ ] Is the current task intent or contract proportional to risk and bound to the latest user correction?
 - [ ] Which TDD scenario applies if behavior changes?
 
 If any answer requires approval, stop and ask. Do not continue into parent file edits, write-child dispatch, or multi-step execution while a material question is unresolved.
+
+### Task Intent and Contract
+
+Before the first source/config mutation, establish task intent proportional to risk. Use the `task_contract` tool when it is registered; until then, record the active direction in chat when it is not already clear from the request and approval.
+
+For unambiguous Tier 1 work, the explicit request normally supplies authority. Use a concise objective, non-goals, and verification target; do not require another confirmation or invent exact line ranges and budgets merely to complete a template.
+
+For Tier 2/3 work, state:
+
+- requested behavior and observable outcome,
+- explicit non-goals,
+- repository root/worktree,
+- expected files, behavior owners, and new persistent files when known,
+- verification and review mode,
+- approval boundaries and stop conditions.
+
+Exact file/range envelopes and changed-line budgets are optional controls for user-requested strict scope, high-risk mutations, dirty-worktree isolation, or concurrent writers. They are not universal performance targets.
+
+Implement the smallest coherent solution and investigate broadly enough to find the real owner. Necessary adjacent edits may proceed when they directly support the approved outcome and do not introduce new behavior, public/API contracts, dependencies, security/data decisions, or unexpected persistent files. Report them. Present a delta and obtain approval before material expansion.
+
+Do not silently add unrelated refactoring or cleanup, new abstractions/frameworks, compatibility work, diagnostic-driven edits, dependency/config changes, or extra persistent files. Reviewer and tool findings are evidence to evaluate, not authority to broaden the task.
+
+A later user correction supersedes conflicting task-intent or contract terms. Pause affected mutations, revise the active direction, and interrupt or reissue stale write children before continuing.
 
 ### Clarification Checkpoints
 
@@ -173,7 +197,7 @@ For exceptional concurrent write execution with subagents:
 - Dispatch read-only `reviewer` agents after implementation:
   1. spec compliance review against the approved task/design,
   2. code quality review when needed.
-- The parent applies must-fix findings, then re-reviews the affected mode. Use write children for fixes only when at least two independent fix areas satisfy the same concurrent-write contract.
+- The parent applies must-fix findings that directly support the current task intent and stay within approved boundaries, then re-reviews the affected mode. Ask before material expansion. Use write children for fixes only when at least two independent fix areas satisfy the same concurrent-write contract.
 - If two focused fix attempts fail, stop and ask; the plan likely needs redesign.
 
 ### Research Phase
@@ -200,8 +224,8 @@ Do not start from helper or abstraction design. Start from the existing owner pa
 
 - The parent normally implements approved changes and directly reads the precise files and symbols it edits.
 - Use write workers only under the exceptional concurrent-write policy above.
-- Give every write worker an exact edit packet: assigned files and symbols, required behavior, non-goals, TDD scenario when applicable, validation commands and evidence, and prohibited product/API/compatibility/scope decisions.
-- If the edit packet cannot specify those boundaries exactly, go back to planning.
+- Give every write worker an exact edit packet: current task-contract revision, assigned files and baseline symbols/ranges, required behavior, non-goals, TDD scenario when applicable, validation commands and evidence, and prohibited product/API/compatibility/scope decisions.
+- If the edit packet cannot specify those boundaries exactly, or its revision is stale, go back to planning.
 - Concurrent writers must have exclusive, non-overlapping file lists. Each child stops before an unassigned file and communicates only a real blocker, discovered overlap, or an unapproved product/API/compatibility/scope decision.
 - Do not run repository-wide mutating formatters, code generators, migrations, or equivalent commands while concurrent writes are active.
 - The parent and workers run focused checks; the parent inspects and integrates worker diffs, then verifies the combined result.
@@ -217,7 +241,7 @@ Do not start from helper or abstraction design. Start from the existing owner pa
 - For plan execution, prefer spec compliance review first, then code quality review when needed.
 - Reviewer writes findings to `.scratch/reviews/` or returns concise inline output when artifacts are unnecessary.
 - Parent synthesizes reviewer disagreements; do not blindly apply every suggestion.
-- Address must-fix findings before presenting to user.
+- Findings cannot amend material scope. Address must-fix findings that directly support the approved outcome; ask before new behavior, public/API contracts, dependencies, compatibility, security/data decisions, unexpected persistent files, or another approval boundary.
 
 ### Completion Phase
 

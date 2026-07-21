@@ -74,7 +74,7 @@
     "packages/pi-subagents",
     "npm:pi-mcp-adapter",
     {
-      "source": "npm:pi-lens",
+      "source": "packages/pi-lens",
       "skills": [
         "ast-grep"
       ]
@@ -94,6 +94,7 @@
         "ctx-doctor"
       ]
     },
+    "npm:pi-intercom",
     "packages/pi-slipstream-compact",
     "packages/pi-goal-supervisor",
     "packages/pisesh",

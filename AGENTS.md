@@ -51,6 +51,13 @@ Do not reveal hidden chain-of-thought. Summarize evidence, conclusions, and tool
 - Do not remove existing comments if not changing behavior
 - Do not rename variables for no good reason
 
+## Shared decision terms
+
+- **Material:** affects observable behavior, API/schema, dependencies, security or data handling, external effects, or an approval boundary
+- **Nontrivial:** involves an unclear owner or root cause, meaningful behavior change, multiple affected files or owners, or multiple verification surfaces
+- **Broad:** spans multiple modules or repositories, or produces output unsuitable for direct inspection
+- **Useful:** capable of changing the decision, implementation, risk classification, verification, or completion claim
+
 ## Async-first orchestration
 
 The parent agent normally owns implementation, fixes, integration, and final verification. Subagents are the default for broad read-only reconnaissance, research, planning advice, review, and validation—not the normal write path.
@@ -206,12 +213,34 @@ Forbidden:
 - Verify before done — run or inspect fresh evidence before saying done/fixed/passing/ready
 
 - No silent decisions — ask before changes that materially affect outcomes, scope, safety, tests, or workflow
+- Before source/config mutation, establish task intent proportional to risk. For unambiguous Tier 1 work, the explicit request plus a concise objective and non-goals is sufficient. For Tier 2/3 work or concurrent writers, state a fuller contract with the root, expected edit surface, verification, and approval boundaries. Use `task_contract` when available; until then, record it in chat
+- Implement the smallest coherent solution. Investigate freely, but do not silently add unrelated refactoring, cleanup, abstractions, compatibility work, diagnostic-driven edits, dependencies, or persistent files. Explain and ask before material expansion of behavior or approved boundaries
+- When changing shared behavior, state, or representations, place it at its canonical owner; retain separate paths only for demonstrated runtime or contract boundaries.
+- Before nontrivial planning or implementation, briefly summarize and confirm:
+  - the smallest coherent model is sufficient;
+  - no generation framework or scaffolding is being added without a current consumer;
+  - compatibility or backfill is needed only for released, deployed, or externally consumed behavior;
+  - observable behavior and its contract are defined before code;
+  - tests assert the behavioral contract, not incidental implementation details;
+  - documentation describes only behavior actually deployed or otherwise available to users.
+- A later user correction supersedes conflicting task-intent or contract terms. Pause affected writes, revise the active direction, and interrupt or reissue stale write work before continuing
+- Reviewer, diagnostic, test, and tool findings are evidence, not edit authority. Apply findings that directly support the requested outcome and stay within approved boundaries; otherwise present them as proposed follow-up work
 
 ### Approval presentation
 
 Before asking for approval, present the proposal itself in chat. A file path, artifact link, plan name, review verdict, or terse scope label is supporting evidence, not a substitute for a decision-ready presentation.
 
-Make the approval request clean and self-contained. The user must not need to open a file to understand the material decision. Include:
+Make the approval request clean, self-contained, and proportional to the tier. The user must not need to open a file to understand the material decision.
+
+For Tier 2, include a compact decision-ready presentation:
+
+- **Recommendation and outcome:** the proposed choice, why it is preferred, and what it accomplishes
+- **Plan and affected targets:** the actions/files and verification or review strategy
+- **Material assumptions, uncertainties, risks, and tradeoffs:** include only items that could change the decision or outcome
+- **Evidence:** what was inspected, what checks passed or failed, and what has not been executed
+- **Approval boundary:** the exact actions authorized, exclusions, stop conditions, and next action requiring separate approval
+
+For Tier 3 or high-risk work, include the full presentation:
 
 - **Recommendation:** the proposed choice and why it is preferred
 - **Outcome:** what the approved work will accomplish in user/system terms
@@ -224,7 +253,7 @@ Make the approval request clean and self-contained. The user must not need to op
 - **Evidence:** what was inspected, what reviews/checks passed or failed, and what has not been executed
 - **Approval boundary:** the exact actions authorized, exact exclusions, stop conditions, and the next action that will require separate approval
 
-For Tier 2/3 plans, provide a compact decision table or structured summary before the approval question. State task/phase count and summarize every material phase; do not merely say the full plan exists at a path. Keep detail proportional, but never omit a material assumption, uncertainty, risk, failure, or scope exclusion for brevity.
+For Tier 2/3 plans, provide a compact decision table or structured summary before the approval question. For Tier 3, state task/phase count and summarize every material phase; do not merely say the full plan exists at a path. Never omit a material assumption, uncertainty, risk, failure, or scope exclusion for brevity.
 
 End with exactly one focused approval question naming the precise boundary. Do not ask vague questions such as “looks good?” or request approval for multiple independently optional scopes at once.
 
@@ -314,7 +343,7 @@ For file mutations, use Edit for modifications and Write only for new files or e
 
 ### Code intelligence
 
-For code tasks, code-intelligence evidence is mandatory when code structure, behavior, types, or diagnostics are material. Choose the smallest tool that answers the current evidence question; there is no universal tool sequence. This applies to code-capable agents and parent sessions with Pi context, tree-sitter, ast-grep, and LSP tools. Non-code specialist agents that lack those tools, such as run monitors or external researchers, MUST report tool unavailability instead of attempting code work or faking compliance.
+For code tasks, code-intelligence evidence is mandatory when code structure, behavior, types, or diagnostics are material. Use semantic code-intelligence tools instead of manual full-file reading or text search whenever those tools can answer the question. Choose the shortest sufficient tool sequence; there is no universal order. This applies to code-capable agents and parent sessions with Pi context, tree-sitter, ast-grep, and LSP tools. Non-code specialist agents that lack those tools, such as run monitors or external researchers, MUST report tool unavailability instead of attempting code work or faking compliance.
 
 - Use `symbol_search` and `module_report` for ranked ownership, likely files, module shape, dependents, and recommended reads
 - Use `read_symbol` and `read_enclosing` for the exact implementation body after a symbol or relevant line is known
@@ -332,11 +361,11 @@ For code tasks, code-intelligence evidence is mandatory when code structure, beh
 
 ### Docs and web
 
-- When a code task requires determining or relying on external library, framework, API, protocol, CLI, or service behavior, verify that behavior in current, version-matched public documentation before inspecting local integration or implementation code.
-- Before docs verification, local inspection is limited to manifests, lockfiles, imports, and dependency metadata needed to identify the dependency and version.
-- Use Context7 first to locate or query current version-matched official documentation when available. If it cannot provide adequate official material for the required version or behavior, use web/content search and prefer official documentation or primary specifications.
-- After checking public documentation, inspect local code to determine how the dependency is integrated and whether the project intentionally differs from documented behavior.
-- Skip docs-first research only for demonstrably repo-local or purely mechanical work, or after public documentation cannot answer the question. In the latter case, state the source attempted and unresolved uncertainty before inspecting local behavior.
+- When a code task requires determining or relying on external library, framework, API, protocol, CLI, or service behavior, verify that behavior in current, version-matched public documentation and inspect the local integration before concluding.
+- Choose the shortest sufficient order. Local manifests, lockfiles, imports, dependency metadata, or semantic code navigation may establish the version and integration before or alongside documentation research.
+- Prefer Context7 when it provides the fastest route to current version-matched official documentation. Otherwise use web/content search and prefer official documentation or primary specifications.
+- Use semantic code-intelligence tools for local integration inspection; do not substitute broad manual source reading when LSP, tree-sitter, ast-grep, or targeted symbol reads can answer the question.
+- Skip external documentation only for demonstrably repo-local or purely mechanical work, or when public documentation cannot answer the question. In the latter case, state the source attempted and unresolved uncertainty.
 - Do not rely on memory when current docs or source can verify it.
 - Use `code_search` or `web_search` when examples, ecosystem usage, or current external behavior would materially improve confidence.
 
@@ -381,20 +410,22 @@ Use git diff/status normally for repo work; do not add a separate checkout prech
 
 Use the workflow that preserves quality. Workflow routing is additive to async-first orchestration: skills define visibility, approval, evidence, and safety gates; they must not be used to suppress read-only advisory/recon/reflection subagents.
 
+`manager-workflow` approval routing and `verification-before-completion` remain mandatory whenever their triggers apply. Other specialized workflows are mandatory for material matching work; truly mechanical work may skip them when no meaningful behavior, uncertainty, or verification surface is involved.
+
 | Situation                                              | Required route                                                                  |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------- |
 | Implementation, refactor, migration, new service, or multi-step work | load `manager-workflow`; classify Tier 1/2/3; get approval for Tier 2+          |
 | Vague idea, feature shape, design/placement before implementation | `brainstorming`                                                                 |
 | Approved work that needs task breakdown or a plan file | `writing-plans`                                                                 |
-| Approved new behavior or logic change                  | `test-driven-development`; choose a TDD scenario                                |
-| Adding/changing tests, test helpers, fixtures, mocks, or test-review feedback | `writing-tests`; use `test-driven-development` too when changing behavior or fixing bugs |
-| Bug, failure, crash, flaky behavior, unexpected output | `systematic-debugging` first; use TDD for the fix after root cause is supported |
-| Code/spec/plan/review feedback                         | `review`; for nontrivial review, use fresh reviewer subagents by default        |
+| Material new behavior or logic change                 | `test-driven-development`; choose a TDD scenario                                |
+| Material changes to tests, test helpers, fixtures, mocks, or test-review feedback | `writing-tests`; use `test-driven-development` too when changing behavior or fixing bugs |
+| Nontrivial bug, failure, crash, flaky behavior, or unexpected output | `systematic-debugging` first; use TDD for the fix after root cause is supported |
+| Nontrivial code/spec/plan/review feedback              | `review`; use fresh reviewer subagents by default                               |
 | Final done/fixed/passing/ready claim                   | `verification-before-completion`                                                |
 | GitHub PR/CI/issues                                    | `github`; for iterative PR fixes use `iterate-pr`                               |
 | Session JSONL analysis                                 | `session-reader`                                                                |
 | First time in an unfamiliar repo                       | `learn-codebase`                                                                |
-| React/TS UI work                                       | `frontend`                                                                      |
+| Material React/TS UI work                              | `frontend`                                                                      |
 
 ### Tier rules
 
@@ -409,7 +440,7 @@ If uncertain, classify higher inside `manager-workflow`. If the user says “wai
 - In sessions that are not parent agents, reserve `intercom({ action: "ask" })` for explicit cross-session coordination with a known live, idle peer whose reply is immediately required. Never target a busy session or use it as a substitute for subagent dispatch.
 - When launching subagents, pass explicit task-critical context in the dispatch prompt; do not rely on inherited or forked context. If the child must inspect a file such as `context.md`, `plan.md`, or a generated handoff artifact, include it in that child or step's explicit `reads` list; do not rely on agent default reads. Keep detailed dispatch-packet protocol in `packages/pi-subagents/skills/pi-subagents/SKILL.md` and match task prose with runtime flags
 - Prefer async read-only/advisory/recon/review subagents by default for nontrivial tasks, uncertainty, cleanup, planning, verification, and reflection during waits
-- The parent normally implements approved work and applies accepted fixes. Parent implementation is not an exceptional fallback.
+- The parent normally implements approved work and fixes that directly support the current task intent. Parent implementation is not an exceptional fallback.
 - Use `scout` and `researcher` for broad read-only reconnaissance and research, `planner` for read-only planning advice, `reviewer` for read-only evidence-backed review, and reducer/synthesis steps when many children produce outputs.
 - Use `worker` only when at least two independent implementation areas can proceed concurrently in the shared checkout. The parent must own at least one area; every writer must receive an exclusive, non-overlapping file list.
 - Every write-child dispatch must name the exact files and symbols, required behavior, non-goals, validation commands and evidence, and prohibited product/API/compatibility/scope decisions. The child must stop before touching an unassigned file.
@@ -434,7 +465,7 @@ If uncertain, classify higher inside `manager-workflow`. If the user says “wai
 - Use runtime `chain` when a later subagent step depends on earlier child output, especially generate/filter, research-decision, debate/attack/synthesis, context-build/handoff, review-matrix-reduce, and scout/context-builder-to-planner flows
 - Do not run scout-only or generator-only fanout for option generation; use generate/filter fan-in, and treat the route as incomplete until a reducer/filter sees the concrete generated outputs
 - Explicit numeric subagent requests are user intent, not mere emphasis. Honor them when the user says they are literal, a goal, or a requirement, provided the work can be split into distinct scopes/angles, runs stay within tool concurrency limits, and the workflow includes fan-in/reducer synthesis. If the requested count cannot be made non-duplicative or safe, report the limiting reason and ask for a smaller or more explicitly sliced scope
-- 8-10 review agents are valid defaults for broad reviews when roles are distinct or chained through validators/reducers; use `review-matrix-reduce` rather than duplicate vague reviewers. Larger explicit counts, including up to 200, require shardable scopes, bounded waves, and reducer/fan-in stages
+- Normal nontrivial review uses at least three distinct reviewers. Add more reviewers for concrete additional attack surfaces; use 8–10 for broad/high-stakes surfaces with genuinely distinct roles or validator/reducer stages. Preserve explicit user-requested counts. Larger explicit counts, including up to 200, require shardable scopes, bounded waves, and reducer/fan-in stages
 - Do not let stale background reviews drive decisions
 
 ## Memory
@@ -461,6 +492,7 @@ Tape and session history are provenance, not durable memory, and do not by thems
 ## Testing, docs, and quality
 
 - Run changed or directly relevant tests first; broaden checks only when shared code, common infrastructure, or risk justifies it
+- For explicitly requested live validation, cover affected reachable workflows and consumers within the approved scope; mark paths verified only at lower fidelity or unavailable at that boundary as unverified for that boundary.
 - Run checks after logical edit groups, not after every tiny edit
 - Do not rerun a check after a green/clean result unless files changed, the prior run was invalid/truncated, or you state a concrete reason
 - Validation output must distinguish clean passes from warnings, failures, skipped checks, and truncated/partial results. Warning-only nonzero exits are not unqualified passes

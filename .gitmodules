@@ -1,16 +1,24 @@
 [submodule "packages/pisesh"]
 	path = packages/pisesh
-	url = git@github.com:OrestesK/pisesh.git
+	url = https://github.com/OrestesK/pisesh.git
 	branch = ok/local
 [submodule "packages/pi-memory-md"]
 	path = packages/pi-memory-md
-	url = git@github.com:OrestesK/pi-memory-md.git
+	url = https://github.com/OrestesK/pi-memory-md.git
 	branch = ok/local
 [submodule "packages/pi-subagents"]
 	path = packages/pi-subagents
-	url = git@github.com:OrestesK/pi-subagents.git
+	url = https://github.com/OrestesK/pi-subagents.git
 	branch = ok/local
 [submodule "packages/pi-slipstream-compact"]
 	path = packages/pi-slipstream-compact
-	url = git@github.com:OrestesK/pi-slipstream-compact.git
+	url = https://github.com/OrestesK/pi-slipstream-compact.git
 	branch = main
+[submodule "packages/pi-openai-service-tier"]
+	path = packages/pi-openai-service-tier
+	url = https://github.com/OrestesK/pi-openai-service-tier.git
+	branch = ok/local
+[submodule "packages/pi-lens"]
+	path = packages/pi-lens
+	url = https://github.com/OrestesK/pi-lens.git
+	branch = ok/local
