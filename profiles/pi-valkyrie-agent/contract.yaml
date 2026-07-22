@@ -6,6 +6,10 @@ run_cmd: >-
   --task-id '{task_id}'
   --timeout-seconds {timeout_seconds}
 final_output: /logs/ok-pi-agent
+egress_allowlist:
+  - https://chatgpt.com
+  - https://auth.openai.com
+  - https://mcp.context7.com
 secrets:
   PI_CODEX_AUTH_JSON_B64: ok-pi-agent-codex-auth-json-b64
 defaults:

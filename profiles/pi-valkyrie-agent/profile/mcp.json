@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "auth": false,
+      "oauth": false,
+      "lifecycle": "lazy"
+    },
+    "context-mode": {
+      "command": "/bin/bash",
+      "args": [
+        "-lc",
+        "exec \"${PI_CODING_AGENT_DIR}/runtime/node-v26.4.0-linux-x64/bin/node\" \"${PI_CODING_AGENT_DIR}/packages/context-mode/cli.bundle.mjs\""
+      ],
+      "lifecycle": "lazy",
+      "excludeTools": [
+        "ctx_fetch_and_index"
+      ]
+    }
+  }
+}
