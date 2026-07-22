@@ -71,6 +71,7 @@
   },
   "packages": [
     "extensions/claude-ui",
+    "git:github.com/nicobailon/pi-intercom@e234a4446e2b3f9c13a1ec3151ae2169315c810f",
     "packages/pi-subagents",
     "npm:pi-mcp-adapter",
     {
@@ -94,7 +95,6 @@
         "ctx-doctor"
       ]
     },
-    "npm:pi-intercom",
     "packages/pi-slipstream-compact",
     "packages/pi-goal-supervisor",
     "packages/pisesh",
