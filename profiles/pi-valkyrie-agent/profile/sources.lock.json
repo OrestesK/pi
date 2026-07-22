@@ -1,0 +1,98 @@
+{
+  "contentHashes": {
+    "directories": {
+      "extensions": "5c52e232aba6538db7450c699834fb66830fc97e5c9c5b2c32e3d69469fbcef4",
+      "packages/context-mode": "4bcb8d046a677d4a9e1408c27eab54649ad8770208e33a3f512f10a40d81be38",
+      "packages/pi-lens": "d2d8e9d3bff35aa360c7525c23e9624ad140b064eea2bd26c39cede302258fca",
+      "packages/pi-openai-service-tier": "929f990d5480bb88fbcc822f2c7a01ece6f264a9d17494ed319049f71eaaadbb",
+      "packages/pi-slipstream-compact-valkyrie": "51925fb1a33a7f29efa4f16e58339306e8f9cd2d72bf231758b778d468fc5cbd",
+      "packages/pi-subagents": "0d4e4129886e00f9a302196b9703b0c3da9d7f2278b58207088e3151248d307b",
+      "packages/pi-tool-result-virtualizer": "346a060805e5811a882b0eb0f563700a7f314be670b4db83a0ded31109e46e35",
+      "tests": "a0274a604be5b2af64d07d80f35f9ffd7482f3e291b639a017049dc1b16ff2b4",
+      "themes": "ba3499d31ebc2b2d5ddd248a6983c6de99704b51b50b79067d8c9f0065db47c3"
+    },
+    "files": {
+      "AGENTS.md": "a4960ba8080547b81e88270a716f4372347f87711c4a401834a7c23aa07bea96",
+      "APPEND_SYSTEM.md": "0e1eb182ca4213ebf00b8b5957d7c2080af71752089d6464a5d7af4c15e0e403",
+      "allowed-tools.json": "378d81160873a0dda8ce527c4c11b4fa9efaa57c0c7f5bb7ef221bd40b8a41d9",
+      "mcp.json": "b2685ee697bf6e1f6a4d9c91539e0b7abf6c24dfaa601226b604293e0ffa9477",
+      "models.json": "421617b9d449430d52a84f6f7622c1dd3ab2f9d39cdc80570b8f5dd28e63a238",
+      "package-lock.json": "bb45e8c55aa80d2c96612db3e633cfeace3745d88c9a7f1ae88ec3019ce11450",
+      "package.json": "48014cabb9e0a973d6b7bab2c854750b0add014dd741c838b0c831588abb3385",
+      "settings.json": "a4fdc00c7fa3964c57a308ef4306b1d095ff888f27f02ff443c1d05b3faa91e9"
+    }
+  },
+  "node": {
+    "sha256": "5c4286dcd5bbd5acb1ccc7eb0e088bd5eb1e3affad671ee9364004f8f6a4a431",
+    "url": "https://nodejs.org/dist/v26.4.0/node-v26.4.0-linux-x64.tar.xz",
+    "version": "26.4.0"
+  },
+  "piConfig": {
+    "commit": "ef04d8cde5e75923b47fcbecc80b312049dcb95d",
+    "repository": "https://github.com/OrestesK/pi.git"
+  },
+  "registry": {
+    "@earendil-works/pi-agent-core": {
+      "integrity": "sha512-Lvn89ko42h5ETUb6Z0Ku6ldskEqXaTdQBYvSa0+7bdG9V6rUEpXptv5e0OVZ1HDcvi8s6/2lGCQWsxKX+DFHNw==",
+      "version": "0.80.6"
+    },
+    "@earendil-works/pi-ai": {
+      "integrity": "sha512-7xfLk8sANBp+bpPEbjoOZTbPxsa+++b1JXAoSJsNa3vbs9AHHEclmvg54XLQcxH+fuwaeti/g2jeIfJ+mVYLpA==",
+      "version": "0.80.6"
+    },
+    "@earendil-works/pi-coding-agent": {
+      "integrity": "sha512-vcfD6tOk402isLl3Cm/qbn2O10TvgroMp1+/fEGM24ZdvETFCdOYv5VZ7m59EI5fPsjfSJh+CpQ5bhBrhfOg7g==",
+      "version": "0.80.6"
+    },
+    "@earendil-works/pi-tui": {
+      "integrity": "sha512-bSuzS4EVSqEPj/Qr/p9eqCESfKsGuDNbl77EGci8Iaqqt/C/XCBZL1MjXaxSWW1NsT5afjp/Cb0NTPzOLv/aPA==",
+      "version": "0.80.6"
+    },
+    "pi-mcp-adapter": {
+      "integrity": "sha512-4Y/eLbhbxnRih519dJUxMyQ5QASvPcdWyBlS8+dDXteAzaMuLnd4nMTWgoZw3JRIW+0r93KAQcz1Rbli4xCwEQ==",
+      "version": "2.11.0"
+    }
+  },
+  "tools": {
+    "fd": {
+      "sha256": "e3257d48e29a6be965187dbd24ce9af564e0fe67b3e73c9bdcd180f4ec11bdde",
+      "url": "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-x86_64-unknown-linux-musl.tar.gz",
+      "version": "10.4.2"
+    },
+    "ripgrep": {
+      "sha256": "33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c",
+      "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz",
+      "version": "15.2.0"
+    }
+  },
+  "vendored": {
+    "context-mode": {
+      "sourceCommit": "3147679af189c39ac25945095689197b187c8d15",
+      "version": "1.0.111"
+    },
+    "pi-lens": {
+      "commit": "5760263730462227773a319b6102b056def70bda",
+      "patch": "include dist built from the pinned source with TypeScript 6.0.3",
+      "version": "3.8.70"
+    },
+    "pi-openai-service-tier": {
+      "commit": "d69f3f235048894a984713d54345a2e6af6092bd",
+      "version": "0.1.4-ok.2"
+    },
+    "pi-slipstream-compact-valkyrie": {
+      "commit": "3fd3f2ea05e85c6fcdaa7698c99e4c62831e322f",
+      "patch": "profile-only settings precedence; exact /logs/ok-pi-agent/compactions validator exception",
+      "upstreamVersion": "0.1.7"
+    },
+    "pi-subagents": {
+      "commit": "7296ddedfa01a2de567b3d11c2bb838b41d0508f",
+      "patch": "use the profile Pi 0.80.6 runtime; omit upstream Pi 0.74 development dependencies; register the supervisor channel during extension startup",
+      "version": "0.34.0"
+    },
+    "pi-tool-result-virtualizer": {
+      "sourceCommit": "3147679af189c39ac25945095689197b187c8d15",
+      "version": "0.1.0"
+    }
+  },
+  "version": 1
+}

@@ -21,6 +21,7 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 | [`agents/`](agents/) | Executable prompts | Local subagent roles; same-name files override packaged builtins |
 | [`skills/`](skills/) | Executable workflows | Instructions loaded on demand |
 | [`extensions/`](extensions/) | Runtime code/config | Commands, UI helpers, todos, and guardrails |
+| [`profiles/pi-valkyrie-agent/`](profiles/pi-valkyrie-agent/) | Benchmark profile | Pinned restricted-egress Pi bundle and Valkyrie RPC bridge |
 | [`mcp-servers/`](mcp-servers/) | Runtime code | Local MCP implementations |
 | [`themes/`](themes/) | Runtime config | TUI themes |
 | [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md) | Provenance | Copied, adapted, and influential sources |
@@ -32,6 +33,7 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 - Local role prompts in [`agents/`](agents/) override packaged roles with the same name.
 - Skills expose short descriptions and load their full instructions only when needed.
 - Extensions under [`extensions/`](extensions/) are auto-discovered.
+- The Valkyrie profile is isolated under [`profiles/pi-valkyrie-agent/`](profiles/pi-valkyrie-agent/) and does not change the interactive Pi configuration.
 - Memory is supplied by `pi-memory-md`.
 - Safety combines prompt policy with configured guardrails. `permissions.json` is
   retained as an inactive artifact and does not control Pi 0.80.6 permissions.
@@ -80,7 +82,7 @@ export PI_CODING_AGENT_DIR="$HOME/.config/pi"
 
 Persist `PI_CODING_AGENT_DIR` in your shell startup file before opening Pi. Run `setup.sh` from a normal terminal outside Pi, then restart Pi; dependency installation replaces local package trees that an active process may have loaded. The script requires the variable to resolve to its own checkout and does not create or modify `~/.pi/agent`.
 
-The script repairs an ordinary non-recursive clone, synchronizes submodule URLs, installs the locked runtime dependencies for Pi Lens, `pi-memory-md`, `pi-openai-service-tier`, and `pi-subagents`, then runs each checked-in `profiles/*/setup.sh` hook. It never installs system tools, global npm packages, credentials, OAuth state, or optional integrations.
+The script repairs an ordinary non-recursive clone, synchronizes submodule URLs, installs the locked runtime dependencies for Pi Lens, `pi-memory-md`, `pi-openai-service-tier`, and `pi-subagents`, then runs each checked-in `profiles/*/setup.sh` hook. Profile setup hooks remain independently executable by their deployment environments. The bootstrap never installs system tools, global npm packages, credentials, OAuth state, or optional integrations.
 
 ## Untracked runtime data
 
