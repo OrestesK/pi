@@ -84,6 +84,18 @@
         "description": "git-spice repository mutation"
       }
     ],
+    "allowedPatterns": [
+      {
+        "pattern": "^[\\t ]*(?:(?:/usr)?/bin/|/usr/local/bin/)?git[\\t ]+(?:branch(?:[\\t ]+(?:-a|--all|-r|--remotes|-v|-vv|--verbose|--no-abbrev|--show-current|--no-color|--color=never))*|tag(?:[\\t ]+(?:-l|--list|--no-column|--color=never))*|remote(?:[\\t ]+(?:-v|--verbose))?|worktree[\\t ]+list(?:[\\t ]+(?:--porcelain|-z))*|submodule(?:[\\t ]+status(?:[\\t ]+(?:--cached|--recursive))*|[\\t ]+summary)?|stash[\\t ]+(?:list|show)|reflog(?:[\\t ]+show(?:[\\t ]+--all)?)?|bisect[\\t ]+(?:log|terms))[\\t ]*$",
+        "regex": true,
+        "description": "Known read-only Git inspection"
+      },
+      {
+        "pattern": "^[\\t ]*(?:(?:/usr)?/bin/|/usr/local/bin/)?git[\\t ]+(?:add[\\t ]+(?:-n|--dry-run)|apply[\\t ]+(?:--check|--stat|--numstat|--summary)|clean(?:[\\t ]+(?:-d|-x|-X))*[\\t ]+(?:-n|--dry-run)(?:[\\t ]+(?:-d|-x|-X))*|commit[\\t ]+--dry-run|fetch[\\t ]+--dry-run|push[\\t ]+(?:-n|--dry-run)|reflog[\\t ]+expire[\\t ]+--dry-run[\\t ]+--all|worktree[\\t ]+prune[\\t ]+--dry-run)[\\t ]*$",
+        "regex": true,
+        "description": "Known no-write Git mode"
+      }
+    ],
     "autoDenyPatterns": [
       {
         "pattern": "(?:^|[;&|()])\\s*rm\\b(?=[^;&|()]*\\s(?:-[A-Za-z]*[rR][A-Za-z]*|--recursive)\\b)(?=[^;&|()]*\\s(?:-[A-Za-z]*[fF][A-Za-z]*|--force)\\b)[^;&|()]*\\s(?:--\\s+)?(?:/|~/?|\\./?)(?=\\s|$|[;&|()])",
