@@ -72,6 +72,16 @@
   "packages": [
     "extensions/claude-ui",
     "git:github.com/nicobailon/pi-intercom@e234a4446e2b3f9c13a1ec3151ae2169315c810f",
+    {
+      "source": "git:github.com/aws/agent-toolkit-for-aws@fae975d565b6c1752e3f4795c499fb3951039777",
+      "extensions": [],
+      "skills": [
+        "skills/core-skills/**",
+        "skills/specialized-skills/operations-skills/troubleshooting-application-failures"
+      ],
+      "prompts": [],
+      "themes": []
+    },
     "packages/pi-subagents",
     "npm:pi-mcp-adapter",
     {
