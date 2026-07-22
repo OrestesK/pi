@@ -5,22 +5,6 @@
       "auth": "oauth",
       "lifecycle": "lazy"
     },
-    "tree-sitter": {
-      "command": "bash",
-      "args": [
-        "-lc",
-        "exec node \"${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/mcp-servers/tree-sitter/index.mjs\""
-      ],
-      "directTools": [
-        "search_symbols",
-        "document_symbols",
-        "symbol_definition",
-        "pattern_search",
-        "codebase_overview",
-        "codebase_map"
-      ],
-      "lifecycle": "keep-alive"
-    },
     "context-mode": {
       "command": "bash",
       "args": [

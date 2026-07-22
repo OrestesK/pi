@@ -121,7 +121,7 @@ Preserve still-valid comments that explain why a non-obvious choice or value exi
 
 Add only applicable domain lenses: security/privacy, performance/hot paths, API compatibility, data/migrations, UI/accessibility, infrastructure/operations, or developer experience. For agent/runtime/config work, prioritize actual runtime behavior, reliability, evidence quality, context/tool boundaries, recovery, and completion over peripheral analytics or wrapper-only concerns.
 
-Use tree-sitter first for code structure and symbols, ast-grep for structural patterns, and LSP for types/references/diagnostics. Use the codebase’s local patterns as evidence, not generic best practice.
+Use `module_report`, `read_symbol`, and `read_enclosing` for code structure and symbols, ast-grep for structural patterns, and LSP for types/references/diagnostics. Use the codebase’s local patterns as evidence, not generic best practice.
 
 ### 5. Use independent reviewers without outsourcing judgment
 

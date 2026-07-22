@@ -1622,12 +1622,6 @@ const EXTENSION_TOOL_WRAPPER_ALLOWLIST = new Set([
 	"tape_read",
 	"tape_reset",
 	"ask_user",
-	"tree_sitter_search_symbols",
-	"tree_sitter_document_symbols",
-	"tree_sitter_symbol_definition",
-	"tree_sitter_pattern_search",
-	"tree_sitter_codebase_overview",
-	"tree_sitter_codebase_map",
 	"ast_grep_search",
 	"ast_grep_replace",
 	"ast_grep_outline",
@@ -2319,48 +2313,6 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
 					: undefined,
 				argValueLabel(args, "status"),
 			]);
-		case "tree_sitter_search_symbols":
-			return joinBodyParts(theme, [
-				pathText(
-					theme,
-					compactOneLine(argValueLabel(args, "query") ?? "…", 60),
-				),
-				compactPathList(args, theme),
-				argValueLabel(args, "language"),
-				argValueLabel(args, "max_results")
-					? `${argValueLabel(args, "max_results")} max`
-					: undefined,
-			]);
-		case "tree_sitter_document_symbols":
-			return compactPathList(args, theme) ?? muted(theme, "…");
-		case "tree_sitter_symbol_definition":
-			return joinBodyParts(theme, [
-				pathText(
-					theme,
-					compactOneLine(argValueLabel(args, "symbol_name") ?? "…", 50),
-				),
-				compactPathList(args, theme),
-			]);
-		case "tree_sitter_pattern_search":
-			return joinBodyParts(theme, [
-				argValueLabel(args, "language"),
-				pathText(
-					theme,
-					compactOneLine(argValueLabel(args, "pattern") ?? "…", 70),
-				),
-				compactPathList(args, theme),
-				argValueLabel(args, "max_results")
-					? `${argValueLabel(args, "max_results")} max`
-					: undefined,
-			]);
-		case "tree_sitter_codebase_overview":
-		case "tree_sitter_codebase_map":
-			return joinBodyParts(theme, [
-				compactPathList(args, theme),
-				argValueLabel(args, "depth")
-					? `depth ${argValueLabel(args, "depth")}`
-					: undefined,
-			]);
 		case "ast_grep_search":
 			return joinBodyParts(theme, [
 				argValueLabel(args, "lang"),
@@ -2591,18 +2543,6 @@ function webToolTitle(name: string): string {
 			return "Subagent List";
 		case "subagent_done":
 			return "Subagent Done";
-		case "tree_sitter_search_symbols":
-			return "Tree Symbols";
-		case "tree_sitter_document_symbols":
-			return "Document Symbols";
-		case "tree_sitter_symbol_definition":
-			return "Symbol Definition";
-		case "tree_sitter_pattern_search":
-			return "Tree Pattern";
-		case "tree_sitter_codebase_overview":
-			return "Codebase Overview";
-		case "tree_sitter_codebase_map":
-			return "Codebase Map";
 		case "ast_grep_search":
 			return "AST Search";
 		case "ast_grep_replace":
@@ -2741,21 +2681,14 @@ function pendingToolLabel(
 	switch (toolName) {
 		case "web_search":
 		case "code_search":
-		case "tree_sitter_search_symbols":
-		case "tree_sitter_pattern_search":
 		case "ast_grep_search":
 			return "Searching";
 		case "fetch_content":
 			return "Fetching";
 		case "get_search_content":
 			return "Loading";
-		case "tree_sitter_document_symbols":
-		case "tree_sitter_symbol_definition":
 		case "lsp_navigation":
 			return "Navigating";
-		case "tree_sitter_codebase_overview":
-		case "tree_sitter_codebase_map":
-			return "Scanning";
 		case "ast_grep_replace":
 			return "Checking";
 		case "memory_search":

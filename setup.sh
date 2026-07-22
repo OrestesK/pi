@@ -6,7 +6,6 @@ REQUIRED_COMMANDS=(git node npm pi ast-grep)
 OPTIONAL_COMMANDS=(pnpm uv chafa wl-paste)
 INSTALL_ROOTS=(
 	"npm"
-	"mcp-servers/tree-sitter"
 	"packages/pi-lens"
 	"packages/pi-memory-md"
 	"packages/pi-openai-service-tier"

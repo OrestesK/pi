@@ -17,7 +17,7 @@ Read the actual failure completely.
 - Identify exact file, line, function, test, request, or data path involved.
 - Reproduce with the narrowest safe command unless reproduction is impossible, unsafe, or already captured in reliable evidence.
 - Check current diff and recent read-only history if relevant.
-- Use tree-sitter/LSP to inspect failing symbols before broad reads.
+- Use `module_report`, `read_symbol`, `read_enclosing`, or LSP to inspect failing symbols before broad reads.
 
 Do not propose a fix in this phase.
 

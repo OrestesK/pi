@@ -208,7 +208,7 @@ Forbidden:
 
 - Never guess. Verify from source, docs, tools, or user input. If evidence is missing, say so and investigate or ask.
 
-- Read before editing — do not modify a file you have not read. Use tree-sitter/LSP for narrow code reads
+- Read before editing — do not modify a file you have not read. Use targeted pi-lens reads or LSP for narrow code inspection
 - Investigate before fixing — observe behavior, form a hypothesis, verify it, then fix
 - Verify before done — run or inspect fresh evidence before saying done/fixed/passing/ready
 
@@ -343,15 +343,15 @@ For file mutations, use Edit for modifications and Write only for new files or e
 
 ### Code intelligence
 
-For code tasks, code-intelligence evidence is mandatory when code structure, behavior, types, or diagnostics are material. Use semantic code-intelligence tools instead of manual full-file reading or text search whenever those tools can answer the question. Choose the shortest sufficient tool sequence; there is no universal order. This applies to code-capable agents and parent sessions with Pi context, tree-sitter, ast-grep, and LSP tools. Non-code specialist agents that lack those tools, such as run monitors or external researchers, MUST report tool unavailability instead of attempting code work or faking compliance.
+For code tasks, code-intelligence evidence is mandatory when code structure, behavior, types, or diagnostics are material. Use semantic code-intelligence tools instead of manual full-file reading or text search whenever those tools can answer the question. Choose the shortest sufficient tool sequence; there is no universal order. This applies to code-capable agents and parent sessions with symbol and module tools, AST tools, and LSP tools. Non-code specialist agents that lack those tools, such as run monitors or external researchers, MUST report tool unavailability instead of attempting code work or faking compliance.
 
 - Use `symbol_search` and `module_report` for ranked ownership, likely files, module shape, dependents, and recommended reads
 - Use `read_symbol` and `read_enclosing` for the exact implementation body after a symbol or relevant line is known
-- Use tree-sitter for declarations, AST structure, file symbols, and structural code understanding
+- Use `module_report` for declarations and file structure, and `ast_grep_outline` when a syntax-only view is sufficient
 - Use `ast_grep_search` / `ast_grep_replace` for structural code patterns and refactors; dry-run replacements first
 - Use LSP navigation for types, definitions, references, implementations, call relationships, and language-aware refactors
 - Use `lens_diagnostics` for aggregate current/session diagnostics and LSP diagnostics for targeted file or directory evidence
-- Read before editing. Before changing an identifiable function, class, method, or symbol, read its body with `tree_sitter_symbol_definition`, `read_symbol`, or `read_enclosing` unless the edit is purely mechanical and already localized by exact line evidence
+- Read before editing. Before changing an identifiable function, class, method, or symbol, read its body with `read_symbol` or `read_enclosing` unless the edit is purely mechanical and already localized by exact line evidence
 - Inspect relevant file/symbol structure before multi-file code edits, using the tool that answers the ownership or structure question
 - After code edits, run targeted LSP diagnostics when available or state why they do not apply
 - Use grep/find/ls only for plain strings, comments, logs, config text, filenames, or when structural/semantic tools do not fit
@@ -364,7 +364,7 @@ For code tasks, code-intelligence evidence is mandatory when code structure, beh
 - When a code task requires determining or relying on external library, framework, API, protocol, CLI, or service behavior, verify that behavior in current, version-matched public documentation and inspect the local integration before concluding.
 - Choose the shortest sufficient order. Local manifests, lockfiles, imports, dependency metadata, or semantic code navigation may establish the version and integration before or alongside documentation research.
 - Prefer Context7 when it provides the fastest route to current version-matched official documentation. Otherwise use web/content search and prefer official documentation or primary specifications.
-- Use semantic code-intelligence tools for local integration inspection; do not substitute broad manual source reading when LSP, tree-sitter, ast-grep, or targeted symbol reads can answer the question.
+- Use semantic code-intelligence tools for local integration inspection; do not substitute broad manual source reading when symbol and module tools, AST tools, or LSP tools can answer the question.
 - Skip external documentation only for demonstrably repo-local or purely mechanical work, or when public documentation cannot answer the question. In the latter case, state the source attempted and unresolved uncertainty.
 - Do not rely on memory when current docs or source can verify it.
 - Use `code_search` or `web_search` when examples, ecosystem usage, or current external behavior would materially improve confidence.

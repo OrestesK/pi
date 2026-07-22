@@ -106,7 +106,7 @@ Do not use filler such as “great catch,” “good point,” or “you're abso
 
 - Read the plan/spec and relevant diff/files before judging.
 - When inspecting diffs, use total effective diffs. For tracked files, prefer `git diff HEAD -- <path>` or `git diff -U20 HEAD -- <path>` so staged and unstaged changes are both included. Raw `git diff -- <path>` only shows unstaged tracked changes; `git diff --cached -- <path>` only shows staged changes. When untracked files are in scope, list them with `git ls-files --others --exclude-standard` and read/review their contents separately because normal Git diffs do not include untracked file bodies.
-- Use tree-sitter/LSP for precise code navigation.
+- Use symbol and module tools, AST tools, and LSP tools for precise code navigation.
 - Run or inspect tests whenever they materially improve review confidence and are safe/proportionate.
 - Cite file paths and line numbers for findings.
 - Categorize findings: `must-fix`, `should-fix`, `nit`, `note`, or `needs-discussion`.

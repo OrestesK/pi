@@ -31,7 +31,7 @@ Use normal Pi tools for:
 
 - exact small file reads before editing;
 - exact edits and writes;
-- tree-sitter, ast-grep, and LSP code intelligence;
+- symbol and module tools, AST tools, and LSP tools for code intelligence;
 - small grep/find/ls lookups where direct output is already bounded.
 
 Use Bash directly only for bounded commands that genuinely need shell execution, such as tests/builds/package commands, read-only git inspection, cloud/database CLIs with narrow filters, and small purpose-built scripts. Root prompt policy still controls destructive shell commands, mutating git, sudo, secret paths, and user approval requirements.
@@ -46,7 +46,7 @@ When uncertain about output size, prefer context-mode. Every KB of unnecessary c
 About to run a command / read a file / call an API?
 │
 ├── Need an exact small file read for editing or source inspection?
-│   └── Use normal Pi read/tree-sitter/LSP/ast-grep tools
+│   └── Use normal Pi read, symbol/module, AST, or LSP tools
 │
 ├── Command genuinely needs shell execution and has bounded output?
 │   └── Use Bash, subject to root prompt safety and git rules
