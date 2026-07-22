@@ -12,7 +12,7 @@
   "forceTopLevelAsync": true,
   "maxSubagentDepth": 32,
   "maxSubagentSpawnsPerSession": 20000,
-  "globalConcurrencyLimit": 128,
+  "globalConcurrencyLimit": 100,
   "chain": {
     "dynamicFanout": {
       "maxItems": 20000
@@ -36,7 +36,7 @@
   },
   "parallel": {
     "maxTasks": 20000,
-    "concurrency": 128
+    "concurrency": 20
   },
   "progress": {
     "reportMode": "supervisor"
