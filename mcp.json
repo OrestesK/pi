@@ -13,6 +13,11 @@
       ],
       "lifecycle": "lazy"
     },
+    "sentry": {
+      "url": "https://mcp.sentry.dev/mcp",
+      "auth": "oauth",
+      "lifecycle": "lazy"
+    },
     "descope": {
       "url": "https://mcp.descope.com",
       "auth": "oauth",

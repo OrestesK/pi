@@ -42,6 +42,7 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 | --- | --- | --- |
 | `context7` | lazy | Library and framework documentation |
 | `context-mode` | lazy | Large-output analysis and indexing |
+| `sentry` | lazy remote OAuth | Sentry issue, trace, release, and project debugging |
 | `descope` | lazy remote OAuth | Descope identity management |
 | `notion` | lazy remote OAuth | Notion access |
 | `google_docs` | lazy local OAuth | Google Docs and Drive-capable operations |
