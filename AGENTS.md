@@ -338,7 +338,7 @@ For file mutations, use Edit for modifications and Write only for new files or e
 ### Resource and cost posture
 
 - For agent tool use and orchestration, bias toward sufficient evidence, speed, and correctness over token or API-cost savings. Do not EVER under-use available local tools, live LLM queries, or distinct scout/reviewer subagents solely to conserve tokens or cost when they materially improve confidence, coverage, or iteration speed. This does not bias product/API design, architecture, or user-facing behavior toward resource efficiency unless that is an explicit requirement.
-- Prefer maximum useful parallelism for independent read-only work: run non-overlapping tool probes and sectioned subagent swarms concurrently when the task is broad, uncertain, high-stakes, or time-sensitive. Keep scopes distinct, bounded, and fan-in/reducer-backed; stop when evidence is sufficient.
+- Use parallel read-only work only for distinct, named evidence gaps or independent work surfaces that can materially affect the decision, risk, validation, or next action. Keep scopes distinct, bounded, and fan-in/reducer-backed; stop when evidence is sufficient.
 - Token or live-LLM-query cost alone is not a reason to ask before bounded read-only research. For very large query/fanout batches, including hundreds or thousands of live LLM queries, do not reject the approach on cost grounds; if the user has not explicitly requested that scale, ask once with a recommended bounded-wave/reducer plan.
 
 ### Code intelligence
