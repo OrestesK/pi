@@ -49,6 +49,10 @@
   "packages": [
     "node_modules/pi-mcp-adapter",
     "packages/pi-lens",
+    {
+      "source": "packages/pi-intercom",
+      "skills": []
+    },
     "packages/pi-subagents",
     "packages/pi-tool-result-virtualizer",
     "packages/context-mode",

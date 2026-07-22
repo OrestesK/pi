@@ -10,6 +10,9 @@ import time
 from typing import cast
 
 
+FINAL_MARKER_PREFIX = "VALKYRIE_FINAL:"
+
+
 def emit(payload: dict[str, object]) -> None:
     sys.stdout.write(json.dumps(payload) + "\n")
     sys.stdout.flush()
@@ -134,9 +137,17 @@ def main() -> int:
             continue
 
         if command_type == "prompt":
-            if command.get("message") != "Fix the task":
+            task_message = command.get("message")
+            if not isinstance(task_message, str) or not task_message.startswith("Fix the task\n\n"):
                 sys.stderr.write("unexpected task prompt\n")
                 return 96
+            final_markers = [
+                line for line in task_message.splitlines() if line.startswith(FINAL_MARKER_PREFIX)
+            ]
+            if len(final_markers) != 1:
+                sys.stderr.write("missing or duplicate final marker\n")
+                return 97
+            final_marker = final_markers[0]
             if args.fake_mode == "reject":
                 emit(
                     {
@@ -215,9 +226,12 @@ def main() -> int:
                 "stale-before-task-response",
                 "stale-handshake-message",
             }:
-                final_text = (
-                    " \n " if args.fake_mode == "whitespace-message" else f"Task finished: {access}"
-                )
+                if args.fake_mode == "whitespace-message":
+                    final_text = f"{final_marker}\n \n "
+                elif args.fake_mode == "malformed-final":
+                    final_text = f"not-the-start {final_marker}\nTask finished: {access}"
+                else:
+                    final_text = f"{final_marker}\nTask finished: {access}"
                 emit(
                     {
                         "type": "message_end",
@@ -227,6 +241,36 @@ def main() -> int:
                         },
                     }
                 )
+                if args.fake_mode == "duplicate-final":
+                    emit(
+                        {
+                            "type": "message_end",
+                            "message": {
+                                "role": "assistant",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": f"{final_marker}\nDuplicate final response",
+                                    }
+                                ],
+                            },
+                        }
+                    )
+                if args.fake_mode == "stale-after-final":
+                    emit(
+                        {
+                            "type": "message_end",
+                            "message": {
+                                "role": "assistant",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Notifications are stale; no additional changes needed.",
+                                    }
+                                ],
+                            },
+                        }
+                    )
             emit({"type": "agent_settled"})
             continue
 

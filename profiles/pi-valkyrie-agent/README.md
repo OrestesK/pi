@@ -21,9 +21,9 @@ The raw `{problem_statement_path}` replacement is safe only for the ValSmith-own
 2. `run_agent.py` creates an isolated mode-`0700` Pi directory and links only curated profile resources, including the verified runtime.
 3. The bridge decodes the runtime Codex secret into mode-`0600` `auth.json`, removes the base64 value and unrelated credentials from the Pi child, and launches pinned Pi 0.80.6 in RPC mode.
 4. Pi starts with project `.pi` resources disabled and the exact startup tool allowlist. A dedicated extension writes atomic `tool-state.json` attestation.
-5. The bridge submits the problem statement as an ordinary prompt, cancels dialog UI requests, waits for `agent_settled`, requires non-empty final assistant text, redacts every observability artifact, and terminates the complete process group.
+5. The bridge submits the problem statement with a unique final-response token, cancels dialog UI requests, waits for `agent_settled`, accepts exactly one task response bearing that token, ignores unmarked notification-only follow-ups, redacts every observability artifact, and terminates the complete process group.
 
-The profile preserves `openai-codex/gpt-5.6-sol`, max thinking, priority service tier, retries, native compaction, Slipstream auto-triggering, coding rules, Pi Lens, subagents, context-mode MCP, and anonymous Context7 MCP. Context-mode URL fetching is excluded. Broad hosted web search, Docent, personal memory, human interaction, private/OAuth MCP, desktop, guardrails, and image/UI surfaces are excluded.
+The profile preserves `openai-codex/gpt-5.6-sol`, max thinking, priority service tier, retries, native compaction, Slipstream auto-triggering, coding rules, Pi Lens with its 12 core grammars bundled for offline parsing, subagents, the local Pi Intercom relay, context-mode MCP, and anonymous Context7 MCP. The public `intercom` tool remains outside the startup allowlist. Context-mode URL fetching is excluded. Broad hosted web search, Docent, personal memory, human interaction, private/OAuth MCP, desktop, guardrails, and image/UI surfaces are excluded.
 
 Bootstrap is not network-restricted: `setup.sh` requires the Node distribution, GitHub release assets, and the npm registry. During task execution Valkyrie permits only ChatGPT model traffic, OpenAI token refresh, and Context7.
 
@@ -56,7 +56,7 @@ Valkyrie archives existing output and continues evaluation for exits `0`, `124`,
 
 | Code | Meaning |
 |---:|---|
-| 0 | Pi emitted final assistant text and reached `agent_settled`; ValSmith still determines task resolution |
+| 0 | Pi emitted exactly one task-correlated marked final response and reached `agent_settled`; ValSmith still determines task resolution |
 | 20 | Missing or invalid auth secret |
 | 21 | Pinned profile, startup, tool attestation, or handshake failure |
 | 22 | RPC, prompt, or final-message protocol failure |
@@ -77,7 +77,7 @@ uv run python -m scripts.verify_profile profile
 uv run python -m scripts.check_profile_rpc
 ```
 
-The profile RPC check performs a direct MCP `initialize` and `tools/list` exchange for context-mode, validates the lazy anonymous Context7 configuration, then starts pinned Pi, calls `get_state`, validates startup tool attestation, and exits without submitting a prompt.
+The profile RPC check performs a direct MCP `initialize` and `tools/list` exchange for context-mode, validates the lazy anonymous Context7 configuration, then starts pinned Pi, calls `get_state`, verifies that the Intercom extension does not expose a model tool, validates startup tool attestation, and exits without submitting a prompt.
 
 ## Security boundary
 

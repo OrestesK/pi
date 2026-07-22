@@ -101,7 +101,7 @@ def process_is_dead(pid: int) -> bool:
     return len(fields) > 2 and fields[2] == "Z"
 
 
-@pytest.mark.parametrize("mode", ["success", "dialog", "malformed"])
+@pytest.mark.parametrize("mode", ["success", "dialog", "malformed", "stale-after-final"])
 def test_bridge_settles_and_redacts_all_artifacts(tmp_path: Path, mode: str) -> None:
     paths = bridge_paths(tmp_path, mode)
     env = source_env()
@@ -180,6 +180,8 @@ def test_invalid_auth_stops_before_process_start(tmp_path: Path, encoded: str) -
         ("stale-before-task-response", EXIT_PROTOCOL),
         ("stale-handshake-message", EXIT_PROTOCOL),
         ("whitespace-message", EXIT_PROTOCOL),
+        ("malformed-final", EXIT_PROTOCOL),
+        ("duplicate-final", EXIT_PROTOCOL),
         ("unexpected-exit", EXIT_UNEXPECTED_PI_EXIT),
         ("exit-with-child", EXIT_UNEXPECTED_PI_EXIT),
     ],

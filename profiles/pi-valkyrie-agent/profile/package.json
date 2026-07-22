@@ -17,6 +17,7 @@
     "@earendil-works/pi-coding-agent": "0.80.6",
     "context-mode": "file:packages/context-mode",
     "pi-lens": "file:packages/pi-lens",
+    "pi-intercom": "file:packages/pi-intercom",
     "pi-mcp-adapter": "2.11.0",
     "pi-openai-service-tier": "file:packages/pi-openai-service-tier",
     "pi-slipstream-compact": "file:packages/pi-slipstream-compact-valkyrie",

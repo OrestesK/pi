@@ -9,6 +9,7 @@ const json = (name) => JSON.parse(readFileSync(join(root, name), "utf8"));
 const retainedPackages = [
   "node_modules/pi-mcp-adapter",
   "packages/pi-lens",
+  { source: "packages/pi-intercom", skills: [] },
   "packages/pi-subagents",
   "packages/pi-tool-result-virtualizer",
   "packages/context-mode",
@@ -21,7 +22,6 @@ const bannedFragments = [
   "guardrails",
   "pi-memory-md",
   "pi-ask-user",
-  "pi-intercom",
   "pisesh",
   "pi-btw",
   "pi-sixel",
@@ -132,12 +132,16 @@ test("source manifest pins approved immutable baseline", () => {
   assert.equal("docent-python" in sources.registry, false);
   assert.deepEqual(sources.vendored["pi-lens"], {
     commit: "5760263730462227773a319b6102b056def70bda",
-    patch: "include dist built from the pinned source with TypeScript 6.0.3",
+    patch: "include dist built from the pinned source with TypeScript 6.0.3; bundle the 12 core grammar WASMs from tree-sitter-wasms 0.1.13",
     version: "3.8.70",
+  });
+  assert.deepEqual(sources.vendored["pi-intercom"], {
+    commit: "e234a4446e2b3f9c13a1ec3151ae2169315c810f",
+    version: "0.6.0-unreleased",
   });
   assert.deepEqual(sources.vendored["pi-subagents"], {
     commit: "7296ddedfa01a2de567b3d11c2bb838b41d0508f",
-    patch: "use the profile Pi 0.80.6 runtime; omit upstream Pi 0.74 development dependencies; register the supervisor channel during extension startup",
+    patch: "use the profile Pi 0.80.6 runtime; omit upstream Pi 0.74 development dependencies; register the supervisor channel during extension startup; reserve the intercom tool name for the pinned Pi Intercom relay",
     version: "0.34.0",
   });
   assert.equal(existsSync(join(root, "python-requirements.in")), false);
@@ -152,6 +156,39 @@ test("source manifest pins approved immutable baseline", () => {
     sha256: "e3257d48e29a6be965187dbd24ce9af564e0fe67b3e73c9bdcd180f4ec11bdde",
     url: "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-x86_64-unknown-linux-musl.tar.gz",
   });
+});
+
+test("Pi Lens core grammars are bundled for offline structural tools", () => {
+  const grammarRoot = join(root, "packages", "pi-lens", "grammars");
+  const expected = [
+    "bash",
+    "css",
+    "go",
+    "html",
+    "java",
+    "javascript",
+    "json",
+    "python",
+    "rust",
+    "tsx",
+    "typescript",
+    "yaml",
+  ];
+  assert.deepEqual(
+    readdirSync(grammarRoot)
+      .filter((name) => name.endsWith(".wasm"))
+      .sort(),
+    expected.map((name) => `tree-sitter-${name}.wasm`).sort(),
+  );
+  const grammarLock = json(join("packages", "pi-lens", "scripts", "grammars.lock.json"));
+  for (const name of expected) {
+    const wasm = `tree-sitter-${name}.wasm`;
+    const metadata = json(join("packages", "pi-lens", "grammars", `${wasm}.json`));
+    const override = grammarLock.overrides[wasm];
+    assert.equal(metadata.npmPackage, override?.package ?? grammarLock.package);
+    assert.equal(metadata.version, override?.version ?? grammarLock.version);
+    assert.equal(metadata.sha256, grammarLock.grammars[wasm]);
+  }
 });
 
 test("npm lock and install-script policy are pinned", () => {
@@ -183,6 +220,7 @@ test("npm lock and install-script policy are pinned", () => {
       assert.equal(entry.integrity, sources.registry[name].integrity, name);
     }
   }
+  assert.equal(lock.packages["node_modules/pi-intercom"].resolved, "packages/pi-intercom");
   assert.equal(lock.packages["node_modules/pi-subagents"].resolved, "packages/pi-subagents");
   assert.equal("node_modules/@aliou/pi-guardrails" in lock.packages, false);
   assert.ok(existsSync(join(root, "models.json")));

@@ -245,9 +245,13 @@ def main() -> int:
             raise RuntimeError("Pi profile check loaded the wrong thinking level")
         tool_state = validate_tool_state(runtime / "tool-state.json", allowed_tools)
         raw_active_tools = tool_state["activeTools"]
-        if not isinstance(raw_active_tools, list):
-            raise RuntimeError("Pi profile check returned invalid active tools")
+        raw_registered_tools = tool_state["registeredTools"]
+        if not isinstance(raw_active_tools, list) or not isinstance(raw_registered_tools, list):
+            raise RuntimeError("Pi profile check returned invalid tool state")
         active_tools = cast(list[object], raw_active_tools)
+        registered_tools = cast(list[object], raw_registered_tools)
+        if "intercom" in registered_tools or "intercom" in active_tools:
+            raise RuntimeError("Pi profile check exposed Intercom to the benchmark agent")
 
         print(
             json.dumps(
@@ -258,6 +262,7 @@ def main() -> int:
                     "effectiveThinkingLevel": effective_thinking,
                     "toolAllowlistCount": len(allowed_tools),
                     "activeToolCount": len(active_tools),
+                    "filteredExtensionTools": ["intercom"],
                     "localMcpToolCounts": {
                         name: len(tools) for name, tools in sorted(mcp_tools.items())
                     },

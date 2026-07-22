@@ -598,7 +598,6 @@ export function createNativeSupervisorChannel(pi: ExtensionAPI, state: SubagentS
 
 	const registerParentTools = (): void => {
 		if (!hasTool(pi, NATIVE_SUPERVISOR_TOOL_NAME)) pi.registerTool(buildParentIntercomTool(pending, state, NATIVE_SUPERVISOR_TOOL_NAME));
-		if (!hasTool(pi, "intercom")) pi.registerTool(buildParentIntercomTool(pending, state));
 	};
 
 	const cleanupStaleChannelsIfDue = (): void => {

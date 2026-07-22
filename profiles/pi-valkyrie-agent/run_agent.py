@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import secrets
 import shutil
 import signal
 import subprocess
@@ -39,6 +40,7 @@ MODEL_ID: Final = "gpt-5.6-sol"
 THINKING_LEVEL: Final = "max"
 EFFECTIVE_THINKING_LEVELS: Final = frozenset({"max", "xhigh"})
 DIALOG_METHODS: Final = frozenset({"select", "confirm", "input", "editor"})
+FINAL_MARKER_PREFIX: Final = "VALKYRIE_FINAL:"
 PROFILE_LINKS: Final = (
     "settings.json",
     "models.json",
@@ -137,6 +139,7 @@ class StreamLogs:
 
 @dataclass
 class EventState:
+    final_marker: str
     final_message: str = ""
     settled: bool = False
 
@@ -381,6 +384,21 @@ def extract_assistant_text(message: object) -> str:
     return "\n".join(parts)
 
 
+def extract_marked_final(text: str, marker: str) -> str | None:
+    occurrences = text.count(marker)
+    if occurrences == 0:
+        return None
+    if occurrences != 1:
+        raise BridgeFailure(EXIT_PROTOCOL, "protocol", "duplicate final response marker")
+    lines = text.splitlines()
+    if not lines or lines[0] != marker:
+        raise BridgeFailure(EXIT_PROTOCOL, "protocol", "malformed final response marker")
+    final_message = "\n".join(lines[1:]).strip()
+    if not final_message:
+        raise BridgeFailure(EXIT_PROTOCOL, "protocol", "final response marker has no content")
+    return final_message
+
+
 def process_event(
     process: subprocess.Popen[str],
     event: JsonObject,
@@ -403,8 +421,11 @@ def process_event(
             )
     elif capture_completion and event_type == "message_end":
         text = extract_assistant_text(event.get("message"))
-        if text:
-            state.final_message = text
+        marked_final = extract_marked_final(text, state.final_marker)
+        if marked_final is not None:
+            if state.final_message:
+                raise BridgeFailure(EXIT_PROTOCOL, "protocol", "duplicate marked final response")
+            state.final_message = marked_final
     elif capture_completion and event_type == "agent_settled":
         state.settled = True
 
@@ -612,7 +633,8 @@ def run_bridge(
     logs: StreamLogs | None = None
     stdout_thread: threading.Thread | None = None
     stderr_thread: threading.Thread | None = None
-    state = EventState()
+    final_marker = f"{FINAL_MARKER_PREFIX}{secrets.token_hex(16)}"
+    state = EventState(final_marker=final_marker)
     tool_state: JsonObject | None = None
     initial_state: JsonObject | None = None
     final_state: JsonObject | None = None
@@ -699,9 +721,17 @@ def run_bridge(
                 f"Pi handshake failed: {error}",
             ) from error
 
+        task_prompt = (
+            f"{problem_text.rstrip()}\n\n"
+            "Completion protocol: only when the task is complete, begin the final "
+            "response with this exact line:\n"
+            f"{final_marker}\n"
+            "Use that line exactly once. Do not include it in progress updates or "
+            "responses to background notifications."
+        )
         send_command(
             process,
-            {"id": "task", "type": "prompt", "message": problem_text},
+            {"id": "task", "type": "prompt", "message": task_prompt},
         )
         _ = await_response(
             process,
@@ -719,8 +749,8 @@ def run_bridge(
             event = next_event(process, events, deadline, stop)
             process_event(process, event, state)
 
-        if not state.final_message.strip():
-            raise BridgeFailure(EXIT_PROTOCOL, "protocol", "settled without final assistant text")
+        if not state.final_message:
+            raise BridgeFailure(EXIT_PROTOCOL, "protocol", "settled without marked final response")
 
         send_command(process, {"id": "final-state", "type": "get_state"})
         final_state = validate_state_response(
