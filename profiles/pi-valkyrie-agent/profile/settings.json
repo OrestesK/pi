@@ -1,0 +1,60 @@
+{
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-sol",
+  "defaultThinkingLevel": "max",
+  "quietStartup": true,
+  "defaultProjectTrust": "never",
+  "steeringMode": "all",
+  "followUpMode": "all",
+  "collapseChangelog": true,
+  "enableInstallTelemetry": false,
+  "npmCommand": [
+    "sh",
+    "-lc",
+    "npm --prefix \"$PI_CODING_AGENT_DIR\" \"$@\"",
+    "npm"
+  ],
+  "branchSummary": {
+    "skipPrompt": true
+  },
+  "hideThinkingBlock": true,
+  "retry": {
+    "maxRetries": 3,
+    "baseDelayMs": 2000
+  },
+  "transport": "auto",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 24000,
+    "keepRecentTokens": 20000
+  },
+  "slipstreamCompact": {
+    "enabled": true,
+    "autoTrigger": true,
+    "triggerContextPercent": 0.6,
+    "slipstreamKeepRecentTokens": 50000,
+    "compactionStrategy": "direct",
+    "summaryModel": "openai-codex/gpt-5.6-terra",
+    "judgeModel": "openai-codex/gpt-5.6-sol",
+    "judgeThreshold": 7,
+    "repairAttempts": 3,
+    "rejectedSummaryMode": "accept",
+    "pendingTtlMs": 300000,
+    "artifactRoot": "/logs/ok-pi-agent/compactions"
+  },
+  "subagents": {
+    "defaultModel": "openai-codex/gpt-5.6-terra",
+    "disableBuiltins": false
+  },
+  "packages": [
+    "node_modules/pi-mcp-adapter",
+    "packages/pi-lens",
+    "packages/pi-subagents",
+    "packages/pi-tool-result-virtualizer",
+    "packages/context-mode",
+    "packages/pi-slipstream-compact-valkyrie",
+    "packages/pi-openai-service-tier"
+  ],
+  "autocompleteMaxVisible": 10,
+  "httpIdleTimeoutMs": 3600000
+}

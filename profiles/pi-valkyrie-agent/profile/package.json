@@ -1,0 +1,46 @@
+{
+  "name": "ok-pi-agent-profile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "26.4.0"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:slipstream": "npm --prefix packages/pi-slipstream-compact-valkyrie test",
+    "typecheck:attestation": "tsc --noEmit --strict --skipLibCheck --module NodeNext --moduleResolution NodeNext --target ES2022 --types node extensions/tool-attestation.ts",
+    "typecheck:slipstream": "npm --prefix packages/pi-slipstream-compact-valkyrie run typecheck",
+    "check": "npm test && npm run test:slipstream && npm run typecheck:attestation && npm run typecheck:slipstream"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.80.6",
+    "context-mode": "file:packages/context-mode",
+    "pi-lens": "file:packages/pi-lens",
+    "pi-mcp-adapter": "2.11.0",
+    "pi-openai-service-tier": "file:packages/pi-openai-service-tier",
+    "pi-slipstream-compact": "file:packages/pi-slipstream-compact-valkyrie",
+    "pi-subagents": "file:packages/pi-subagents",
+    "pi-tool-result-virtualizer": "file:packages/pi-tool-result-virtualizer"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "@earendil-works/pi-agent-core": "0.80.6",
+    "@earendil-works/pi-ai": "0.80.6",
+    "@earendil-works/pi-tui": "0.80.6",
+    "protobufjs": "7.6.5",
+    "ws": "8.21.1"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.27.7": true,
+    "esbuild@0.28.1": true,
+    "protobufjs@7.6.5": true,
+    "@ast-grep/cli@0.44.1": true,
+    "@google/genai@1.52.0": true,
+    "file:../packages/pi-lens": false
+  }
+}

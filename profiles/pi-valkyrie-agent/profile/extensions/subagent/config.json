@@ -1,0 +1,10 @@
+{
+  "toolDescriptionMode": "compact",
+  "toolExtensions": {
+    "mcp": {
+      "description": "MCP access for code reconnaissance and Context7 documentation",
+      "builtinTools": ["mcp"],
+      "allowedAgents": ["scout", "researcher", "context-builder"]
+    }
+  }
+}
