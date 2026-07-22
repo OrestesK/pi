@@ -1,0 +1,16 @@
+name: ok-pi-agent
+install_cmd: bash /bundle/ok-pi-agent/setup.sh
+run_cmd: >-
+  /usr/local/bin/python3 /bundle/ok-pi-agent/run_agent.py
+  --problem-statement '{problem_statement_path}'
+  --task-id '{task_id}'
+  --timeout-seconds {timeout_seconds}
+final_output: /logs/ok-pi-agent
+secrets:
+  PI_CODEX_AUTH_JSON_B64: ok-pi-agent-codex-auth-json-b64
+defaults:
+  timeout_seconds:
+    type: int
+    required: false
+    default: 7200
+    description: Internal unattended deadline in seconds
