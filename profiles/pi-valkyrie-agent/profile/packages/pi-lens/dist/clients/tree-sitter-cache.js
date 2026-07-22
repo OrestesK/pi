@@ -1,0 +1,277 @@
+/**
+ * Tree-sitter Tree Cache with Incremental Parsing Support
+ *
+ * Caches parsed ASTs and enables incremental updates for large files.
+ * This provides 10-100× speedup on edits to large files (>1000 lines).
+ */
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import { normalizeFilePath } from "./path-utils.js";
+export class TreeCache {
+    cache = new Map();
+    maxSize;
+    debug;
+    constructor(maxSize = 50, debug = false) {
+        this.maxSize = maxSize;
+        this.debug = debug
+            ? (msg) => console.error(`[tree-cache] ${msg}`)
+            : () => { };
+    }
+    /**
+     * Free a tree-sitter Tree's WASM-heap allocation.
+     *
+     * web-tree-sitter Trees live in the WASM heap; JS GC reclaims only the wrapper,
+     * so the underlying memory leaks unless `tree.delete()` is called explicitly
+     * (no FinalizationRegistry auto-free in 0.25). Guarded — a tree may already be
+     * deleted, or `delete()` may throw on a corrupt/aborted runtime. Safe because
+     * every consumer uses a returned tree transiently (parse → extract → discard
+     * within one call); the eviction target is always the OLDEST entry, never the
+     * just-parsed tree still in a caller's hand (#417).
+     */
+    // biome-ignore lint/suspicious/noExplicitAny: web-tree-sitter Tree
+    freeTree(tree) {
+        try {
+            if (tree && typeof tree.delete === "function")
+                tree.delete();
+        }
+        catch {
+            // best-effort — a dead wasm runtime or double-delete must not throw
+        }
+    }
+    /** Remove a cache entry AND free its WASM tree. */
+    removeEntry(key) {
+        const cached = this.cache.get(key);
+        if (cached)
+            this.freeTree(cached.tree);
+        this.cache.delete(key);
+    }
+    /**
+     * Generate hash for file content
+     */
+    hashContent(content) {
+        return crypto
+            .createHash("sha256")
+            .update(content)
+            .digest("hex")
+            .slice(0, 16);
+    }
+    /**
+     * Get cache key for a file
+     */
+    getCacheKey(filePath, languageId) {
+        return `${languageId}:${normalizeFilePath(filePath)}`;
+    }
+    /**
+     * Check if tree is cached and valid
+     */
+    get(filePath, content, languageId) {
+        const key = this.getCacheKey(filePath, languageId);
+        const cached = this.cache.get(key);
+        if (!cached) {
+            this.debug(`Cache miss: ${filePath}`);
+            return null;
+        }
+        // (No language-mismatch check needed: the cache key is prefixed with
+        // languageId, so a key hit already implies the language matches.)
+        // Check content hash
+        const contentHash = this.hashContent(content);
+        if (cached.contentHash !== contentHash) {
+            this.debug(`Content changed: ${filePath} (${cached.lineCount} → ${content.split("\n").length} lines)`);
+            // Keep old tree for potential incremental update, but mark as stale
+            return null;
+        }
+        // Check if file was modified on disk (mtime changed)
+        try {
+            const stats = fs.statSync(filePath);
+            if (stats.mtimeMs !== cached.lastModified) {
+                this.debug(`File modified on disk: ${filePath}`);
+                this.removeEntry(key);
+                return null;
+            }
+        }
+        catch {
+            // File might be deleted, invalidate cache
+            this.removeEntry(key);
+            return null;
+        }
+        this.debug(`Cache hit: ${filePath} (${cached.lineCount} lines)`);
+        return cached.tree;
+    }
+    /**
+     * Store parsed tree in cache
+     */
+    set(filePath, content, languageId, tree) {
+        const key = this.getCacheKey(filePath, languageId);
+        // Free the tree we're about to replace at this key (re-parse of the same
+        // file) so it doesn't leak its WASM heap.
+        if (this.cache.has(key)) {
+            this.removeEntry(key);
+        }
+        else if (this.cache.size >= this.maxSize) {
+            // Evict + free the oldest entry when the cache is full.
+            const firstKey = this.cache.keys().next().value;
+            if (firstKey) {
+                this.removeEntry(firstKey);
+                this.debug(`Evicted: ${firstKey}`);
+            }
+        }
+        let mtime = 0;
+        try {
+            mtime = fs.statSync(filePath).mtimeMs;
+        }
+        catch {
+            // File deleted between parse and cache — cache with mtime=0;
+            // next get() will miss on mtime check and re-parse
+        }
+        this.cache.set(key, {
+            tree,
+            contentHash: this.hashContent(content),
+            languageId,
+            fileSize: content.length,
+            lineCount: content.split("\n").length,
+            lastModified: mtime,
+        });
+        this.debug(`Cached: ${filePath} (${content.split("\n").length} lines)`);
+    }
+    /**
+     * Calculate the diff between old and new content
+     * Returns edit information for incremental parsing
+     */
+    calculateEdit(oldContent, newContent) {
+        // Find the first difference
+        let startIndex = 0;
+        while (startIndex < oldContent.length &&
+            startIndex < newContent.length &&
+            oldContent[startIndex] === newContent[startIndex]) {
+            startIndex++;
+        }
+        // Find the last difference (working backwards)
+        let oldEndIndex = oldContent.length;
+        let newEndIndex = newContent.length;
+        while (oldEndIndex > startIndex &&
+            newEndIndex > startIndex &&
+            oldContent[oldEndIndex - 1] === newContent[newEndIndex - 1]) {
+            oldEndIndex--;
+            newEndIndex--;
+        }
+        // No change detected
+        if (startIndex === oldContent.length && startIndex === newContent.length) {
+            return null;
+        }
+        // Calculate positions
+        const startPosition = this.indexToPosition(oldContent, startIndex);
+        const oldEndPosition = this.indexToPosition(oldContent, oldEndIndex);
+        const newEndPosition = this.indexToPosition(newContent, newEndIndex);
+        return {
+            startIndex,
+            oldEndIndex,
+            newEndIndex,
+            startPosition,
+            oldEndPosition,
+            newEndPosition,
+        };
+    }
+    /**
+     * Convert byte index to row/column position
+     */
+    indexToPosition(content, index) {
+        const lines = content.slice(0, index).split("\n");
+        return {
+            row: lines.length - 1,
+            column: lines[lines.length - 1].length,
+        };
+    }
+    /**
+     * Attempt incremental update using tree.edit()
+     * Returns updated tree or null if incremental update failed
+     */
+    async incrementalUpdate(filePath, oldContent, newContent, languageId, parser) {
+        const key = this.getCacheKey(filePath, languageId);
+        const cached = this.cache.get(key);
+        if (!cached) {
+            this.debug(`No cached tree for incremental update: ${filePath}`);
+            return null;
+        }
+        // Only use incremental for large files (>100 lines)
+        const lineCount = oldContent.split("\n").length;
+        if (lineCount < 100) {
+            this.debug(`File too small for incremental: ${filePath} (${lineCount} lines)`);
+            return null;
+        }
+        // Calculate edit
+        const edit = this.calculateEdit(oldContent, newContent);
+        if (!edit) {
+            this.debug(`No edit detected for: ${filePath}`);
+            return null;
+        }
+        this.debug(`Incremental update: ${filePath} (lines ${edit.startPosition.row}-${edit.oldEndPosition.row})`);
+        try {
+            // Apply edit to tree
+            cached.tree.edit({
+                startIndex: edit.startIndex,
+                oldEndIndex: edit.oldEndIndex,
+                newEndIndex: edit.newEndIndex,
+                startPosition: edit.startPosition,
+                oldEndPosition: edit.oldEndPosition,
+                newEndPosition: edit.newEndPosition,
+            });
+            // Re-parse only changed region
+            const newTree = parser.parse(newContent, cached.tree);
+            // Update cache
+            this.set(filePath, newContent, languageId, newTree);
+            this.debug(`Incremental update successful: ${filePath}`);
+            return newTree;
+        }
+        catch (err) {
+            this.debug(`Incremental update failed: ${err}`);
+            return null;
+        }
+    }
+    /**
+     * Clear cache for a specific file
+     */
+    invalidate(filePath, languageId) {
+        if (languageId) {
+            const key = this.getCacheKey(filePath, languageId);
+            this.removeEntry(key);
+            this.debug(`Invalidated: ${key}`);
+        }
+        else {
+            // Invalidate all entries for this file
+            for (const [key, value] of this.cache.entries()) {
+                if (key.includes(filePath)) {
+                    this.freeTree(value.tree);
+                    this.cache.delete(key);
+                    this.debug(`Invalidated: ${key}`);
+                }
+            }
+        }
+    }
+    /**
+     * Clear entire cache
+     */
+    clear() {
+        for (const entry of this.cache.values()) {
+            this.freeTree(entry.tree);
+        }
+        this.cache.clear();
+        this.debug("Cache cleared");
+    }
+    /**
+     * Get cache statistics
+     */
+    getStats() {
+        let totalLines = 0;
+        let totalBytes = 0;
+        for (const entry of this.cache.values()) {
+            totalLines += entry.lineCount;
+            totalBytes += entry.fileSize;
+        }
+        return {
+            size: this.cache.size,
+            maxSize: this.maxSize,
+            totalLines,
+            totalBytes,
+        };
+    }
+}

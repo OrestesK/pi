@@ -1,0 +1,1561 @@
+/**
+ * lens_diagnostics tool — cached project diagnostic state (issue #159).
+ *
+ * Three modes:
+ *   delta (default) — fixable warnings from the current agent turn, read from
+ *                     the actionable-warnings and code-quality-warnings caches.
+ *   all             — all known diagnostic counts across every file pi-lens has
+ *                     seen this session, read from the widget state.
+ *   full            — active project-wide LSP diagnostic scan merged with all.
+ */
+
+import { promises as fs } from "node:fs";
+import * as fsSync from "node:fs";
+import * as path from "node:path";
+import { Type } from "../clients/deps/typebox.js";
+import {
+	anchorsForDiagnostic,
+	applyDispositions,
+	getDisposition,
+} from "../clients/diagnostic-dispositions.js";
+import { applyInlineSuppressions } from "../clients/dispatch/inline-suppressions.js";
+import { compactRenderResult } from "./render-compact.js";
+import { combineAbortSignals } from "../clients/deadline-utils.js";
+import { getProjectIgnoreMatcher } from "../clients/file-utils.js";
+import { normalizeFilePath } from "../clients/path-utils.js";
+import { getLSPService } from "../clients/lsp/index.js";
+import { primaryServerId } from "../clients/lsp/config.js";
+import type { LSPDiagnostic } from "../clients/lsp/client.js";
+import type { CacheManager } from "../clients/cache-manager.js";
+import {
+	loadProjectDiagnosticsDeltaReport,
+	loadProjectDiagnosticsSnapshot,
+	PROJECT_DIAGNOSTICS_CACHE_VERSION,
+	reconcileProjectDiagnosticsSnapshot,
+} from "../clients/project-diagnostics/cache.js";
+import { warmTriggerFor } from "../clients/project-diagnostics/extractors.js";
+import type { FreshProjectDiagnosticsResult } from "../clients/project-diagnostics/fresh-fetch.js";
+import { fetchFreshProjectDiagnostics } from "../clients/project-diagnostics/fresh-fetch.js";
+import { loadBootstrapClients } from "../clients/bootstrap.js";
+import { scanProjectDiagnostics } from "../clients/project-diagnostics/scanner.js";
+import type {
+	ProjectDiagnostic,
+	ProjectDiagnosticsDeltaReport,
+	ProjectDiagnosticsSnapshot,
+} from "../clients/project-diagnostics/types.js";
+import type { ActionableWarningsReport } from "../clients/actionable-warnings.js";
+import type { CodeQualityWarningsReport } from "../clients/code-quality-warnings.js";
+import {
+	getFileDiagnosticSummaries,
+	type FileDiagnosticSummary,
+	reconcileScanDiagnostics,
+	reconcileStaleWidgetFiles,
+	type WidgetDiagnostic,
+} from "../clients/widget-state.js";
+import { convertLspDiagnostics } from "../clients/dispatch/utils/lsp-diagnostics.js";
+import { retagAuxiliaryDiagnostics } from "../clients/dispatch/auxiliary-lsp.js";
+import { detectFileRole } from "../clients/file-role.js";
+import { makeProgressReporter, scanningSummaryLine } from "./scan-progress.js";
+
+// The widget state exposes the full per-file diagnostic set; this is the tool's
+// own generous display budget per file (independent of the TUI's 12 cap), to
+// keep output bounded on a pathologically broken file.
+const MAX_DIAGNOSTICS_PER_FILE = 50;
+
+// `paths` (#461) is a wrapper-facing scope restrictor (e.g. "git-staged files
+// only"), not a bulk-listing mechanism — a wrapper that hits this needs to
+// narrow, not paginate. Erroring (rather than silently truncating) means a
+// caller can never believe it checked files it didn't (issue's stated
+// invariant).
+const MAX_PATHS_ENTRIES = 200;
+
+type LSPServiceLike = ReturnType<typeof getLSPService> & {
+	runWorkspaceDiagnostics?: (
+		cwd: string,
+		options?: {
+			maxFiles?: number;
+			signal?: AbortSignal;
+			onProgress?: (completed: number, total: number) => void;
+			files?: string[];
+		},
+	) => Promise<WorkspaceLspDiagnosticResult[]>;
+};
+
+
+type WorkspaceLspDiagnosticResult = {
+	filePath: string;
+	diagnostics: LSPDiagnostic[];
+	count?: number;
+	error?: string;
+	// See LSPWorkspaceDiagnosticResult in clients/lsp/index.ts — true when this
+	// file's per-file check didn't complete within budget (or threw), so
+	// `diagnostics` is a default-empty placeholder, not a confirmed result.
+	timedOut?: boolean;
+};
+
+// Wall-clock ceiling for the whole mode=full scan. Even with per-file budgets
+// and abort-signal honoring, a pathological state (a language server hanging on
+// spawn/initialize across many files) could otherwise stall the tool
+// indefinitely — an unattended session was observed hung for ~8h. This hard cap
+// aborts the scan so it always returns (partial) rather than never. Env-tunable.
+const FULL_SCAN_WALL_CLOCK_MS = (() => {
+	const raw = Number(process.env.PI_LENS_LENS_DIAGNOSTICS_FULL_TIMEOUT_MS);
+	return Number.isFinite(raw) && raw > 0 ? raw : 300_000; // 5 min default
+})();
+
+export function createLensDiagnosticsTool(
+	cacheManager: CacheManager,
+	getCwd: () => string,
+	getLspService: () => LSPServiceLike = getLSPService,
+	// Flush any debounced per-edit dispatches before reading, so files the agent
+	// fixed earlier in the turn are re-dispatched and the widget reflects the
+	// CURRENT state — not the pre-fix diagnostics still pending in the debounce
+	// window. Injected (index wires `flushDebouncedToolResults`); optional so the
+	// tool stays decoupled and testable.
+	flushPending: () => Promise<void> = async () => {},
+	// #571: mode=full's own fresh LSP results are reconciled into the footer
+	// (widget-state's `allDiagnostics`) for files this scan got a CONFIRMED
+	// (non-timed-out) result for — otherwise an unedited file whose diagnostics
+	// only changed because of a change to a file it depends on stays stale in
+	// the footer forever. Each reconciled write draws a fresh token from the
+	// SAME monotonic source `pipeline.ts`'s per-edit writes use
+	// (`RuntimeCoordinator.nextWriteIndex()`, injected by index.ts) so the
+	// existing `WriteOrderingGuard` (#555/#560) can tell this scan-originated
+	// write apart from a concurrent, genuinely newer per-edit write for the
+	// same file. Optional/undefined in tests — an omitted writeIndex always
+	// proceeds (see `reconcileScanDiagnostics`'s doc comment).
+	nextWriteIndex?: () => number,
+) {
+	return {
+		name: "lens_diagnostics" as const,
+		label: "Project Diagnostics",
+		description:
+			"Query pi-lens's diagnostic state. mode=delta/all are cache-only and instant; " +
+			"mode=full is an expensive active project-wide LSP scan merged with cached runner state.\n\n" +
+			"IMPORTANT: unlike lsp_diagnostics (LSP only), this tool covers ALL dispatch " +
+			"runners: LSP errors, tree-sitter structural rules, ast-grep security rules, " +
+			"biome/ruff/eslint lint findings, complexity violations, and more.\n\n" +
+			"mode=delta (default): all warnings for the current agent turn — fixable warnings " +
+			"(actionable-warnings cache) AND code quality/style/complexity issues " +
+			"(code-quality-warnings cache). Same scope as the turn-end advisory, current turn only.\n\n" +
+			"mode=all: blocking errors and warnings — with the actual messages (line, rule, " +
+			"text), not just counts — for every file the agent has " +
+			"EDITED this session (files that went through the dispatch pipeline). " +
+			"NOTE: unedited files with pre-existing errors do NOT appear here — this is " +
+			"not a full project scan. Use before declaring work done; stale blocking " +
+			"errors from earlier turns are visible even if they dropped from turn-end context.\n\n" +
+			"mode=full: EXPENSIVE active scan. Runs project-wide LSP diagnostics for " +
+			"all supported files (including unedited files), then merges/deduplicates " +
+			"that with mode=all cached runner state. Optional refreshRunners=cheap/all/cached " +
+			"folds in project-wide runner findings: the in-process scanners (tree-sitter + " +
+			"fact-rules + ast-grep) plus a FRESH run of the heavyweight analyzers — knip, " +
+			"jscpd (copy-paste), madge (circular deps), gitleaks (secrets), govulncheck/trivy " +
+			"(CVEs), dead-code — rather than a possibly-stale session_start cache; each " +
+			"analyzer de-dupes against a concurrent background run of itself, so this can't " +
+			"double-spawn. Bounded by the slowest analyzer (trivy's own ~180s ceiling).",
+		promptSnippet:
+			"Use lens_diagnostics mode=all to verify no blocking errors remain; use mode=full for expensive project-wide checks",
+		renderResult: compactRenderResult<{
+			mode?: string;
+			phase?: string;
+			completed?: number;
+			total?: number;
+			actionableWarnings?: number;
+			qualityIssues?: number;
+			projectDiagnostics?: number;
+			filesWithIssues?: number;
+			filesChecked?: number;
+			totalBlocking?: number;
+			totalErrors?: number;
+			totalWarnings?: number;
+			coldRunners?: string[];
+		}>(({ details, args, isError, text }) => {
+			// Streaming progress partials render the live bar (see scanningSummaryLine)
+			// instead of the details-driven summary, which would show "0 diagnostics"
+			// mid-scan.
+			const scanning = scanningSummaryLine(details, text);
+			if (scanning) return scanning;
+			const mode =
+				details?.mode ?? (typeof args.mode === "string" ? args.mode : "delta");
+			if (isError) {
+				return `lens_diagnostics ${mode} — ${text.split("\n")[0] ?? "error"}`;
+			}
+			// #533: a "clean"/zero render must say so when heavyweight analyzers never
+			// ran this session — a bare "clean" would otherwise misrepresent a cold
+			// cache as a confirmed answer from those analyzers.
+			const coldSuffix =
+				details?.coldRunners && details.coldRunners.length > 0
+					? ` (${details.coldRunners.length} cold: ${details.coldRunners.join(", ")})`
+					: "";
+			if (mode === "delta") {
+				const aw = details?.actionableWarnings ?? 0;
+				const cq = details?.qualityIssues ?? 0;
+				const pd = details?.projectDiagnostics ?? 0;
+				if (aw + cq + pd === 0)
+					return `lens_diagnostics delta — clean${coldSuffix}`;
+				return `lens_diagnostics delta — ${aw} actionable · ${cq} quality · ${pd} project${coldSuffix}`;
+			}
+			const b = details?.totalBlocking ?? 0;
+			const e = details?.totalErrors ?? 0;
+			const w = details?.totalWarnings ?? 0;
+			const files = details?.filesWithIssues ?? details?.filesChecked ?? 0;
+			if (b + e + w === 0) {
+				return `lens_diagnostics ${mode} — clean (${files} files)${coldSuffix}`;
+			}
+			return `lens_diagnostics ${mode} — ${b} blocking · ${e} errors · ${w} warnings (${files} files)${coldSuffix}`;
+		}),
+		parameters: Type.Object({
+			mode: Type.Optional(
+				Type.String({
+					enum: ["delta", "all", "full"],
+					description:
+						"delta = current turn's fixable warnings (default). " +
+						"all = session diagnostics for edited/dispatched files. " +
+						"full = expensive active project-wide LSP scan plus cached runner diagnostics.",
+				}),
+			),
+			refreshRunners: Type.Optional(
+				Type.Union(
+					[
+						Type.Boolean(),
+						Type.String({ enum: ["cached", "cheap", "all", "none"] }),
+					],
+					{
+						description:
+							"mode=full only: false/none = LSP + widget state only. cached/cheap/all all now trigger a FRESH run (#585) of the heavyweight project analyzers (knip, jscpd, madge, gitleaks, govulncheck, trivy, dead-code) in parallel — bounded by the slowest one (trivy's own ~180s ceiling) — instead of reading a possibly-stale session_start cache; safe to relaunch since each analyzer de-dupes concurrent runs against the same project root. cheap/all additionally refresh the in-process runners (tree-sitter + fact-rules + ast-grep) first.",
+					},
+				),
+			),
+			maxProjectFiles: Type.Optional(
+				Type.Number({
+					description:
+						"mode=full refreshRunners=cheap/all only: cap project files scanned by the cheap project runners (tree-sitter + fact-rules + ast-grep). Does NOT bound the LSP sweep — use maxLspFiles for that.",
+				}),
+			),
+			maxLspFiles: Type.Optional(
+				Type.Number({
+					description:
+						"mode=full only: cap the number of files routed through the language server for the project-wide LSP sweep. On large projects (e.g. a Next.js app with thousands of source files) the uncapped sweep can take many minutes; set this to bound it. Default is generous (env PI_LENS_LSP_WORKSPACE_MAX_FILES, else 5000).",
+				}),
+			),
+			severity: Type.Optional(
+				Type.String({
+					enum: ["error", "warning", "all"],
+					description: "Filter by severity (default: all).",
+				}),
+			),
+			paths: Type.Optional(
+				Type.Array(Type.String(), {
+					maxItems: MAX_PATHS_ENTRIES,
+					description:
+						`Restrict any mode to an explicit file/directory list (max ${MAX_PATHS_ENTRIES} entries; ` +
+						"more errors instead of silently truncating). Entries may be relative " +
+						"(resolved against cwd) or absolute, and a directory entry matches all " +
+						"files under it (e.g. \"src/\"). mode=delta/all are a pure post-filter " +
+						"of cached/session state — they can only show findings for files pi-lens " +
+						"has already dispatched, so an unseen file shows nothing (use mode=full " +
+						"for an active scan). mode=full actively scans exactly these paths (LSP " +
+						"sweep + cheap in-process runners); cached heavyweight analyzers " +
+						"(jscpd/madge/gitleaks/knip) and the project snapshot are still post-filtered " +
+						"cache reads, never relaunched. Explicitly-listed files are NOT filtered " +
+						"through the project ignore matcher (matching lsp_diagnostics' paths " +
+						"semantics) — naming a file is assumed to mean it regardless of " +
+						".gitignore/.pi-lens.json; a directory entry's expansion still honors " +
+						"ignore (and when the list mixes directories and files, mode=full scans " +
+						"via the ignore-filtered walk, so an ignore-excluded file entry is only " +
+						"guaranteed an active scan in a files-only list). Nonexistent entries " +
+						"are skipped (mode=full notes them; useful for git-staged-file wrappers " +
+						"where a deleted-but-staged path can appear).",
+				}),
+			),
+		}),
+		async execute(
+			_toolCallId: string,
+			params: Record<string, unknown>,
+			signal: AbortSignal | undefined,
+			onUpdate: unknown,
+			ctx: { cwd?: string; signal?: AbortSignal },
+		) {
+			const mode = (params.mode as string | undefined) ?? "delta";
+			const severity = (params.severity as string | undefined) ?? "all";
+			const refreshRunners = params.refreshRunners;
+			const parsePositiveInt = (value: unknown): number | undefined =>
+				typeof value === "number" && Number.isFinite(value) && value > 0
+					? Math.floor(value)
+					: undefined;
+			const maxProjectFiles = parsePositiveInt(params.maxProjectFiles);
+			const maxLspFiles = parsePositiveInt(params.maxLspFiles);
+			const cwd = ctx.cwd ?? getCwd();
+
+			let pathsScope: PathsScope | undefined;
+			try {
+				pathsScope = resolvePathsScope(cwd, params.paths);
+			} catch (err) {
+				return {
+					content: [
+						{
+							type: "text" as const,
+							text: err instanceof Error ? err.message : String(err),
+						},
+					],
+					isError: true,
+					details: { mode, pathsError: true },
+				};
+			}
+
+			// Escape aborts the agent *turn*, which fires ctx.signal (the turn-wired
+			// abort); the positional signal is the tool-call signal. A registered
+			// extension tool only reliably sees the turn abort via ctx.signal, so honor
+			// BOTH — else a long mode=full scan ignores Escape (the reported bug).
+			const abortSignal = combineAbortSignals(signal, ctx.signal);
+
+			// Reflect the agent's just-made fixes before reporting: flush pending
+			// per-edit dispatches (re-records fixed files), then drop entries whose
+			// file changed on disk afterwards / was deleted (stale, e.g. external
+			// edits). Together these stop fixed-this-session findings from lingering.
+			await flushPending();
+			const staleDropped = await reconcileStaleWidgetFiles();
+
+			if (mode === "all") {
+				return formatAllMode(
+					cwd,
+					severity,
+					undefined,
+					undefined,
+					staleDropped,
+					pathsScope,
+				);
+			}
+			if (mode === "full") {
+				// Fold a hard wall-clock ceiling into the abort signal so the scan
+				// always terminates (partial) even if a hung server would otherwise
+				// stall it forever. AbortSignal.timeout aborts with a TimeoutError.
+				const ceiling = AbortSignal.timeout(FULL_SCAN_WALL_CLOCK_MS);
+				const fullSignal = combineAbortSignals(abortSignal, ceiling);
+				// Stream a throttled progress bar: the full scan is opaque for minutes
+				// otherwise.
+				const onProgress = makeProgressReporter(onUpdate);
+				return formatFullMode(cwd, severity, getLspService(), cacheManager, {
+					refreshRunners,
+					maxProjectFiles,
+					maxLspFiles,
+					signal: fullSignal,
+					wallClockMs: FULL_SCAN_WALL_CLOCK_MS,
+					onProgress,
+					pathsScope,
+					nextWriteIndex,
+				});
+			}
+			return formatDeltaMode(cacheManager, cwd, severity, pathsScope);
+		},
+	};
+}
+
+// ── delta mode ────────────────────────────────────────────────────────────────
+
+function formatProjectDeltaDiagnostic(diagnostic: ProjectDiagnostic): string {
+	const marker =
+		diagnostic.semantic === "blocking" || diagnostic.severity === "error"
+			? "🔴"
+			: "ℹ";
+	const rule = diagnostic.rule ?? diagnostic.code ?? diagnostic.runner;
+	return `  ${marker} L${diagnostic.line ?? "?"}  ${rule}  ${diagnostic.message}`;
+}
+
+function appendProjectDiagnosticsDeltaLines(
+	lines: string[],
+	cwd: string,
+	report: ProjectDiagnosticsDeltaReport | undefined,
+	severity: string,
+	includeFile: (filePath: string) => boolean,
+): number {
+	const diagnostics = (report?.diagnostics ?? []).filter(
+		(diagnostic) =>
+			includeFile(diagnostic.filePath) &&
+			matchesSeverity(projectDiagnosticToWidget(diagnostic), severity),
+	);
+	const byFile = new Map<string, ProjectDiagnostic[]>();
+	for (const diagnostic of diagnostics) {
+		const filePath = path.resolve(diagnostic.filePath);
+		const bucket = byFile.get(filePath) ?? [];
+		bucket.push(diagnostic);
+		byFile.set(filePath, bucket);
+	}
+	for (const [filePath, fileDiagnostics] of byFile) {
+		const rel = path.relative(cwd, filePath);
+		if (!lines.includes(rel)) lines.push(rel);
+		for (const diagnostic of fileDiagnostics) {
+			lines.push(formatProjectDeltaDiagnostic(diagnostic));
+		}
+	}
+	return diagnostics.length;
+}
+
+function formatDeltaMode(
+	cacheManager: CacheManager,
+	cwd: string,
+	severity: string,
+	pathsScope?: PathsScope,
+): { content: [{ type: "text"; text: string }]; details: object } {
+	const actionableEntry = cacheManager.readCache<ActionableWarningsReport>(
+		"actionable-warnings",
+		cwd,
+	);
+	const qualityEntry = cacheManager.readCache<CodeQualityWarningsReport>(
+		"code-quality-warnings",
+		cwd,
+	);
+	const actionable = actionableEntry?.data;
+	const quality = qualityEntry?.data;
+	const projectDelta = loadProjectDiagnosticsDeltaReport(cwd);
+	const ignoreFile = createCurrentIgnoreFilter(cwd);
+	const includeFile = (filePath: string) =>
+		ignoreFile(filePath) && (!pathsScope || pathsScope.includeFile(filePath));
+	const actionableFiles = (actionable?.files ?? []).filter((file) =>
+		includeFile(file.filePath),
+	);
+	const qualityFiles = (quality?.files ?? []).filter((file) =>
+		includeFile(file.filePath),
+	);
+
+	const lines: string[] = [];
+
+	// Fixable warnings from actionable-warnings
+	if (actionableFiles.length > 0 && severity !== "error") {
+		for (const file of actionableFiles) {
+			const rel = path.relative(cwd, file.filePath);
+			lines.push(`${rel}`);
+			for (const w of file.warnings ?? []) {
+				lines.push(
+					`  ⚠ L${w.line ?? "?"}  ${w.rule ?? w.code ?? w.tool}  ${w.message}`,
+				);
+			}
+		}
+	}
+
+	// Quality issues
+	if (qualityFiles.length > 0 && severity !== "error") {
+		for (const file of qualityFiles) {
+			const rel = path.relative(cwd, file.filePath);
+			if (!lines.includes(rel)) lines.push(rel);
+			for (const w of file.warnings ?? []) {
+				lines.push(
+					`  ℹ L${w.line ?? "?"}  ${w.rule ?? w.code ?? w.tool}  ${w.message}`,
+				);
+			}
+		}
+	}
+
+	const projectDeltaCount = appendProjectDiagnosticsDeltaLines(
+		lines,
+		cwd,
+		projectDelta,
+		severity,
+		includeFile,
+	);
+
+	const aw = actionableFiles.reduce(
+		(count, file) => count + (file.warnings?.length ?? 0),
+		0,
+	);
+	const cq = qualityFiles.reduce(
+		(count, file) => count + (file.warnings?.length ?? 0),
+		0,
+	);
+
+	if (lines.length === 0) {
+		let text = `No ${severity === "all" ? "" : severity + " "}issues in the current turn delta.`;
+		// Discoverability (#190): `delta` is current-turn-scoped, so it's empty
+		// right after a resume even when prior findings were rehydrated into the
+		// session-wide view. Point the agent at `mode=all` when that's the case.
+		const carried = getFileDiagnosticSummaries().filter(
+			(f) => includeFile(f.filePath) && f.diagnostics.length > 0,
+		);
+		const carriedIssues = carried.reduce((n, f) => n + f.diagnostics.length, 0);
+		if (carried.length > 0) {
+			text += ` ${carriedIssues} finding${carriedIssues === 1 ? "" : "s"} across ${carried.length} file${carried.length === 1 ? "" : "s"} carried over from earlier this session — use mode=all to see them.`;
+		}
+		text += pathsScopeCacheOnlyNote(pathsScope);
+		return {
+			content: [{ type: "text" as const, text }],
+			details: { mode: "delta", warnings: 0, carriedOverFiles: carried.length },
+		};
+	}
+
+	const summary = `\nSummary (turn delta): ${aw} actionable warning${aw === 1 ? "" : "s"} · ${cq} quality issue${cq === 1 ? "" : "s"} · ${projectDeltaCount} project diagnostic${projectDeltaCount === 1 ? "" : "s"}`;
+	return {
+		content: [{ type: "text" as const, text: lines.join("\n") + summary }],
+		details: {
+			mode: "delta",
+			actionableWarnings: aw,
+			qualityIssues: cq,
+			projectDiagnostics: projectDeltaCount,
+		},
+	};
+}
+
+// ── all mode ──────────────────────────────────────────────────────────────────
+
+function createCurrentIgnoreFilter(cwd: string): (filePath: string) => boolean {
+	try {
+		const matcher = getProjectIgnoreMatcher(cwd);
+		return (filePath: string) =>
+			!matcher.isIgnored(path.resolve(filePath), false);
+	} catch {
+		// Diagnostics should remain available even if an ignore config/root probe is
+		// temporarily unreadable. Walkers already treat config load failures as
+		// non-fatal; match that behavior for cached diagnostic presentation.
+		return () => true;
+	}
+}
+
+// ── paths scope restrictor (#461) ─────────────────────────────────────────────
+//
+// `paths` narrows any mode to an explicit file/directory list — a wrapper tool
+// (e.g. "check exactly the git-staged files") passes whatever a `git diff
+// --name-only` gave it. Entries may be files or directories (directories match
+// as prefixes — cheap via the same predicate, and "run on src/" is a natural
+// wrapper call); relative entries resolve against cwd. Deliberately NOT run
+// through the project ignore matcher for explicitly-listed files, matching
+// `lsp_diagnostics`' `paths` param, which also takes explicit entries as-is
+// (only its directory/auto-walk mode applies the ignore matcher) — an agent
+// that names a file by hand is assumed to mean it regardless of `.gitignore`.
+
+interface PathsScope {
+	/** True when the file (or a directory prefix of it) was requested. */
+	includeFile: (filePath: string) => boolean;
+	/** Absolute paths of requested entries that don't exist on disk. */
+	missing: string[];
+	/**
+	 * Resolved, on-disk-existing absolute FILE paths (directory entries are
+	 * expanded lazily via `includeFile`'s prefix match, never eagerly listed).
+	 * This is what mode=full feeds to the active LSP sweep / cheap scanner as an
+	 * explicit file list — a nonexistent entry has nothing to scan.
+	 */
+	existingEntries: string[];
+	/**
+	 * True when any entry was a directory. mode=full then falls back to the
+	 * normal project walk (narrowed by includeFile) — passing only
+	 * `existingEntries` would silently skip every file under the requested
+	 * directories, an under-scan the caller has no way to detect.
+	 */
+	hasDirectoryEntries: boolean;
+}
+
+/**
+ * Resolves the `paths` param into a scope predicate. Returns `undefined` when
+ * `paths` was not provided (callers fall back to no restriction). Throws a
+ * plain `Error` when the cap is exceeded — the caller turns that into a
+ * clear tool error rather than silently truncating (a wrapper must not
+ * believe it checked files it didn't).
+ */
+function resolvePathsScope(
+	cwd: string,
+	rawPaths: unknown,
+): PathsScope | undefined {
+	if (!Array.isArray(rawPaths) || rawPaths.length === 0) return undefined;
+	if (rawPaths.length > MAX_PATHS_ENTRIES) {
+		throw new Error(
+			`paths has ${rawPaths.length} entries, over the ${MAX_PATHS_ENTRIES} cap. ` +
+				"Narrow the list or omit paths to scan without a restriction.",
+		);
+	}
+	const entries = rawPaths
+		.filter(
+			(entry): entry is string =>
+				typeof entry === "string" && entry.trim().length > 0,
+		)
+		.map((entry) =>
+			path.resolve(path.isAbsolute(entry) ? entry : path.resolve(cwd, entry)),
+		);
+
+	const missing: string[] = [];
+	const fileEntries: string[] = [];
+	const existingEntries: string[] = [];
+	const dirEntries: string[] = [];
+	for (const entry of entries) {
+		let stat: fsSync.Stats;
+		try {
+			stat = fsSync.statSync(entry);
+		} catch {
+			// Nonexistent on disk right now — still treated as a file-key match
+			// candidate for the delta/all cache filter (not just dropped): the
+			// wrapper use case passes git output, where a deleted-but-staged path
+			// legitimately has no on-disk file yet may still have cached findings
+			// from before deletion. Excluded from `existingEntries` (nothing to
+			// actively scan) and recorded in `missing` for mode=full's skipped-note.
+			missing.push(entry);
+			fileEntries.push(entry);
+			continue;
+		}
+		if (stat.isDirectory()) {
+			dirEntries.push(entry);
+		} else {
+			fileEntries.push(entry);
+			existingEntries.push(entry);
+		}
+	}
+
+	const fileKeys = new Set(fileEntries.map((f) => normalizeFilePath(f)));
+	const dirPrefixes = dirEntries.map((d) => normalizeFilePath(d));
+
+	const includeFile = (filePath: string): boolean => {
+		const key = normalizeFilePath(path.resolve(filePath));
+		if (fileKeys.has(key)) return true;
+		return dirPrefixes.some(
+			(prefix) => key === prefix || key.startsWith(`${prefix}/`),
+		);
+	};
+
+	return {
+		includeFile,
+		missing,
+		existingEntries,
+		hasDirectoryEntries: dirEntries.length > 0,
+	};
+}
+
+/** Short, honest note for delta/all when `paths` filtered everything out — these modes are cache-only, so an unseen file legitimately shows nothing. */
+function pathsScopeCacheOnlyNote(scope: PathsScope | undefined): string {
+	if (!scope) return "";
+	return (
+		"\n\nNote: paths restricts this to cached findings for files pi-lens has " +
+		"already dispatched this session — mode=delta/all can't see files it " +
+		"hasn't touched. Use mode=full to actively scan exactly these paths."
+	);
+}
+
+/** Short note listing paths entries that don't exist on disk (mode=full only — the wrapper use case passes git output, where a deleted-but-staged file WILL appear). */
+function pathsScopeMissingNote(scope: PathsScope | undefined): string {
+	if (!scope || scope.missing.length === 0) return "";
+	const shown = scope.missing.slice(0, 10).map((p) => path.basename(p));
+	const more =
+		scope.missing.length > shown.length
+			? ` (+${scope.missing.length - shown.length} more)`
+			: "";
+	return `\n\n⚠ Skipped ${scope.missing.length} path(s) not found on disk: ${shown.join(", ")}${more}`;
+}
+
+function filterProjectDiagnosticsSnapshot(
+	snapshot: ProjectDiagnosticsSnapshot | undefined,
+	includeFile: (filePath: string) => boolean,
+): ProjectDiagnosticsSnapshot | undefined {
+	if (!snapshot) return undefined;
+	return {
+		...snapshot,
+		diagnostics: snapshot.diagnostics.filter((d) => includeFile(d.filePath)),
+	};
+}
+
+function filterProjectDiagnosticsDeltaReport(
+	report: ProjectDiagnosticsDeltaReport | undefined,
+	includeFile: (filePath: string) => boolean,
+): ProjectDiagnosticsDeltaReport | undefined {
+	if (!report) return undefined;
+	return {
+		...report,
+		diagnostics: report.diagnostics.filter((d) => includeFile(d.filePath)),
+	};
+}
+
+/** A diagnostic counts as error-like when it blocks or has error severity. */
+function isErrorLike(d: WidgetDiagnostic): boolean {
+	return d.semantic === "blocking" || d.severity === "error";
+}
+
+function matchesSeverity(d: WidgetDiagnostic, severity: string): boolean {
+	if (severity === "error") return isErrorLike(d);
+	if (severity === "warning") return !isErrorLike(d);
+	return true;
+}
+
+/** Most-important first: blocking → error → warning/other, then by line. */
+function severityRank(d: WidgetDiagnostic): number {
+	if (d.semantic === "blocking") return 0;
+	if (d.severity === "error") return 1;
+	if (d.severity === "warning") return 2;
+	return 3;
+}
+
+function bySeverityThenLine(a: WidgetDiagnostic, b: WidgetDiagnostic): number {
+	return severityRank(a) - severityRank(b) || (a.line ?? 0) - (b.line ?? 0);
+}
+
+function lspSeverityName(severity: LSPDiagnostic["severity"]): string {
+	if (severity === 1) return "error";
+	if (severity === 2) return "warning";
+	if (severity === 3) return "info";
+	return "hint";
+}
+
+function lspRuleId(diagnostic: LSPDiagnostic): string {
+	const code =
+		diagnostic.code === undefined ? undefined : String(diagnostic.code);
+	if (diagnostic.source && code) return `${diagnostic.source}:${code}`;
+	return diagnostic.source ?? code ?? "lsp";
+}
+
+function lspDiagnosticToWidget(diagnostic: LSPDiagnostic): WidgetDiagnostic {
+	const severity = lspSeverityName(diagnostic.severity);
+	const rule = lspRuleId(diagnostic);
+	return {
+		severity,
+		semantic: diagnostic.severity === 1 ? "blocking" : "warning",
+		message: diagnostic.message,
+		line: diagnostic.range.start.line + 1,
+		col: diagnostic.range.start.character + 1,
+		rule,
+		tool: "lsp",
+	};
+}
+
+function projectDiagnosticToWidget(
+	diagnostic: ProjectDiagnostic,
+): WidgetDiagnostic {
+	return {
+		severity: diagnostic.severity,
+		semantic: diagnostic.semantic,
+		message: diagnostic.message,
+		line: diagnostic.line,
+		col: diagnostic.column,
+		rule: diagnostic.rule ?? diagnostic.code,
+		tool: diagnostic.runner || diagnostic.tool,
+	};
+}
+
+// The ast-grep LSP keys its diagnostics `rule = "ast-grep:<id>"` (source:code,
+// lsp-diagnostics.ts), while the napi runner — per-edit AND the project scan
+// (#308) — emits the bare `<id>`. Both run the same shipped ruleset, so the same
+// violation must collapse to one finding in mode=full's merge regardless of which
+// engine produced it. Strip the `ast-grep:` source prefix and the `-js` language
+// suffix (the napi runner already treats `<id>` / `<id>-js` as one rule) so the
+// LSP sweep and the napi scan don't double-report the same line.
+function normalizeRuleForDedup(ruleId: string): string {
+	return ruleId.replace(/^ast-grep:/, "").replace(/-js$/, "");
+}
+
+function diagnosticDedupKey(
+	filePath: string,
+	diagnostic: WidgetDiagnostic,
+): string {
+	const ruleId = normalizeRuleForDedup(diagnostic.rule ?? diagnostic.tool ?? "");
+	return [path.resolve(filePath), diagnostic.line ?? "?", ruleId].join(":");
+}
+
+function summarizeDiagnostics(
+	filePath: string,
+	diagnostics: WidgetDiagnostic[],
+	hasFinalSnapshot: boolean,
+): FileDiagnosticSummary {
+	let blocking = 0;
+	let errors = 0;
+	let warnings = 0;
+	for (const diagnostic of diagnostics) {
+		if (diagnostic.semantic === "blocking") blocking++;
+		if (diagnostic.severity === "error") errors++;
+		else if (diagnostic.severity === "warning") warnings++;
+	}
+	return {
+		filePath,
+		blocking,
+		errors,
+		warnings,
+		hasFinalSnapshot,
+		diagnostics,
+	};
+}
+
+/**
+ * #646: break the confirmed/unconfirmed LSP-sweep tally down PER primary
+ * server id (typescript, pyright, marksman, ...) instead of one flat
+ * aggregate count. Mirrors `tools/lsp-diagnostics.ts`'s `primaryServerId`/
+ * `tallyConfirmation` split — both tools now use the SAME
+ * `primaryServerId` (clients/lsp/config.ts) so a file's classification as
+ * "primary language server" vs "auxiliary scanner" agrees between them.
+ *
+ * Motivating case (#646): a real sweep came back 34/155 unconfirmed, and
+ * diagnosing WHICH server was responsible required grepping
+ * `~/.pi-lens/latency.log` by hand — it turned out to be 100% one push-only
+ * server (marksman). This tally makes that visible directly: `{ marksman:
+ * { confirmed: 0, total: 34 }, typescript: { confirmed: 121, total: 121 } }`.
+ *
+ * Purely an additional reporting dimension — does NOT change what counts as
+ * confirmed/unconfirmed (the existing `confirmedLspResults`/
+ * `unconfirmedLspResults` partition in `formatFullMode` is unchanged and
+ * still the source of truth this reads from).
+ */
+function tallyLspByPrimaryServer(
+	confirmed: WorkspaceLspDiagnosticResult[],
+	unconfirmed: WorkspaceLspDiagnosticResult[],
+): Map<string, { confirmed: number; total: number }> {
+	const byServer = new Map<string, { confirmed: number; total: number }>();
+	const bump = (filePath: string, wasConfirmed: boolean) => {
+		const id = primaryServerId(filePath) ?? "unknown";
+		const entry = byServer.get(id) ?? { confirmed: 0, total: 0 };
+		entry.total += 1;
+		if (wasConfirmed) entry.confirmed += 1;
+		byServer.set(id, entry);
+	};
+	for (const result of confirmed) bump(result.filePath, true);
+	for (const result of unconfirmed) bump(result.filePath, false);
+	return byServer;
+}
+
+/**
+ * Render the per-server tally from `tallyLspByPrimaryServer` as a short
+ * clause, e.g. "typescript: 121/121, marksman: 0/34" — sorted so the
+ * worst-confirmed server (the one most likely to be why a sweep looks
+ * unconfirmed) is called out first.
+ */
+function formatLspServerBreakdown(
+	byServer: Map<string, { confirmed: number; total: number }>,
+): string {
+	return [...byServer.entries()]
+		.sort((a, b) => {
+			const rateA = a[1].confirmed / a[1].total;
+			const rateB = b[1].confirmed / b[1].total;
+			return rateA - rateB;
+		})
+		.map(([id, { confirmed, total }]) => `${id}: ${confirmed}/${total}`)
+		.join(", ");
+}
+
+/**
+ * #646: split a raw LSP-sweep result set's diagnostics into "primary" (the
+ * real language server, e.g. typescript/pyright) vs "auxiliary" (cross-
+ * cutting scanners attached via clientScope "all" — ast-grep, opengrep,
+ * zizmor, typos, marksman, ...), the same separation `lsp_diagnostics`
+ * already applies to its own findings rendering (see
+ * `tools/lsp-diagnostics.ts`'s `collectBatchDiagnostics`). Computed from the
+ * raw per-file LSP results (not the merged widget-state summaries further
+ * down `formatFullMode`) so it doesn't disturb the existing merge/dedup
+ * logic those summaries feed into.
+ */
+function tallyLspPrimaryVsAuxiliary(
+	results: WorkspaceLspDiagnosticResult[],
+): { primary: number; auxiliary: number } {
+	let primary = 0;
+	let auxiliary = 0;
+	for (const result of results) {
+		const primaryId = primaryServerId(result.filePath);
+		for (const diagnostic of result.diagnostics ?? []) {
+			if (diagnostic.source === primaryId) primary += 1;
+			else auxiliary += 1;
+		}
+	}
+	return { primary, auxiliary };
+}
+
+function mergeDiagnosticsWithWidgetSummaries(
+	widgetSummaries: FileDiagnosticSummary[],
+	lspResults: WorkspaceLspDiagnosticResult[],
+	projectSnapshot?: ProjectDiagnosticsSnapshot,
+	projectDelta?: ProjectDiagnosticsDeltaReport,
+): FileDiagnosticSummary[] {
+	const byFile = new Map<string, FileDiagnosticSummary>();
+	const seen = new Set<string>();
+
+	for (const summary of widgetSummaries) {
+		const filePath = path.resolve(summary.filePath);
+		const diagnostics = (summary.diagnostics ?? []).map((d) => ({ ...d }));
+		byFile.set(filePath, { ...summary, filePath, diagnostics });
+		for (const diagnostic of diagnostics) {
+			seen.add(diagnosticDedupKey(filePath, diagnostic));
+		}
+	}
+
+	const addDiagnostic = (
+		filePath: string,
+		widgetDiagnostic: WidgetDiagnostic,
+	) => {
+		const existing = byFile.get(filePath);
+		const diagnostics = existing ? [...existing.diagnostics] : [];
+		const key = diagnosticDedupKey(filePath, widgetDiagnostic);
+		if (seen.has(key)) return;
+		seen.add(key);
+		diagnostics.push(widgetDiagnostic);
+		byFile.set(
+			filePath,
+			summarizeDiagnostics(
+				filePath,
+				diagnostics,
+				existing?.hasFinalSnapshot ?? true,
+			),
+		);
+	};
+
+	for (const result of lspResults) {
+		const filePath = path.resolve(result.filePath);
+		for (const diagnostic of result.diagnostics ?? []) {
+			addDiagnostic(filePath, lspDiagnosticToWidget(diagnostic));
+		}
+	}
+
+	for (const diagnostic of projectSnapshot?.diagnostics ?? []) {
+		addDiagnostic(
+			path.resolve(diagnostic.filePath),
+			projectDiagnosticToWidget(diagnostic),
+		);
+	}
+	for (const diagnostic of projectDelta?.diagnostics ?? []) {
+		addDiagnostic(
+			path.resolve(diagnostic.filePath),
+			projectDiagnosticToWidget(diagnostic),
+		);
+	}
+
+	return [...byFile.values()];
+}
+
+/**
+ * Apply inline `pi-lens-ignore` suppression to the merged mode=full summaries so
+ * the project-wide sweep honors the same comments as the per-edit path (#442) —
+ * without it, a site cleanly suppressed in mode=all reappears as blocking here.
+ * Reads each flagged file once (bounded to files that actually have diagnostics);
+ * a read failure is fail-safe (keep the diagnostics rather than hide a finding on
+ * an I/O error). Re-summarizes so the blocking/error/warning counts reflect the
+ * suppression.
+ */
+async function applyInlineSuppressionsToSummaries(
+	summaries: FileDiagnosticSummary[],
+	cwd: string,
+): Promise<FileDiagnosticSummary[]> {
+	return Promise.all(
+		summaries.map(async (summary) => {
+			if (!summary.diagnostics.length) return summary;
+			let content: string;
+			try {
+				content = await fs.readFile(summary.filePath, "utf8");
+			} catch {
+				return summary; // never hide a finding on a read error
+			}
+			const inlineKept = applyInlineSuppressions(summary.diagnostics, content);
+			// #690: same false-positive/suppress/defer disposition filter the
+			// per-edit dispatch path applies (dispatcher.ts) — mode=full merges in
+			// diagnostics from a fresh LSP sweep/project scan that never went
+			// through that path, so without this a disposed finding reappears here.
+			const kept = applyDispositions(inlineKept, cwd, summary.filePath, content);
+			// Tag `flagged` diagnostics for the render loop (formatAllMode). Content
+			// is already in hand here (unlike mode=all/delta's cache-only path), so
+			// this is the one place the tag can be computed without adding I/O to
+			// the "instant" modes.
+			for (const d of kept) {
+				// flagged is weak-anchored (module doc, diagnostic-dispositions.ts) so
+				// the tag survives incidental edits to the flagged line itself.
+				const { weak } = anchorsForDiagnostic(cwd, summary.filePath, d, content);
+				if (getDisposition(cwd, weak)?.disposition === "flagged") {
+					(d as { flagged?: boolean }).flagged = true;
+				}
+			}
+			if (kept.length === summary.diagnostics.length) return summary;
+			return summarizeDiagnostics(
+				summary.filePath,
+				kept,
+				summary.hasFinalSnapshot,
+			);
+		}),
+	);
+}
+
+function shouldUseCachedProjectDiagnostics(value: unknown): boolean {
+	return value === "cached";
+}
+
+function shouldRefreshProjectDiagnostics(value: unknown): boolean {
+	return value === "cheap" || value === "all";
+}
+
+/** True when full mode should include project-runner state at all (any non-none refreshRunners). */
+function shouldIncludeProjectRunners(value: unknown): boolean {
+	return shouldRefreshProjectDiagnostics(value) || value === "cached";
+}
+
+/**
+ * Merge cache-derived diagnostics from the analyzer extractors (jscpd, madge,
+ * gitleaks, knip …) into the scanned project snapshot: append to the existing
+ * one (recording the runners), or synthesize a minimal snapshot when there was
+ * no in-process scan. Returns the snapshot unchanged when there is nothing extra.
+ */
+function foldExtraDiagnosticsIntoSnapshot(
+	snapshot: ProjectDiagnosticsSnapshot | undefined,
+	extra: ProjectDiagnostic[],
+	runners: string[],
+	cwd: string,
+): ProjectDiagnosticsSnapshot | undefined {
+	if (extra.length === 0) return snapshot;
+	if (snapshot) {
+		const merged = new Set([...snapshot.runners, ...runners]);
+		return {
+			...snapshot,
+			diagnostics: [...snapshot.diagnostics, ...extra],
+			runners: [...merged],
+		};
+	}
+	return {
+		version: PROJECT_DIAGNOSTICS_CACHE_VERSION,
+		cwd,
+		tier: "all",
+		scannedAt: new Date().toISOString(),
+		diagnostics: extra,
+		filesScanned: 0,
+		runners,
+	};
+}
+
+async function getProjectDiagnosticsSnapshotForFullMode(
+	cwd: string,
+	options: {
+		refreshRunners?: unknown;
+		maxProjectFiles?: number;
+		signal?: AbortSignal;
+		files?: string[];
+	},
+): Promise<ProjectDiagnosticsSnapshot | undefined> {
+	if (shouldRefreshProjectDiagnostics(options.refreshRunners)) {
+		return scanProjectDiagnostics({
+			cwd,
+			tier: "cheap",
+			maxFiles: options.maxProjectFiles,
+			signal: options.signal,
+			files: options.files,
+		});
+	}
+	if (shouldUseCachedProjectDiagnostics(options.refreshRunners)) {
+		// The cached snapshot is a cross-session cache; drop diagnostics for files
+		// edited/deleted since the scan so a stale entry isn't replayed (#298). A
+		// fresh scan (above) is current by construction and needs no reconcile.
+		const cached = loadProjectDiagnosticsSnapshot(cwd);
+		return cached
+			? reconcileProjectDiagnosticsSnapshot(cached).snapshot
+			: undefined;
+	}
+	return undefined;
+}
+
+async function formatFullMode(
+	cwd: string,
+	severity: string,
+	lspService: LSPServiceLike,
+	cacheManager: CacheManager,
+	options: {
+		refreshRunners?: unknown;
+		maxProjectFiles?: number;
+		maxLspFiles?: number;
+		signal?: AbortSignal;
+		wallClockMs?: number;
+		onProgress?: (completed: number, total: number) => void;
+		pathsScope?: PathsScope;
+		nextWriteIndex?: () => number;
+	} = {},
+): Promise<{ content: [{ type: "text"; text: string }]; details: object }> {
+	const runWorkspaceDiagnostics = lspService.runWorkspaceDiagnostics;
+	if (typeof runWorkspaceDiagnostics !== "function") {
+		return {
+			content: [
+				{
+					type: "text" as const,
+					text: "LSP service does not support project-wide workspace diagnostics.",
+				},
+			],
+			details: { mode: "full", filesChecked: 0, lspUnavailable: true },
+		};
+	}
+	const { signal, pathsScope, nextWriteIndex } = options;
+	const ignoreFile = createCurrentIgnoreFilter(cwd);
+	const includeFile = (filePath: string) =>
+		ignoreFile(filePath) && (!pathsScope || pathsScope.includeFile(filePath));
+	// `paths` (#461): route the active scans at exactly the requested files
+	// instead of walking the whole project. Three cases:
+	// - files only → pass them as the explicit list (skips the walk). An EMPTY
+	//   list (every requested file was missing) still passes through — both
+	//   seams treat [] as "scan nothing", where undefined would trigger a full
+	//   project walk that includeFile then filters to nothing (expensive no-op).
+	// - any directory entry → fall back to the walk, narrowed by includeFile.
+	//   Passing only the file entries would silently skip everything under the
+	//   requested directories — an under-scan the caller can't detect.
+	// - no paths → undefined, today's full walk.
+	const explicitFiles =
+		pathsScope && !pathsScope.hasDirectoryEntries
+			? pathsScope.existingEntries
+			: undefined;
+	// #613: the heavyweight-analyzer fresh-fetch (below) used to be `await`ed
+	// AFTER this Promise.all had already fully resolved — sequentially eating
+	// into the SAME wall-clock ceiling (`FULL_SCAN_WALL_CLOCK_MS`) the LSP sweep
+	// already spent, rather than sharing it concurrently as the old comment here
+	// claimed. On a real project the LSP sweep alone can take 100+s, leaving the
+	// analyzers almost no budget before the shared abort signal fires — killing
+	// ALL of them (even unconditional ones like knip/jscpd/madge) before any
+	// could complete. Building its promise here, alongside the sweep and cheap
+	// scan, makes it genuinely concurrent — all three phases now race the SAME
+	// signal from the same starting point instead of stacking.
+	const analyzersPromise = shouldIncludeProjectRunners(options.refreshRunners)
+		? loadBootstrapClients().then((clients) =>
+				fetchFreshProjectDiagnostics(cacheManager, cwd, clients, signal),
+			)
+		: Promise.resolve<FreshProjectDiagnosticsResult>({
+				diagnostics: [],
+				runners: [],
+				cold: [],
+				timings: {},
+			});
+	const [rawLspResults, rawProjectSnapshot, extracted] = await Promise.all([
+		runWorkspaceDiagnostics.call(lspService, cwd, {
+			maxFiles: options.maxLspFiles,
+			signal,
+			onProgress: options.onProgress,
+			files: explicitFiles,
+		}),
+		getProjectDiagnosticsSnapshotForFullMode(cwd, {
+			...options,
+			files: explicitFiles,
+		}),
+		analyzersPromise,
+	]);
+	const aborted = signal?.aborted ?? false;
+	const lspResults = rawLspResults.filter((result) =>
+		includeFile(result.filePath),
+	);
+	// #630: `timedOut`/`error` means the per-file check never actually
+	// completed or was inconclusive (#570's `touchFile().inconclusive`, or
+	// this sweep's own outer per-file deadline/throw — see
+	// `LSPWorkspaceDiagnosticResult`'s doc comment) — `diagnostics` is a
+	// default-EMPTY placeholder in that case, not a confirmed clean. Partition
+	// once here so BOTH the footer write (below, #571) and the merge into
+	// `summaries` (further down) share the same confirmed/unconfirmed split.
+	// Previously only the footer write excluded these; the merge still fed
+	// the unfiltered `lspResults` in, so a timed-out file's placeholder `[]`
+	// read as "0 diagnostics" — false-clean — in the rendered/`details`
+	// output (#630).
+	const confirmedLspResults = lspResults.filter(
+		(result) => !result.timedOut && !result.error,
+	);
+	const unconfirmedLspResults = lspResults.filter(
+		(result) => result.timedOut || result.error,
+	);
+	// #571: reconcile this scan's fresh, CONFIRMED per-file results into the
+	// footer cache. A footer write is never allowed to fail the tool call, so
+	// any unexpected throw is swallowed.
+	for (const result of confirmedLspResults) {
+		try {
+			// #692: provenance label ONLY — must never affect `rule`/identity (see
+			// `ConvertLspDiagnosticsOptions.scanOrigin`'s doc comment).
+			const diagnostics = convertLspDiagnostics(
+				result.diagnostics,
+				result.filePath,
+				{ scanOrigin: "lens_diagnostics_full" },
+			);
+			// #692: re-tag aux-sourced findings (ast-grep, opengrep, zizmor, typos)
+			// with their real tool id + semantic policy — the same treatment the
+			// per-edit dispatch runner gives them — so a scan-reconciled entry no
+			// longer keeps tool "lsp". No file content is read here (this loop
+			// only has `result.diagnostics`/`result.filePath` from the sweep, not
+			// the file body) — `detectFileRole` still classifies test files
+			// correctly from the path alone (its content-based checks only refine
+			// generated/stub detection), and native inline-suppression comments
+			// were already applied upstream by `runWorkspaceDiagnostics`
+			// (`applyAuxiliarySuppressions`), so an empty content string here is a
+			// safe no-op re-check rather than a behavior gap.
+			const retagged = retagAuxiliaryDiagnostics(
+				diagnostics,
+				result.diagnostics,
+				"",
+				{ cwd, fileRole: detectFileRole(result.filePath) },
+			);
+			reconcileScanDiagnostics(
+				result.filePath,
+				retagged,
+				true,
+				nextWriteIndex?.(),
+			);
+		} catch {
+			// Never let a footer-reconciliation hiccup fail the scan itself.
+		}
+	}
+	const scannedSnapshot = filterProjectDiagnosticsSnapshot(
+		rawProjectSnapshot,
+		includeFile,
+	);
+	// Heavyweight-analyzer findings (jscpd, madge, gitleaks, knip, govulncheck,
+	// trivy, dead-code) — a FRESH run of each (#585), not a cache-only read:
+	// mode=full is the "authoritative full picture" call, so a session_start-only
+	// snapshot that can be hours stale in a long session is no longer good
+	// enough. Safe to run concurrently with the LSP sweep: every one of these
+	// analyzers has its own in-flight de-dupe guard (KnipClient/JscpdClient/
+	// DeadCodeClient's `inFlight` map, SecurityScanClient.dedupeScan for
+	// gitleaks/govulncheck/trivy — see fresh-fetch.ts's header), so a fresh
+	// fetch here racing a concurrent session_start/turn_end pass over the same
+	// tool JOINS that run instead of double-spawning it. `extracted` was already
+	// computed above, in the SAME `Promise.all` as the LSP sweep (#613) — only
+	// when the caller opted into project-runner state (otherwise it's the
+	// `Promise.resolve({...})` stub from `analyzersPromise` above).
+	const projectSnapshot = foldExtraDiagnosticsIntoSnapshot(
+		scannedSnapshot,
+		extracted.diagnostics.filter((d) => includeFile(d.filePath)),
+		extracted.runners,
+		cwd,
+	);
+	const projectDelta = filterProjectDiagnosticsDeltaReport(
+		loadProjectDiagnosticsDeltaReport(cwd),
+		includeFile,
+	);
+	// #630: only the CONFIRMED LSP results contribute diagnostics to the merge
+	// — an unconfirmed (timed-out/errored) file's placeholder `[]` must not be
+	// read as "0 issues, clean" via its LSP contribution. It can still
+	// legitimately show diagnostics from widgetSummaries/project-runner state
+	// below if those independently have entries for it.
+	const summaries = await applyInlineSuppressionsToSummaries(
+		mergeDiagnosticsWithWidgetSummaries(
+			getFileDiagnosticSummaries().filter((summary) =>
+				includeFile(summary.filePath),
+			),
+			confirmedLspResults,
+			projectSnapshot,
+			projectDelta,
+		),
+		cwd,
+	);
+	const result = formatAllMode(cwd, severity, summaries, {
+		mode: "full",
+		lspFilesChecked: rawLspResults.length,
+		partial: aborted,
+		projectDiagnostics:
+			projectSnapshot === undefined
+				? undefined
+				: {
+						tier: projectSnapshot.tier,
+						filesScanned: projectSnapshot.filesScanned,
+						diagnostics: projectSnapshot.diagnostics.length,
+						runners: projectSnapshot.runners,
+					},
+		projectDiagnosticsDelta:
+			projectDelta === undefined
+				? undefined
+				: {
+						diagnostics: projectDelta.diagnostics.length,
+						sources: projectDelta.sources,
+						turnIndex: projectDelta.turnIndex,
+					},
+	});
+	const missingNote = pathsScopeMissingNote(pathsScope);
+	// #630: mirrors `tools/lsp-diagnostics.ts`'s `unconfirmedReasonClause`/
+	// `tallyConfirmation` semantic guarantee (never silently render
+	// unconfirmed as clean), adapted to this tool's own aggregate-summary
+	// shape rather than its per-file result shape. `confirmedLspResults` were
+	// already excluded from the merge above, so an agent reading the summary
+	// alone would otherwise see nothing for these files and could read that
+	// as "0 diagnostics" — say explicitly which files the LSP sweep could not
+	// confirm and why, distinguishing a hard error from a soft timeout the
+	// same way #570 does upstream.
+	const unconfirmedTimedOut = unconfirmedLspResults.filter(
+		(result) => result.timedOut,
+	).length;
+	const unconfirmedErrored = unconfirmedLspResults.length - unconfirmedTimedOut;
+	// #646: per-primary-server breakdown of the same confirmed/unconfirmed
+	// tally — lets an agent see AT A GLANCE which server is responsible for
+	// any unconfirmed files (e.g. "marksman: 0/34") instead of having to
+	// cross-reference latency.log by hand. Computed unconditionally so it's
+	// always available in `details` even on an all-confirmed sweep; only
+	// rendered in the text note when more than one server is involved (with
+	// a single server the breakdown is redundant with the totals already
+	// stated).
+	const lspServerBreakdown = tallyLspByPrimaryServer(
+		confirmedLspResults,
+		unconfirmedLspResults,
+	);
+	const serverBreakdownClause =
+		lspServerBreakdown.size > 1
+			? ` — by server: ${formatLspServerBreakdown(lspServerBreakdown)}.`
+			: "";
+	const unconfirmedLspNote =
+		unconfirmedLspResults.length > 0
+			? `\n\n⚠ LSP sweep: ${confirmedLspResults.length} file(s) confirmed via LSP, ` +
+				`${unconfirmedLspResults.length} unconfirmed (${
+					unconfirmedTimedOut > 0 && unconfirmedErrored > 0
+						? `${unconfirmedTimedOut} timed out, ${unconfirmedErrored} errored`
+						: unconfirmedTimedOut > 0
+							? "check didn't complete within budget"
+							: "check errored"
+				})${serverBreakdownClause} — NOT the same as 0 diagnostics for: ${unconfirmedLspResults
+					.slice(0, 20)
+					.map((result) => result.filePath)
+					.join(
+						", ",
+					)}${unconfirmedLspResults.length > 20 ? ", …" : ""}. These files' LSP contribution is excluded from this result; re-run mode=full to retry them (they may still show findings above from cached/project-runner state).`
+			: "";
+	// #646: primary-vs-auxiliary split of the raw LSP-sweep findings (before
+	// they're merged into the widget-state summaries below), mirroring
+	// `lsp_diagnostics`' "Primary findings"/"Auxiliary findings" separation —
+	// so a page of ast-grep/opengrep/marksman noise never buries whether the
+	// real language server itself found anything in this sweep.
+	const lspPrimaryVsAuxiliary = tallyLspPrimaryVsAuxiliary(confirmedLspResults);
+	const lspPrimaryVsAuxiliaryNote =
+		lspPrimaryVsAuxiliary.primary + lspPrimaryVsAuxiliary.auxiliary > 0
+			? `\n\nLSP sweep findings: ${lspPrimaryVsAuxiliary.primary} primary (language server), ` +
+				`${lspPrimaryVsAuxiliary.auxiliary} auxiliary (ast-grep/opengrep/zizmor/typos/marksman/...).`
+			: "";
+	// #533/#585: a heavyweight analyzer (knip/jscpd/madge/gitleaks/govulncheck/
+	// trivy/dead-code) that contributed nothing this run is either COLD (not
+	// applicable to this project / tool unavailable — see fresh-fetch.ts's
+	// per-analyzer gates) or genuinely clean; `cold` only ever lists the
+	// former. Silently folding "not applicable" into "no issues found" would be
+	// exactly the false-empty #533 is about. Named per #511/#514's
+	// actionable-warning shape: say what's cold and what would warm it, only
+	// when the caller actually asked for runner state (extracted.cold is
+	// always [] otherwise).
+	// #585: an aborted fresh-fetch (Escape / the mode=full wall-clock ceiling)
+	// reports its still-in-flight analyzers separately from a genuine
+	// not-applicable/unavailable skip — "stopped mid-scan, unknown" is a
+	// different, more honest reason than "not applicable to this project", and
+	// conflating them would suggest re-running mode=full is pointless when it
+	// isn't (a re-run may well complete for that analyzer).
+	const abortedIds = new Set(extracted.abortedIds ?? []);
+	const genuinelyColdIds = extracted.cold.filter((id) => !abortedIds.has(id));
+	const coldNote =
+		genuinelyColdIds.length > 0
+			? `\n\ncold (not applicable / unavailable this run): ${genuinelyColdIds
+					.map((id) => `${id} — ${warmTriggerFor(id)}`)
+					.join(
+						", ",
+					)}. These analyzers have not contributed to this result — absence of their findings is NOT a clean verdict.`
+			: "";
+	const abortedNote =
+		abortedIds.size > 0
+			? `\n\nstopped mid-scan (still running in the background, not reflected in this result): ${[
+					...abortedIds,
+				].join(
+					", ",
+				)}. Not a clean verdict for these — re-run mode=full to pick up their result once it's cached.`
+			: "";
+	// #585: mode=full now fetches these analyzers fresh rather than reading a
+	// possibly-stale session_start cache — say so honestly, with per-analyzer
+	// elapsed time, since this can legitimately take a while (trivy's own
+	// ~180s ceiling).
+	const timingEntries = Object.entries(extracted.timings ?? {});
+	const freshNote =
+		timingEntries.length > 0
+			? `\n\nfetched fresh this call: ${timingEntries
+					.map(([id, ms]) => `${id} (${Math.round(ms)}ms)`)
+					.join(", ")}.`
+			: "";
+	// coldRunners always lands in details (even when empty) so a caller can
+	// reliably check "were any extractors cold" without a presence check.
+	// analyzerTimingsMs surfaces the #585 fresh-fetch elapsed time per
+	// analyzer that actually ran this call (empty when refreshRunners opted
+	// out of runner state entirely).
+	const resultWithCold = {
+		...result,
+		details: {
+			...result.details,
+			coldRunners: extracted.cold,
+			analyzerTimingsMs: extracted.timings,
+			analyzersAborted: extracted.aborted ?? false,
+			analyzersAbortedIds: extracted.abortedIds ?? [],
+			// #630: confirmed/unconfirmed LSP-sweep tally, mirroring
+			// `lsp_diagnostics`' confirmation state — lets a caller check "were
+			// any files unconfirmed" without re-deriving it from the text.
+			lspFilesConfirmed: confirmedLspResults.length,
+			lspFilesUnconfirmed: unconfirmedLspResults.length,
+			unconfirmedLspFiles: unconfirmedLspResults.map(
+				(result) => result.filePath,
+			),
+			// #646: per-primary-server breakdown of the same tally, plus the
+			// primary/auxiliary findings split — mirrors `lsp_diagnostics`'
+			// per-server reporting granularity (always present, even when every
+			// server confirmed cleanly, so a caller can check it unconditionally).
+			lspServerBreakdown: Object.fromEntries(lspServerBreakdown),
+			lspPrimaryDiagnosticsCount: lspPrimaryVsAuxiliary.primary,
+			lspAuxiliaryDiagnosticsCount: lspPrimaryVsAuxiliary.auxiliary,
+		},
+	};
+	// Stopped mid-scan: the results above are whatever completed before the abort.
+	// Tell the agent so it doesn't read a partial sweep as "clean" (#341). The
+	// abort is either a user/turn cancel (Escape) or the wall-clock ceiling firing
+	// (AbortSignal.timeout → TimeoutError), which guarantees the scan can't hang
+	// indefinitely — distinguish them so the agent knows whether to just re-run.
+	if (aborted) {
+		const timedOut =
+			(signal as (AbortSignal & { reason?: { name?: string } }) | undefined)
+				?.reason?.name === "TimeoutError";
+		const note = timedOut
+			? `\n\n⚠ Scan exceeded its ${Math.round((options.wallClockMs ?? 0) / 1000)}s time budget and was stopped — results are partial. ` +
+				"Narrow it with maxLspFiles, or raise PI_LENS_LENS_DIAGNOSTICS_FULL_TIMEOUT_MS."
+			: "\n\n⚠ Scan cancelled before completion — results are partial. " +
+				"Re-run with a smaller maxLspFiles to finish within budget.";
+		return {
+			content: [
+				{
+					type: "text" as const,
+					text:
+						result.content[0].text +
+						note +
+						unconfirmedLspNote +
+						lspPrimaryVsAuxiliaryNote +
+						coldNote +
+						abortedNote +
+						freshNote +
+						missingNote,
+				},
+			],
+			details: { ...resultWithCold.details, timedOut },
+		};
+	}
+	if (
+		missingNote ||
+		coldNote ||
+		abortedNote ||
+		freshNote ||
+		unconfirmedLspNote ||
+		lspPrimaryVsAuxiliaryNote
+	) {
+		return {
+			content: [
+				{
+					type: "text" as const,
+					text:
+						result.content[0].text +
+						unconfirmedLspNote +
+						lspPrimaryVsAuxiliaryNote +
+						coldNote +
+						abortedNote +
+						freshNote +
+						missingNote,
+				},
+			],
+			details: resultWithCold.details,
+		};
+	}
+	return resultWithCold;
+}
+
+function formatAllMode(
+	cwd: string,
+	severity: string,
+	summaries: FileDiagnosticSummary[] = getFileDiagnosticSummaries(),
+	detailOverrides: Record<string, unknown> = { mode: "all" },
+	staleDropped = 0,
+	pathsScope?: PathsScope,
+): { content: [{ type: "text"; text: string }]; details: object } {
+	// Files changed/deleted since their diagnostics were recorded have already
+	// been dropped by reconcileStaleWidgetFiles; note them so the agent knows
+	// those aren't "clean", just un-rescanned (use mode=full to refresh).
+	const staleNote =
+		staleDropped > 0
+			? ` (${staleDropped} changed file${staleDropped === 1 ? "" : "s"} omitted as stale — use mode=full to rescan)`
+			: "";
+
+	const ignoreFile = createCurrentIgnoreFilter(cwd);
+	const includeFile = (filePath: string) =>
+		ignoreFile(filePath) && (!pathsScope || pathsScope.includeFile(filePath));
+	const visibleSummaries = summaries.filter((s) => includeFile(s.filePath));
+
+	// Filter to files with actual issues
+	const withIssues = visibleSummaries.filter((s) => {
+		if (severity === "error") return s.blocking > 0 || s.errors > 0;
+		if (severity === "warning") return s.warnings > 0;
+		return s.blocking > 0 || s.errors > 0 || s.warnings > 0;
+	});
+
+	// mode=full already actively scanned exactly the requested paths, so a zero
+	// result there IS a legitimate clean read — the cache-only note only applies
+	// to delta/all, which is why this is gated on detailOverrides.mode !== "full".
+	const isFullMode = (detailOverrides as { mode?: string }).mode === "full";
+	const pathsNote = isFullMode ? "" : pathsScopeCacheOnlyNote(pathsScope);
+
+	if (withIssues.length === 0) {
+		const text =
+			(visibleSummaries.length === 0
+				? "No files diagnosed yet this session."
+				: `No ${severity === "all" ? "" : severity + " "}issues across ${visibleSummaries.length} file${visibleSummaries.length === 1 ? "" : "s"} diagnosed this session. ✓`) +
+			staleNote +
+			pathsNote;
+		return {
+			content: [{ type: "text" as const, text }],
+			details: {
+				...detailOverrides,
+				filesChecked: visibleSummaries.length,
+				staleDropped,
+			},
+		};
+	}
+
+	// Sort: blocking first, then errors, then warnings
+	const sorted = withIssues.sort(
+		(a, b) =>
+			b.blocking - a.blocking || b.errors - a.errors || b.warnings - a.warnings,
+	);
+
+	const lines: string[] = [];
+	let totalBlocking = 0;
+	let totalErrors = 0;
+	let totalWarnings = 0;
+
+	for (const s of sorted) {
+		const rel = path.relative(cwd, s.filePath);
+		const parts: string[] = [];
+		if (s.blocking > 0) parts.push(`🔴 ${s.blocking} blocking`);
+		if (s.errors > 0 && s.blocking === 0) parts.push(`${s.errors}E`);
+		if (s.warnings > 0) parts.push(`${s.warnings}W`);
+		if (!s.hasFinalSnapshot) parts.push(`(pending)`);
+		lines.push(`${rel}  ${parts.join("  ")}`);
+
+		// List the actual diagnostics (not just counts) so the agent can act on
+		// them without re-running anything — same "L<line>: <message>" shape as the
+		// inline blocker output. The widget state now exposes the FULL set (not the
+		// TUI's 12-cap); the tool applies its own generous per-file budget purely to
+		// avoid flooding context on a pathologically broken file.
+		const matching = (s.diagnostics ?? [])
+			.filter((d) => matchesSeverity(d, severity))
+			.sort(bySeverityThenLine);
+		const shown = matching.slice(0, MAX_DIAGNOSTICS_PER_FILE);
+		for (const d of shown) {
+			const marker = isErrorLike(d)
+				? d.semantic === "blocking"
+					? "🔴 "
+					: ""
+				: "";
+			const label = d.rule ?? d.tool;
+			const tag = label ? ` [${label}]` : "";
+			const flaggedTag = d.flagged ? " 📌 flagged-to-fix" : "";
+			const msg = d.message.replace(/\s+/g, " ").trim();
+			lines.push(`  ${marker}L${d.line ?? "?"}: ${msg}${tag}${flaggedTag}`);
+		}
+		if (matching.length > shown.length) {
+			lines.push(
+				`  … ${matching.length - shown.length} more in this file (showing ${shown.length} of ${matching.length})`,
+			);
+		}
+
+		totalBlocking += s.blocking;
+		totalErrors += s.errors;
+		totalWarnings += s.warnings;
+	}
+
+	const summary = [
+		`\nSummary (${visibleSummaries.length} files diagnosed this session):`,
+		totalBlocking > 0
+			? `  🔴 ${totalBlocking} blocking error${totalBlocking === 1 ? "" : "s"}`
+			: null,
+		totalErrors > 0
+			? `  ${totalErrors} error${totalErrors === 1 ? "" : "s"}`
+			: null,
+		totalWarnings > 0
+			? `  ${totalWarnings} warning${totalWarnings === 1 ? "" : "s"}`
+			: null,
+	]
+		.filter(Boolean)
+		.join("\n");
+
+	return {
+		content: [
+			{ type: "text" as const, text: lines.join("\n") + summary + staleNote },
+		],
+		details: {
+			...detailOverrides,
+			filesWithIssues: withIssues.length,
+			totalBlocking,
+			totalErrors,
+			totalWarnings,
+			staleDropped,
+		},
+	};
+}

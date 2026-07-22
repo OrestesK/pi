@@ -1,0 +1,68 @@
+{
+  "name": "pi-openai-service-tier",
+  "version": "0.1.4-ok.2",
+  "description": "Cost-correct OpenAI service tier / fast mode extension for pi",
+  "type": "module",
+  "license": "MIT",
+  "author": "Anirudh Mehra",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "openai",
+    "codex",
+    "fast",
+    "priority",
+    "service-tier"
+  ],
+  "homepage": "https://github.com/OrestesK/pi-openai-service-tier#readme",
+  "bugs": {
+    "url": "https://github.com/OrestesK/pi-openai-service-tier/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OrestesK/pi-openai-service-tier.git"
+  },
+  "files": [
+    "index.ts",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "assets/social-preview.svg",
+    "assets/social-preview.png"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/OrestesK/pi-openai-service-tier/main/assets/social-preview.png"
+  },
+  "scripts": {
+    "check": "npm run typecheck && npm test && npm run pack:dry-run",
+    "pack:dry-run": "npm pack --dry-run",
+    "test": "node --test --experimental-strip-types index.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pi-ai-runtime": "npm:@earendil-works/pi-ai@^0.80.6"
+  },
+  "overrides": {
+    "protobufjs": "7.6.5",
+    "ws": "8.21.1"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.80.6"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.6",
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "packageManager": "npm@11.6.2"
+}

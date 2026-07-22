@@ -1,0 +1,615 @@
+import { randomBytes } from "node:crypto";
+import * as path from "node:path";
+import type { ActionableWarningRecord } from "./actionable-warnings.js";
+import type { FunctionCallGraph } from "./call-graph.js";
+import type { WordIndex } from "./word-index.js";
+import type { CascadeRun } from "./cascade-types.js";
+import type { CodeQualityWarningRecord } from "./code-quality-warnings.js";
+import type { FileComplexity } from "./complexity-client.js";
+import { normalizeMapKey } from "./path-utils.js";
+import { ReadGuard } from "./read-guard.js";
+import type { RuleScanResult } from "./rules-scanner.js";
+import { RUNTIME_CONFIG } from "./runtime-config.js";
+import { TurnSummaryCollector } from "./turn-summary.js";
+
+export interface ErrorDebtBaseline {
+	testsPassed: boolean;
+	buildPassed: boolean;
+}
+
+export interface CascadeSessionStats {
+	runs: number;
+	diagnosticsSurfaced: number;
+	coldSnapshotTouches: number;
+}
+
+export interface DeferredFormatRecord {
+	filePath: string;
+	/** Formatter/language cwd captured when the edit was analyzed. */
+	cwd: string;
+	/**
+	 * Workspace/project cwd used for turn-state and change-log bookkeeping.
+	 * Required: omitting it silently routes bookkeeping through `record.cwd`
+	 * (the language root), which is the monorepo-cwd-mismatch bug PR #105
+	 * fixed. The agent-end consumer trusts this is set.
+	 */
+	turnStateCwd: string;
+	firstTouchedAt: number;
+	lastTouchedAt: number;
+	toolNames: Set<"write" | "edit">;
+}
+
+export class RuntimeCoordinator {
+	private _projectRoot = normalizeMapKey(process.cwd());
+	private _sessionGeneration = 0;
+	private _sessionStartedAt = Date.now();
+	private _errorDebtBaseline: ErrorDebtBaseline | null = null;
+	private _pipelineCrashCounts = new Map<string, number>();
+	private _cachedExports = new Map<string, string>();
+	private _startupScansInFlight = new Map<string, number>();
+	private _cascadeRuns: CascadeRun[] = [];
+	// Cascade computes are kicked off unawaited by the pipeline (#450); their
+	// promises park here until turn_end drains them via settleCascadeRuns. Each is
+	// guaranteed non-rejecting by the pipeline's .catch.
+	private _pendingCascadeRuns: Promise<CascadeRun>[] = [];
+	private _cascadeSessionStats: CascadeSessionStats = {
+		runs: 0,
+		diagnosticsSurfaced: 0,
+		coldSnapshotTouches: 0,
+	};
+	private _complexityBaselines = new Map<string, FileComplexity>();
+	private _fixedThisTurn = new Set<string>();
+	private readonly _reportedThisTurn = new Set<string>();
+	private _projectRulesScan: RuleScanResult = {
+		rules: [],
+		hasCustomRules: false,
+	};
+	private _telemetrySessionId = `lens-${Date.now().toString(36)}`;
+	private _lifecycleReason: string | undefined;
+	private _hasStableSessionId = false;
+	private _telemetryModel = "unknown";
+	private _turnIndex = 0;
+	private _writeIndex = 0;
+	private _projectSeq = 0;
+	private _turnStartProjectSeq = 0;
+	private readonly _fileSeq = new Map<string, number>();
+	// File key → the projectSeq value at that file's most recent bump (#451). Lets
+	// the review-graph builder ask "which files changed since I last built?" and
+	// skip its per-build O(project) walk+stat sweep when only pi-observed edits
+	// occurred. Keyed identically to _fileSeq (normalizeMapKey + path.resolve).
+	private readonly _fileLastProjectSeq = new Map<string, number>();
+	private _gitGuardHasBlockers = false;
+	private _gitGuardSummary = "";
+	callGraph: FunctionCallGraph | null = null;
+	wordIndex: WordIndex | null = null;
+	private _readGuard: ReadGuard | null = null;
+	private readonly _pendingDeferredFormatFiles = new Map<
+		string,
+		DeferredFormatRecord
+	>();
+	private readonly _lspReadWarmState = new Map<
+		string,
+		{ status: "warming" | "ready"; ts: number }
+	>();
+	private readonly _pendingInlineBlockers = new Map<
+		string,
+		{ filePath: string; summary: string }
+	>();
+	private readonly _actionableWarningsThisTurn = new Map<
+		string,
+		ActionableWarningRecord
+	>();
+	private readonly _codeQualityWarningsThisTurn = new Map<
+		string,
+		CodeQualityWarningRecord
+	>();
+	// #484: opt-in per-RUN summary of diagnostics/autofixes/formats,
+	// accumulated across the run's turns and consumed once at the
+	// agent_settled quiet window. The collector itself is always constructed
+	// (cheap, empty Map) but callers gate recording behind the
+	// `lens-turn-summary` flag so it's a true no-op when the feature is off.
+	private readonly _turnSummary = new TurnSummaryCollector();
+
+	resetForSession(): void {
+		this._sessionGeneration += 1;
+		this._sessionStartedAt = Date.now();
+		this._complexityBaselines.clear();
+		this._pipelineCrashCounts.clear();
+		this._cachedExports.clear();
+		this.wordIndex = null;
+		this._startupScansInFlight.clear();
+		this._cascadeRuns = [];
+		this._pendingCascadeRuns = [];
+		this._cascadeSessionStats = {
+			runs: 0,
+			diagnosticsSurfaced: 0,
+			coldSnapshotTouches: 0,
+		};
+		this._fixedThisTurn.clear();
+		this._reportedThisTurn.clear();
+		this._telemetrySessionId = `lens-${Date.now().toString(36)}-${randomBytes(4).toString("hex")}`;
+		this._hasStableSessionId = false;
+		this._telemetryModel = "unknown";
+		this._turnIndex = 0;
+		this._writeIndex = 0;
+		this._projectSeq = 0;
+		this._turnStartProjectSeq = 0;
+		this._fileSeq.clear();
+		this._fileLastProjectSeq.clear();
+		this._gitGuardHasBlockers = false;
+		this._gitGuardSummary = "";
+		this._readGuard = null;
+		this._pendingDeferredFormatFiles.clear();
+		this._lspReadWarmState.clear();
+		this._pendingInlineBlockers.clear();
+		this._actionableWarningsThisTurn.clear();
+		this._codeQualityWarningsThisTurn.clear();
+		this._turnSummary.clear();
+	}
+
+	get sessionStartedAt(): number {
+		return this._sessionStartedAt;
+	}
+
+	get cascadeSessionStats(): CascadeSessionStats {
+		return this._cascadeSessionStats;
+	}
+
+	recordCascadeRun(
+		diagnosticsSurfaced: number,
+		coldSnapshotTouches: number,
+	): void {
+		this._cascadeSessionStats.runs += 1;
+		this._cascadeSessionStats.diagnosticsSurfaced += diagnosticsSurfaced;
+		this._cascadeSessionStats.coldSnapshotTouches += coldSnapshotTouches;
+	}
+
+	updateGitGuardStatus(hasBlockers: boolean, output: string): void {
+		this._gitGuardHasBlockers = hasBlockers;
+		if (!hasBlockers) {
+			this._gitGuardSummary = "";
+			return;
+		}
+		const firstLine = output
+			.split("\n")
+			.map((line) => line.trim())
+			.find((line) => line.length > 0);
+		this._gitGuardSummary = (firstLine ?? "Unresolved blockers detected").slice(
+			0,
+			160,
+		);
+	}
+
+	get gitGuardHasBlockers(): boolean {
+		return this._gitGuardHasBlockers;
+	}
+
+	get gitGuardSummary(): string {
+		return this._gitGuardSummary;
+	}
+
+	beginTurn(): void {
+		this._cascadeRuns = [];
+		// _pendingCascadeRuns is deliberately NOT cleared here: a cascade compute
+		// still in flight past last turn_end's settle cap (fresh graph builds have
+		// measured up to ~19s) must surface on the NEXT turn_end, not be dropped —
+		// pre-#450 those findings were always awaited, never lost. Session reset
+		// still clears it.
+		this._pendingInlineBlockers.clear();
+		this._actionableWarningsThisTurn.clear();
+		this._codeQualityWarningsThisTurn.clear();
+		// _turnSummary is deliberately NOT cleared here (#484 rework): the
+		// summary entry is emitted once per RUN at the agent_settled quiet
+		// window (sendMessage during a live stream would STEER the agent, and
+		// turn_end can fire mid-stream), so the collector must accumulate
+		// across the run's turns. It is cleared only by consume() at emit and
+		// by resetForSession().
+		this._turnStartProjectSeq = this._projectSeq;
+		this._turnIndex += 1;
+		this._writeIndex = 0;
+		this._reportedThisTurn.clear();
+	}
+
+	get reportedThisTurn(): Set<string> {
+		return this._reportedThisTurn;
+	}
+
+	nextWriteIndex(): number {
+		this._writeIndex += 1;
+		return this._writeIndex;
+	}
+
+	peekWriteIndex(): number {
+		return this._writeIndex;
+	}
+
+	setTelemetryIdentity(identity: {
+		sessionId?: string;
+		model?: string;
+		provider?: string;
+	}): void {
+		if (identity.sessionId && identity.sessionId.trim()) {
+			this._telemetrySessionId = identity.sessionId.trim();
+		}
+		const model = identity.model?.trim();
+		const provider = identity.provider?.trim();
+		if (model && provider) {
+			this._telemetryModel = `${provider}/${model}`;
+		} else if (model) {
+			this._telemetryModel = model;
+		} else if (provider) {
+			this._telemetryModel = provider;
+		}
+	}
+
+	get telemetrySessionId(): string {
+		return this._telemetrySessionId;
+	}
+
+	/**
+	 * Pin the session identity to pi's STABLE session id and record why this
+	 * session started (#190). Called AFTER {@link resetForSession} (which assigns
+	 * a fresh random id), so the stable id — when pi provides one via
+	 * `ctx.sessionManager.getSessionId()` — wins and survives a quit→resume.
+	 */
+	setSessionLifecycle(args: {
+		sessionId?: string;
+		reason?: string;
+	}): void {
+		if (args.sessionId && args.sessionId.trim()) {
+			this._telemetrySessionId = args.sessionId.trim();
+			this._hasStableSessionId = true;
+		}
+		this._lifecycleReason = args.reason;
+	}
+
+	/** Why the current session started: new | resume | fork | reload | startup. */
+	get sessionLifecycleReason(): string | undefined {
+		return this._lifecycleReason;
+	}
+
+	/** True once a stable pi session id has been pinned (vs the random fallback). */
+	get hasStableSessionId(): boolean {
+		return this._hasStableSessionId;
+	}
+
+	get telemetryModel(): string {
+		return this._telemetryModel;
+	}
+
+	get turnIndex(): number {
+		return this._turnIndex;
+	}
+
+	get projectSeq(): number {
+		return this._projectSeq;
+	}
+
+	get turnStartProjectSeq(): number {
+		return this._turnStartProjectSeq;
+	}
+
+	seedProjectSequence(
+		projectSeq: number,
+		fileSeqByPath?: Map<string, number>,
+	): void {
+		this._projectSeq = Math.max(0, Math.floor(projectSeq));
+		this._turnStartProjectSeq = this._projectSeq;
+		this._fileSeq.clear();
+		// Seeded per-file counters carry no projectSeq provenance, so start the
+		// changed-since map empty; the graph fast path simply won't fire until an
+		// in-process bump records a seq-stamped change (safe: falls back to sweep).
+		this._fileLastProjectSeq.clear();
+		for (const [filePath, seq] of fileSeqByPath ?? []) {
+			this._fileSeq.set(
+				normalizeMapKey(path.resolve(filePath)),
+				Math.max(0, seq),
+			);
+		}
+	}
+
+	bumpFileSeq(filePath: string): { projectSeq: number; fileSeq: number } {
+		const key = normalizeMapKey(path.resolve(filePath));
+		this._projectSeq += 1;
+		const fileSeq = (this._fileSeq.get(key) ?? 0) + 1;
+		this._fileSeq.set(key, fileSeq);
+		this._fileLastProjectSeq.set(key, this._projectSeq);
+		return { projectSeq: this._projectSeq, fileSeq };
+	}
+
+	/**
+	 * Files whose most recent bump happened AFTER `seq` — i.e. every file the
+	 * review graph would need to re-ingest to catch up from a build taken at
+	 * projectSeq `seq` (#451). Returns NORMALIZED keys (normalizeMapKey +
+	 * path.resolve), the same form the builder's fileSignatures map uses, so the
+	 * caller can compare without re-normalizing.
+	 */
+	getFilesChangedSince(seq: number): string[] {
+		const changed: string[] = [];
+		for (const [key, lastSeq] of this._fileLastProjectSeq) {
+			if (lastSeq > seq) changed.push(key);
+		}
+		return changed;
+	}
+
+	getFileSeq(filePath: string): number {
+		return this._fileSeq.get(normalizeMapKey(path.resolve(filePath))) ?? 0;
+	}
+
+	getFileSeqEntries(): Array<[string, number]> {
+		return [...this._fileSeq.entries()];
+	}
+
+	get sessionGeneration(): number {
+		return this._sessionGeneration;
+	}
+
+	isCurrentSession(generation: number): boolean {
+		return this._sessionGeneration === generation;
+	}
+
+	markStartupScanInFlight(name: string, generation: number): void {
+		this._startupScansInFlight.set(name, generation);
+	}
+
+	clearStartupScanInFlight(name: string, generation: number): void {
+		const owner = this._startupScansInFlight.get(name);
+		if (owner === generation) {
+			this._startupScansInFlight.delete(name);
+		}
+	}
+
+	isStartupScanInFlight(name: string): boolean {
+		return this._startupScansInFlight.has(name);
+	}
+
+	formatPipelineCrashNotice(filePath: string, err: unknown): string {
+		const key = path.resolve(filePath);
+		const count = (this._pipelineCrashCounts.get(key) ?? 0) + 1;
+		this._pipelineCrashCounts.set(key, count);
+
+		const message = err instanceof Error ? err.message : String(err);
+		const shortMessage = message.split("\n")[0].slice(0, 220);
+		const shouldSurface =
+			count <= RUNTIME_CONFIG.crashNotice.alwaysShowFirstN ||
+			count % RUNTIME_CONFIG.crashNotice.showEveryNth === 0;
+		if (!shouldSurface) return "";
+
+		return [
+			"⚠️ pi-lens pipeline crashed while analyzing this write.",
+			`File: ${path.basename(filePath)} | crash count this session: ${count}`,
+			`Error: ${shortMessage}`,
+			"Recovery: LSP service was reset. If this repeats, rerun with --no-lsp and report the file + stack.",
+		].join("\n");
+	}
+
+	getCrashEntries(): Array<[string, number]> {
+		return Array.from(this._pipelineCrashCounts.entries());
+	}
+
+	get projectRoot(): string {
+		return this._projectRoot;
+	}
+
+	set projectRoot(value: string) {
+		this._projectRoot = normalizeMapKey(value);
+	}
+
+	get errorDebtBaseline(): ErrorDebtBaseline | null {
+		return this._errorDebtBaseline;
+	}
+
+	set errorDebtBaseline(value: ErrorDebtBaseline | null) {
+		this._errorDebtBaseline = value;
+	}
+
+	get cachedExports(): Map<string, string> {
+		return this._cachedExports;
+	}
+
+	appendCascadeRun(run: CascadeRun): void {
+		this._cascadeRuns.push(run);
+	}
+
+	appendCascadePromise(p: Promise<CascadeRun>): void {
+		this._pendingCascadeRuns.push(p);
+	}
+
+	/**
+	 * Drain the deferred cascade computes kicked off this turn (#450), racing them
+	 * against a bounded wait. Fulfilled runs feed the same accumulator as inline
+	 * runs (appendCascadeRun). A promise still pending at the cap is retained so a
+	 * late-resolving compute is picked up on the next turn_end rather than lost.
+	 * The stored promises never reject (pipeline guarantees an "error" skip-run).
+	 */
+	async settleCascadeRuns(
+		maxWaitMs: number,
+	): Promise<{ settled: number; timedOut: number }> {
+		const pending = this._pendingCascadeRuns;
+		if (pending.length === 0) return { settled: 0, timedOut: 0 };
+		this._pendingCascadeRuns = [];
+
+		// Track per-promise settlement so promises still in flight at the cap can be
+		// carried over. A settled entry records its run; an unsettled one is re-parked.
+		const tracked = pending.map((p) => {
+			const entry: { done: boolean; run?: CascadeRun; promise: Promise<CascadeRun> } =
+				{ done: false, promise: p };
+			entry.promise = p.then((run) => {
+				entry.done = true;
+				entry.run = run;
+				return run;
+			});
+			return entry;
+		});
+
+		const timeout = new Promise<void>((resolve) => {
+			setTimeout(resolve, maxWaitMs).unref?.();
+		});
+		await Promise.race([
+			Promise.allSettled(tracked.map((t) => t.promise)),
+			timeout,
+		]);
+
+		let settled = 0;
+		let timedOut = 0;
+		for (const entry of tracked) {
+			if (entry.done && entry.run) {
+				this.appendCascadeRun(entry.run);
+				settled += 1;
+			} else {
+				this._pendingCascadeRuns.push(entry.promise);
+				timedOut += 1;
+			}
+		}
+		return { settled, timedOut };
+	}
+
+	consumeCascadeRuns(): CascadeRun[] {
+		const runs = this._cascadeRuns;
+		this._cascadeRuns = [];
+		return runs;
+	}
+
+	recordInlineBlockers(filePath: string, summary: string): void {
+		this._pendingInlineBlockers.set(path.resolve(filePath), {
+			filePath,
+			summary,
+		});
+	}
+
+	clearInlineBlockers(filePath: string): void {
+		this._pendingInlineBlockers.delete(path.resolve(filePath));
+	}
+
+	consumeInlineBlockers(): Array<{ filePath: string; summary: string }> {
+		const entries = [...this._pendingInlineBlockers.values()];
+		this._pendingInlineBlockers.clear();
+		return entries;
+	}
+
+	recordActionableWarnings(warnings: ActionableWarningRecord[]): void {
+		for (const warning of warnings) {
+			this._actionableWarningsThisTurn.set(warning.id, warning);
+		}
+	}
+
+	peekActionableWarnings(): ActionableWarningRecord[] {
+		return [...this._actionableWarningsThisTurn.values()];
+	}
+
+	clearActionableWarnings(): void {
+		this._actionableWarningsThisTurn.clear();
+	}
+
+	recordCodeQualityWarnings(warnings: CodeQualityWarningRecord[]): void {
+		for (const warning of warnings) {
+			this._codeQualityWarningsThisTurn.set(warning.id, warning);
+		}
+	}
+
+	peekCodeQualityWarnings(): CodeQualityWarningRecord[] {
+		return [...this._codeQualityWarningsThisTurn.values()];
+	}
+
+	clearCodeQualityWarnings(): void {
+		this._codeQualityWarningsThisTurn.clear();
+	}
+
+	/** #484: the per-run diagnostics/autofix/format collector (accumulates
+	 * across turns; consumed once at the agent_settled quiet window). Always
+	 * present; callers gate recording behind the `lens-turn-summary` opt-in
+	 * flag. */
+	get turnSummary(): TurnSummaryCollector {
+		return this._turnSummary;
+	}
+
+	get complexityBaselines(): Map<string, FileComplexity> {
+		return this._complexityBaselines;
+	}
+
+	get fixedThisTurn(): Set<string> {
+		return this._fixedThisTurn;
+	}
+
+	get projectRulesScan(): RuleScanResult {
+		return this._projectRulesScan;
+	}
+
+	set projectRulesScan(value: RuleScanResult) {
+		this._projectRulesScan = value;
+	}
+
+	get readGuard(): ReadGuard {
+		this._readGuard ??= new ReadGuard(this._telemetrySessionId);
+		return this._readGuard;
+	}
+
+	/**
+	 * Queue `filePath` for deferred formatting at `agent_end`. Returns `true`
+	 * when this call created a NEW pending entry, `false` when it re-touched
+	 * an already-queued file. #673: the caller uses this to publish
+	 * `pilens:format:queued` only on first queue entry, so repeated edits to
+	 * the same already-queued file before `agent_end` don't spam the bus.
+	 */
+	deferFormat(
+		filePath: string,
+		cwd: string,
+		toolName: "write" | "edit",
+		turnStateCwd: string,
+	): boolean {
+		const key = path.resolve(filePath);
+		const now = Date.now();
+		const existing = this._pendingDeferredFormatFiles.get(key);
+		if (existing) {
+			existing.lastTouchedAt = now;
+			existing.cwd = cwd;
+			existing.turnStateCwd = turnStateCwd;
+			existing.toolNames.add(toolName);
+			return false;
+		}
+		this._pendingDeferredFormatFiles.set(key, {
+			filePath: key,
+			cwd,
+			turnStateCwd,
+			firstTouchedAt: now,
+			lastTouchedAt: now,
+			toolNames: new Set([toolName]),
+		});
+		return true;
+	}
+
+	get pendingDeferredFormatCount(): number {
+		return this._pendingDeferredFormatFiles.size;
+	}
+
+	consumeDeferredFormatFiles(): DeferredFormatRecord[] {
+		const records = [...this._pendingDeferredFormatFiles.values()];
+		this._pendingDeferredFormatFiles.clear();
+		return records;
+	}
+
+	shouldWarmLspOnRead(filePath: string, maxAgeMs = 120_000): boolean {
+		const state = this._lspReadWarmState.get(path.resolve(filePath));
+		if (!state) return true;
+		if (state.status === "warming") return false;
+		return Date.now() - state.ts > maxAgeMs;
+	}
+
+	markLspReadWarmStarted(filePath: string): void {
+		this._lspReadWarmState.set(path.resolve(filePath), {
+			status: "warming",
+			ts: Date.now(),
+		});
+	}
+
+	markLspReadWarmCompleted(filePath: string): void {
+		this._lspReadWarmState.set(path.resolve(filePath), {
+			status: "ready",
+			ts: Date.now(),
+		});
+	}
+
+	clearLspReadWarmState(filePath: string): void {
+		this._lspReadWarmState.delete(path.resolve(filePath));
+	}
+}

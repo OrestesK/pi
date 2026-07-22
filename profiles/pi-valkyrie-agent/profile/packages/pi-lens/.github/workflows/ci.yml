@@ -1,0 +1,356 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & type-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Lockfile in sync with package.json
+        run: npm run check:lockfile
+
+      # `npm install` above ran `prepare` → downloaded the core grammars into
+      # grammars/ with provenance sidecars. Verify their bytes/versions match the
+      # committed manifest so a stale or tampered/ABI-mismatched wasm can't slip in
+      # against the pinned web-tree-sitter (#177).
+      - name: Grammar provenance in sync with manifest
+        run: npm run check:grammars
+
+      # Fail on known-vulnerable PRODUCTION deps (what actually ships to users via
+      # `npm install --omit=dev`). Scoped to high/critical to avoid blocking PRs on
+      # fix-less moderate advisories; transitive moderate ones are handled by
+      # Dependabot security updates. DevDeps are excluded — they never reach users.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: TypeScript lint
+        run: npm run lint
+
+      # Catches accidental duplicate ast-grep rule bodies across language
+      # tags (#657) — e.g. a `-js` twin whose language tag never got updated
+      # off its copy-pasted `TypeScript` value, so both rules always fired
+      # under the SAME language and the twin's JS coverage was silently dead.
+      - name: ast-grep rule pair audit
+        run: npm run audit:astgrep-rule-pairs
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+  # Simulates pi's real install path: a `git:` install runs `npm install
+  # --omit=dev`, which triggers `prepare` → `build:dist` FROM SOURCE with the
+  # dev-only @types/node ABSENT. That's the path that broke with TS2688 (#193)
+  # and that the tarball-based install-test never exercises (#194) — the tarball
+  # ships pre-built dist/, so it never re-runs the build under --omit=dev.
+  prod-install-build:
+    name: Production install build (--omit=dev, from source)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+
+      # #437: typescript is a devDependency (#402), so --omit=dev omits it. pi builds
+      # the GitHub install from source under --omit=dev, so `build:dist` must resolve
+      # tsc WITHOUT a local typescript. GitHub runners ship typescript GLOBALLY, which
+      # would let a bare `tsc` leak off PATH and hide the regression — so remove it
+      # first, forcing build:dist to resolve tsc itself (npx -p typescript). If this
+      # step ever fails, the from-source --omit=dev build is broken for real users.
+      - name: Remove global typescript (kill the PATH leak that hid #437)
+        run: |
+          npm rm -g typescript 2>/dev/null || true
+          if command -v tsc >/dev/null 2>&1; then
+            echo "note: a tsc still on PATH at $(command -v tsc) — build must not depend on it"
+          else
+            echo "no global tsc — clean"
+          fi
+
+      - name: Install without devDeps (--omit=dev)
+        run: npm install --omit=dev --no-audit --no-fund
+
+      - name: Build dist from source under --omit=dev (the prepare path)
+        run: npm run build:dist
+
+      - name: Verify dist built and the compiled entry loads
+        run: |
+          test -f dist/index.js || \
+            (echo "ERROR: dist/index.js not built under --omit=dev (TS2688? prepare/build:dist failed)" && exit 1)
+          node dist/index.js 2>&1 | tee /tmp/load.txt || true
+          # ERR_MODULE_NOT_FOUND = a runtime dep was wrongly in devDependencies.
+          # pi-coding-agent is a host-provided peer; its absence is expected here.
+          if grep -q "ERR_MODULE_NOT_FOUND\|Cannot find module" /tmp/load.txt \
+             && ! grep -q "pi-coding-agent" /tmp/load.txt; then
+            echo "FAILED: missing runtime module under --omit=dev"
+            cat /tmp/load.txt
+            exit 1
+          fi
+          echo "Production --omit=dev build + load OK"
+
+      # The faithful reproduction of `pi install git:github.com/apmantza/pi-lens`
+      # (#437): pi CLONES the repo and runs `npm install --omit=dev` in a PRISTINE
+      # tree (no pre-existing node_modules / dev artifacts), which runs the WHOLE
+      # `prepare` — build:dist (npx-resolved tsc, since typescript is a devDep and
+      # global tsc was removed above) AND the grammar download. This catches the
+      # from-source install class end-to-end, the way a real user hits it.
+      - name: Simulate `pi install git:…` (clean clone + --omit=dev)
+        run: |
+          set -e
+          rm -rf "$RUNNER_TEMP/gh-install"
+          git clone --quiet . "$RUNNER_TEMP/gh-install"
+          cd "$RUNNER_TEMP/gh-install"
+          npm install --omit=dev --no-audit --no-fund
+          test -f dist/index.js || \
+            (echo "ERROR: dist/index.js not built from a clean clone under --omit=dev" && exit 1)
+          node dist/index.js 2>&1 | tee /tmp/gh-load.txt || true
+          if grep -q "ERR_MODULE_NOT_FOUND\|Cannot find module" /tmp/gh-load.txt \
+             && ! grep -q "pi-coding-agent" /tmp/gh-load.txt; then
+            echo "FAILED: missing runtime module from a clean GitHub-style install"
+            cat /tmp/gh-load.txt
+            exit 1
+          fi
+          echo "GitHub-style install (clean clone + --omit=dev) OK"
+
+  install-test:
+    name: Install test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [lint-and-typecheck, test]
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Rule catalog report (non-blocking)
+        continue-on-error: true
+        run: npm run audit:rule-catalog
+
+      - name: Pack tarball
+        run: npm pack
+
+      - name: Verify required files in tarball
+        shell: bash
+        run: |
+          TARBALL=$(ls pi-lens-*.tgz)
+          echo "Checking tarball: $TARBALL"
+          REQUIRED_RE="scripts/download-grammars\.js"
+          REQUIRED_RE="${REQUIRED_RE}|dist/index\.js|package\.json"
+          tar -tzf "$TARBALL" | grep -E "$REQUIRED_RE" | sort
+          tar -tzf "$TARBALL" | grep "scripts/download-grammars.js" || {
+            echo "ERROR: scripts/download-grammars.js missing"
+            exit 1
+          }
+          # The published entry is compiled JS (prepare builds dist/); pi loads
+          # it directly instead of jiti-transpiling source on startup (#182).
+          tar -tzf "$TARBALL" | grep "package/dist/index.js" || {
+            echo "ERROR: dist/index.js missing from tarball"
+            exit 1
+          }
+          # Skills ship at package root (skills/); pi.skills is "../../skills",
+          # resolved relative to dist/index.js back to root.
+          tar -tzf "$TARBALL" | grep "package/skills/" || {
+            echo "ERROR: skills/ missing from tarball"
+            exit 1
+          }
+          # Guard against shipping TS source again (jiti startup cost).
+          SOURCE_RE="package/(index\.ts|clients/.*\.ts)"
+          if tar -tzf "$TARBALL" | grep -E "$SOURCE_RE"; then
+            echo "ERROR: TypeScript source leaked into the tarball"
+            exit 1
+          fi
+
+      - name: Verify package.json entry points exist in tarball
+        shell: bash
+        run: |
+          TARBALL=$(ls pi-lens-*.tgz)
+          TMPDIR=$(mktemp -d)
+          tar -xzf "$TARBALL" -C "$TMPDIR"
+
+          check_field() {
+            local field="$1" value="$2"
+            if [ ! -f "$TMPDIR/package/$value" ]; then
+              echo "ERROR: package.json '$field' points to missing '$value'"
+              exit 1
+            fi
+            echo "OK: $field -> $value"
+          }
+
+          # Pass package paths via env vars for cross-platform Node calls.
+          export PI_LENS_PKG_DIR="$TMPDIR/package"
+          export PI_LENS_PKG_JSON="$TMPDIR/package/package.json"
+          MAIN=$(node -p "require(process.env.PI_LENS_PKG_JSON).main || ''")
+          [ -n "$MAIN" ] && check_field "main" "$MAIN"
+
+          # Check pi.extensions entries — this is what pi actually loads.
+          node <<'NODE'
+          const path = require("path");
+          const fs = require("fs");
+          const pkgDir = process.env.PI_LENS_PKG_DIR;
+          const pkg = require(path.join(pkgDir, "package.json"));
+          const exts = (pkg.pi && pkg.pi.extensions) || [];
+          if (exts.length === 0) {
+            console.error("ERROR: no pi.extensions declared");
+            process.exit(1);
+          }
+          for (const e of exts) {
+            if (!fs.existsSync(path.join(pkgDir, e))) {
+              console.error("ERROR: pi.extensions entry missing: " + e);
+              process.exit(1);
+            }
+            console.log("OK: pi.extensions -> " + e);
+          }
+          NODE
+
+          # Check exports map entries (string values only).
+          node <<'NODE'
+          const path = require("path");
+          const fs = require("fs");
+          const pkgDir = process.env.PI_LENS_PKG_DIR;
+          const pkg = require(path.join(pkgDir, "package.json"));
+          const exp = pkg.exports;
+          if (!exp) process.exit(0);
+          const collect = (v) => {
+            if (typeof v === "string") return [v];
+            if (v && typeof v === "object") {
+              return Object.values(v).flatMap(collect);
+            }
+            return [];
+          };
+          collect(exp).forEach((f) => {
+            const full = path.join(pkgDir, f);
+            if (!fs.existsSync(full)) {
+              console.error("ERROR: exports entry missing: " + f);
+              process.exit(1);
+            }
+            console.log("OK: exports -> " + f);
+          });
+          NODE
+          rm -rf "$TMPDIR"
+
+      # Intentional: this job verifies the package installs like pi installs it.
+      - name: Install from tarball (simulates pi install npm:pi-lens)
+        shell: bash
+        run: | # zizmor: ignore[adhoc-packages]
+          TARBALL=$(ls pi-lens-*.tgz)
+          npm install -g "$TARBALL"
+
+      - name: Verify bundled core grammars shipped in the tarball
+        shell: bash
+        run: |
+          # Core grammars ship bundled in pi-lens/grammars (via prepare + files[]);
+          # the tail lazy-fetches at runtime. There is no postinstall now.
+          GLOBAL_MODULES=$(npm root -g)
+          GRAMMARS_DIR="$GLOBAL_MODULES/pi-lens/grammars"
+          echo "Checking bundled core grammars at: $GRAMMARS_DIR"
+          ls "$GRAMMARS_DIR"
+          test -f "$GRAMMARS_DIR/tree-sitter-typescript.wasm" || \
+            (echo "ERROR: bundled tree-sitter-typescript.wasm missing from tarball" && exit 1)
+          echo "Bundled core grammar checks passed"
+
+      - name: Load each extension entry point (catches missing files)
+        shell: bash
+        run: |
+          INSTALL_DIR=$(npm root -g)/pi-lens
+          node scripts/check-extensions.mjs "$INSTALL_DIR"
+
+      - name: Verify extension entry loads (catches missing node_modules deps)
+        shell: bash
+        run: |
+          INSTALL_DIR=$(npm root -g)/pi-lens
+          cd "$INSTALL_DIR"
+          # Simulate how pi loads the extension: compiled entry, loaded by node.
+          # ERR_MODULE_NOT_FOUND = missing dep (e.g. 'minimatch') → fail.
+          # Any other error is expected in CI (no pi API available) → pass.
+          # pi-coding-agent is host-provided; absence is expected.
+          ENTRY=$(node -p "require('./package.json').pi.extensions[0]")
+          echo "Loading entry: $ENTRY"
+          node "$ENTRY" 2>&1 | tee /tmp/load-output.txt || true
+          if grep -q "ERR_MODULE_NOT_FOUND\|Cannot find module" \
+               /tmp/load-output.txt \
+             && ! grep -q "pi-coding-agent" /tmp/load-output.txt; then
+            echo "FAILED: missing module dependency detected"
+            cat /tmp/load-output.txt
+            exit 1
+          fi
+          echo "Extension import check passed"
+
+      - name: Startup not weakened — entry loads from precompiled dist (#182)
+        shell: bash
+        run: |
+          # Loading the entry above made pi-lens self-report its load source to
+          # ~/.pi-lens/sessionstart.log.
+          # A source/jiti regression (or missing dist) would weaken cold start.
+          START_LOG="$HOME/.pi-lens/sessionstart.log"
+          START_LINE=$(
+            grep "pi-lens loaded:" "$START_LOG" 2>/dev/null \
+              | tail -1 \
+              || true
+          )
+          echo "Startup line: ${START_LINE:-<none>}"
+          if [ -z "$START_LINE" ]; then
+            echo "ERROR: no startup line logged"
+            exit 1
+          fi
+          echo "$START_LINE" | grep -q "from dist" || {
+            echo "ERROR: extension loaded from source, not dist"
+            exit 1
+          }
+          echo "Startup loads from dist ✓"
