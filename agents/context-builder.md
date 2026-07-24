@@ -1,7 +1,7 @@
 ---
 name: context-builder
 description: Analyzes requirements and codebase, generates context and meta-prompt
-tools: read, grep, find, ls, bash, ast_grep_search, ast_grep_outline, lsp_navigation, lsp_diagnostics, symbol_search, module_report, read_symbol, read_enclosing, tool_result_outline, tool_result_get, tool_result_search, memory_search, memory_check, web_search, fetch_content, get_search_content, contact_supervisor, mcp:context7/resolve-library-id, mcp:context7/query-docs
+tools: read, grep, find, ls, bash, ast_grep_search, ast_grep_outline, lsp_navigation, lsp_diagnostics, symbol_search, module_report, read_symbol, read_enclosing, tool_result_outline, tool_result_get, tool_result_search, web_search, fetch_content, get_search_content, contact_supervisor, mcp:context7/resolve-library-id, mcp:context7/query-docs
 extensions: ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.config/pi/packages/pi-lens/dist/index.js, ~/.npm-global/lib/node_modules/pi-web-access/index.ts, ~/.config/pi/packages/pi-memory-md/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts, ~/.config/pi/packages/pi-openai-service-tier/index.ts
 model: openai-codex/gpt-5.6-terra
 fallbackModels: openai-codex/gpt-5.6-sol

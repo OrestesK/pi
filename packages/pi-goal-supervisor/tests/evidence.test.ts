@@ -53,8 +53,10 @@ test("validates goal blocker reasons by documented blocker class", () => {
 		"runtime tool guardrail blocked rm -rf",
 		"tool call was rejected by automatic blocker",
 		"missing required credential for the private API",
-		"auth unavailable for Google Docs document",
+		"missing required resource for the task",
+		"auth unavailable: AWS SSO expired",
 		"required service is unavailable",
+		"required protected action not authorized; no safe alternative: action=deploy production migration; effect=apply required schema; evidence=deployment mutation was not authorized",
 	];
 	const disallowed = [
 		"unapproved production/remote/external-account mutation",
@@ -83,6 +85,11 @@ test("validates goal blocker reasons by documented blocker class", () => {
 		"need database inspection",
 		"material architecture decision not implied by the goal",
 		"workflow decision not implied by the goal",
+		"missing optional tool for an alternative approach",
+		"missing resource estimate for the plan",
+		"no service migration exists",
+		"required protected action not authorized; no safe alternative: deploy",
+		"required protected action not authorized; no safe alternative: action=deploy; effect=apply schema; evidence=",
 	];
 
 	for (const reason of allowed)

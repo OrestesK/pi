@@ -1,6 +1,6 @@
 ---
 name: code-quality-review
-description: Deep post-implementation code-quality and simplification review. Use when the user asks for a full review focused on simplicity, cleanliness, elegance, structure, maintainability, non-hacky or smart code, behavior-preserving cleanup, over-engineering, AI slop, or the cleanest/best implementation. Reviews the effective diff and affected code paths, verifies findings, and stays read-only unless fixes are explicitly requested.
+description: Deep code-quality and simplification review for explicit review requests or concrete useful background quality checks. Reviews simplicity, structure, maintainability, behavior-preserving cleanup, over-engineering, and AI slop; stays read-only unless fixes are explicitly authorized.
 ---
 
 # Full Code Quality Review
@@ -9,12 +9,14 @@ Review completed work for the best behavior-preserving implementation: correct, 
 
 This is not a style pass and not a contest to minimize lines. “Simple” means the fewest justified concepts, branches, states, layers, and invariants—not compressed or clever code.
 
-Use this specialized skill for an explicitly requested deep post-implementation structural/simplification review. Use `review` alone for ordinary code review and `pi-subagents`’ cleanup workflow for cleanup-only requests. Load and follow `review` for general finding standards, `pi-subagents` for orchestration, and `manager-workflow` before any fix pass.
+Use this specialized skill when the user explicitly requests a deep structural/simplification review; that request makes behavior-preserving simplification the primary in-scope target. It may also run opportunistically during ordinary nontrivial work when a concrete useful quality, structure, simplicity, or ownership question warrants a read-only background lane. Opportunistic review is nonblocking, does not require a known defect, stops when no novel useful target remains, and cannot authorize fixes or delay readiness unless the parent validates and accepts a concrete finding into the primary scope.
+
+Use `review` alone for ordinary claim-bound code review and `pi-subagents`’ cleanup workflow for cleanup-only requests. Load and follow `review` for finding partitions and standards, `pi-subagents` for orchestration, and `manager-workflow` before any fix pass.
 
 ## Default boundary
 
 - Review-only by default. Do not edit project/source files or perform mutating VCS/filesystem operations.
-- Treat `autofix`, “fix the findings,” “apply the cleanup,” or equivalent explicit wording as a request to enter fix mode for validated, in-scope findings. It does not bypass `manager-workflow` tiering, scope presentation, or approval requirements.
+- Treat `autofix`, “fix the findings,” “apply the cleanup,” or equivalent explicit wording as a request to enter fix mode for validated, in-scope findings. It does not bypass `manager-workflow` approval, stage, or scope requirements.
 - Keep the requested behavior and approved product scope fixed. Question the implementation, not the product decision.
 - Ask before any change to behavior, architecture, schema, config, security policy, data, compatibility, public API, or user workflow.
 - Default scope is the total effective diff plus directly affected callers, callees, tests, contracts, and docs—not the whole repository.
@@ -58,7 +60,7 @@ Build a compact behavior-preservation contract from code, tests, docs, and live 
 
 - inputs and accepted shapes;
 - outputs and public contracts;
-- errors and failure semantics;
+- reachable errors and failure semantics when the affected path or contract defines them;
 - side effects and persistence;
 - ordering, retries, concurrency, and atomicity;
 - observability that callers/operators rely on;
@@ -104,7 +106,7 @@ Assess the applicability of each lens before reviewing it so broad checklists do
 Core lenses:
 
 1. **Correctness and behavior preservation**
-   - invariants, edge cases, failure paths, state transitions, concurrency, unintended behavior drift;
+   - invariants, reachable states/failures, relevant transitions or concurrency, and unintended behavior drift;
 2. **Simplicity and accidental complexity**
    - unnecessary branches, modes, wrappers, layers, fallback paths, indirection, configuration, or generalization;
 3. **Structure and ownership**
@@ -112,7 +114,7 @@ Core lenses:
 4. **Types and contracts**
    - casts, `any`/`unknown`, loose object bags, avoidable optionality, duplicated representations, hidden invariants;
 5. **Tests and proof quality**
-   - behavior assertions, meaningful edge cases, over-mocked paths, and fresh diagnostics;
+   - behavior assertions, reachable boundary cases relevant to the change, over-mocked paths, and fresh diagnostics;
    - tests that merely copy hardcoded values, restate constants or configuration, or verify guarantees already owned by the type system, schema, validator, or framework. A useful test must prove observable behavior, a meaningful invariant or wiring relationship, an edge case, or a failure mode;
 6. **Slop and clarity**
    - narration comments, speculative defensive checks, dead helpers, pass-through wrappers, stale rationale, noisy prose, debug artifacts, compressed cleverness.
@@ -125,11 +127,11 @@ Use `module_report`, `read_symbol`, and `read_enclosing` for code structure and 
 
 ### 5. Use independent reviewers without outsourcing judgment
 
-After the parent locks scope, intent, and the behavior-preservation contract, run independent read-only discovery in parallel where scopes are separable—for example by subsystem, affected path, caller/callee set, contract/test surface, safe runtime evidence, or simplification lens. Keep dependent traces sequential, avoid duplicate coverage, and fan in before parent validation.
+After the parent locks scope, intent, and the behavior-preservation contract, launch at least three fresh parallel read-only reviewers with genuinely distinct evidence targets—for example by subsystem, affected path, caller/callee set, contract/test surface, safe runtime evidence, or simplification lens. Keep dependent traces sequential, avoid duplicate coverage, and fan in before parent validation.
 
-Launch a fresh-context read-only reviewer only when it adds a distinct evidence surface beyond the parent and active reviewers. Name the risk, evidence target, and stop condition. The parent’s direct inspection supplies the informed/non-fresh perspective; no minimum reviewer count applies.
+Every reviewer receives the approved behavior/non-goals, relevant decisions, target/effective change, proof/evidence, assigned angle/evidence target, and stop condition. Add more reviewers only for another distinct material surface. The parent's direct inspection is mandatory but does not replace the three independent reviewers.
 
-Scale by risk and shape:
+Scale beyond the minimum by risk and shape:
 
 - broad or cross-cutting diff: sectioned reviewers by subsystem and concern;
 - high-risk or disputed findings: targeted validators or skeptics;
@@ -183,23 +185,30 @@ A `should-fix` structural finding requires a concrete simpler design. Use `needs
 
 ## Final review output
 
+Avoid tables in Markdown output. Use the general `review` partitions:
+
 ```text
 Verdict: PASS | FAIL | INCONCLUSIVE
-Scope: base/range, files, symbols, affected paths
 Behavior contract: what was held fixed
+Evidence inspected: owners, paths, tests, diagnostics, or live observations
 
-Findings:
-- validated findings in severity order
+In-scope required findings:
+- validated requested quality/simplification findings in severity order, or no findings
 
-Best simplification:
-- the highest-leverage behavior-preserving simplification, only when concrete
+Incidental material adjacent risks:
+- only material risks encountered outside the requested quality target
+
+Incidental optional cleanup/polish:
+- only optional ideas encountered outside the requested quality target; never blocking
+
+Best in-scope simplification:
+- highest-leverage behavior-preserving simplification, only when concrete
 
 Rejected/deferred reviewer ideas:
 - false positives, taste-only refactors, scope expansion, or low-value churn, with reason
 
 Verification:
-- code paths traced
-- tests/checks/diagnostics run or inspected
+- checks run or inspected
 - missing evidence and residual risk
 ```
 
@@ -217,11 +226,11 @@ When fixes are explicitly authorized:
    - decisions requiring approval.
 3. The parent applies one coherent fix group at a time. Use write children only under the configured exclusive-file policy.
 4. For behavior-preserving refactors, capture focused baseline evidence first; do not invent new behavior tests for purely mechanical cleanup unless existing proof is insufficient.
-5. For behavior changes or bug fixes, use the configured TDD workflow.
+5. For behavior changes or bug fixes, use `behavioral-proof` to select proportionate evidence.
 6. After each meaningful fix group, run the narrowest proof that can detect drift, then relevant broader checks.
 7. Inspect the new effective diff for accidental churn.
 8. Run a fresh focused re-review after material fixes.
-9. Use the configured or user-requested review-loop cap. If the cap is reached with validated findings unresolved, return `FAIL`, enumerate them and the residual risks, and do not claim completion. Do not loop for optional polish.
+9. Continue re-review only while validated in-scope findings yield material progress. Stop when clean, incidental-only, stalled/repeated, blocked, or approval-gated; if validated findings remain unresolved, return `FAIL` with residual risks. Do not stop merely at an arbitrary round count or loop for optional polish.
 
 Never claim “behavior preserved” from intention alone. Cite tests, traces, contracts, diagnostics, or live observations.
 

@@ -12,19 +12,38 @@ Do not claim success without fresh evidence.
 Before saying work is done, fixed, passing, ready, clean, or complete:
 
 - [ ] **Identify** what evidence proves the claim.
+- [ ] **Assess** every materially relevant completion category below.
 - [ ] **Run or inspect** the evidence after the latest relevant edit.
 - [ ] **Read** the output/result, including exit code and failures.
 - [ ] **Compare** evidence to the actual claim.
-- [ ] **Report** the claim with evidence, or state the limitation directly.
+- [ ] **Report** `PASS`, `FAIL`, or `INCONCLUSIVE` with evidence and limitations.
 
-If you cannot run a check, say so. Do not convert inability to verify into confidence.
+Run safe, bounded, local, non-expensive verification automatically. It may create bounded disposable repository-local state, but may not change source/config, dependency policy, real data, external systems, or broader system state without authorization.
+
+Credentials or private access alone do not make a genuinely read-only verification action protected. Obtain explicit authorization when validation mutates, discloses/exports/persists data, creates material production load, cost/time, privacy/legal impact, deployment effects, destruction, or another protected external effect. Unless already approved, the authorization states the target/environment, exact workflow/action, permitted effects, credential/data boundary, and cost/time boundary.
+
+If you cannot run a required check, say so. Do not convert inability to verify into confidence.
+
+## Relevance-gated completion categories
+
+Assess each category when it can materially change the readiness claim; do not perform speculative security/data hardening or irrelevant ritual to fill the list:
+
+- **Requested observable behavior:** the approved outcome and non-goals are satisfied.
+- **Canonical ownership and reachable consumers:** the behavior lives at its actual owner and every materially affected caller/consumer is accounted for.
+- **Real boundaries and failure states:** demonstrated trust, lifecycle, concurrency, protocol, platform, or external-service boundaries behave correctly; impossible producer-owned states are not invented.
+- **Simplicity:** no avoidable concept, branch, mode, wrapper, fallback, compatibility path, or duplicated owner was added.
+- **Fresh claim-bound evidence:** proof was captured after the latest relevant edit with a method proportionate to the claim.
+- **Public representations:** affected API/schema/config/docs/comments/user-facing names and examples match behavior that actually exists.
+- **Final effective change and delegated-work disposition:** the parent inspected the final change, every readiness-relevant output, accepted/rejected findings, and remaining incidental/background work.
+
+A materially expected category may be inapplicable, but state why. Do not silently skip it.
 
 ## Claim Binding
 
 Bind every completion claim to the exact thing being completed:
 
-- current approved task intent or contract and requested behavior,
-- final repository root/worktree and changed paths,
+- current approved behavioral contract and requested outcome/non-goals,
+- final repository root/worktree and effective implementation locations,
 - current observable implementation route when it is material to the claim,
 - evidence captured after the latest relevant edit or correction.
 
@@ -47,44 +66,39 @@ Do not use claim verification for vague claims such as “cleaner” or “bette
 
 ## Evidence by Claim
 
-| Claim                   | Required evidence                                                                             |
-| ----------------------- | --------------------------------------------------------------------------------------------- |
-| Tests pass              | Fresh test command output after edits                                                         |
-| Typecheck/lint clean    | Fresh command output after edits                                                              |
-| Bug fixed               | Reproduction or regression test passes                                                        |
-| Feature complete        | Requirements/task checklist plus relevant tests                                               |
-| CLI/TUI behavior        | Repo-native harness, tmux/PTY transcript, or screen capture showing the expected state change |
-| Subagent completed task | Parent inspected subagent summary, diff, and verification                                     |
-| Config/skill valid      | Frontmatter/path/reference validation or explicit inspection                                  |
-| Scope preserved         | Final diff showing each changed path/hunk directly supports the requested outcome or is reported as material expansion |
-| No behavior change      | Diff inspection showing prompt/docs/config-only change                                        |
+- **Tests pass:** fresh test command output after edits.
+- **Typecheck/lint clean:** fresh command output after edits.
+- **Bug fixed:** reproduction or regression test passes.
+- **Feature complete:** approved behavior checklist plus relevant proof.
+- **CLI/TUI behavior:** repo-native harness, tmux/PTY transcript, or screen capture showing the expected state change.
+- **Subagent completed task:** parent inspected the child output, actual target/effective change, and verification.
+- **Config/skill valid:** frontmatter/path/reference validation, effective discovery, or explicit inspection.
+- **Behavioral boundary preserved:** final effective change supports the approved outcome/non-goals; new material behavior is reported rather than hidden behind implementation-location bookkeeping.
+- **No behavior change:** effective change inspection and relevant proof show the observable contract is unchanged.
 
 For interactive CLI/TUI claims, prefer the repo's own harness first. If none exists, use a bounded tmux or PTY probe: capture the screen before acting, send one action, wait for a concrete prompt or screen pattern, then capture the result. Prefer deterministic waits over sleeps.
 
-## Subagent Verification
+## Subagent and review verification
 
-Do not trust “worker says done” by itself.
+Do not trust “worker/reviewer says done” by itself.
 
-Parent must inspect at least one of:
+The parent inspects the actual target/effective change, relevant child outputs, and fresh claim-bound evidence. For nontrivial readiness, at least three fresh parallel reviewers with distinct evidence targets inspect the final state after the last fix. Each reviewer receives the approved behavior, non-goals, relevant decisions, proof/evidence, assigned angle, and stop condition.
 
-- changed files/diff,
-- test output captured by worker,
-- reviewer findings,
-- relevant command output rerun by parent.
-
-If parent cannot verify directly, report “worker reported X; I did not independently verify Y.”
+The parent validates candidate findings for scope, producer/reachability, impact, proof, and behavior preservation before disposition. Reviewer output is partitioned into primary in-scope required findings, incidental material adjacent risks, and incidental optional cleanup/polish. Every accepted primary in-scope `must-fix` and `should-fix` finding must be fixed or explicitly user-deferred before `PASS`; optional/background quality exploration remains nonblocking. If the parent cannot verify directly, report the exact unverified boundary and return `INCONCLUSIVE` where it affects the claim.
 
 ## Completion Report Format
 
 Use this shape:
 
 ```text
-Contract: <revision/approved behavior or not applicable>
-Changed: <files/areas>
+Contract: <approved behavior/non-goals or not applicable>
+Outcome: <observable result>
+Implementation: <owners/areas used as evidence, not approval boundaries>
 Verification: <commands/evidence and results>
-Review: <review status or not run>
+Completion categories: <material categories and any inapplicable reason>
+Review: <three-review status for nontrivial work and finding dispositions>
 Risks: <remaining risks or none known>
-Next: <user-run git/PR steps if needed>
+Next: <protected or user-run action if needed>
 ```
 
 For quantitative summaries, add a short evidence line before finalizing counts/totals/coverage:

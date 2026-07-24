@@ -5,7 +5,7 @@ description: Generic conventions and rubrics for writing, editing, and reviewing
 
 # Writing Tests
 
-This skill covers how to write good tests. It complements `test-driven-development`, which owns the workflow sequence: choosing a TDD scenario, red/green evidence, and verification reporting.
+This skill owns test quality and placement. `behavioral-proof` selects whether tests, characterization, reproduction, existing coverage, integration, live, or manual evidence best proves the changed claim.
 
 Use this skill when you are:
 
@@ -52,7 +52,7 @@ Do not create a new test when:
 3. The code is a trivial delegation, constant, type-only change, formatting change, or generated output.
 4. The test would only verify a third-party library, runtime, or framework.
 
-When you skip tests, state why the change does not need a behavior test.
+When no new test is appropriate, state which other evidence proves the claim and why a behavior test would add no useful regression signal.
 
 ## Choosing the Test Shape
 

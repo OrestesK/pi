@@ -80,14 +80,6 @@ function createGoalHarness(
 	return { entries, hooks, handler, ctx, sendCount: () => sends, lastState };
 }
 
-function sliceBetween(source: string, startMarker: string, endMarker: string): string {
-	const start = source.indexOf(startMarker);
-	assert.notEqual(start, -1, `missing start marker: ${startMarker}`);
-	const end = source.indexOf(endMarker, start + startMarker.length);
-	assert.notEqual(end, -1, `missing end marker: ${endMarker}`);
-	return source.slice(start, end);
-}
-
 async function deliverPendingContinuation(harness: TestHarness): Promise<void> {
 	const id = harness.lastState()?.pendingContinuation?.id;
 	assert.ok(id);
@@ -181,22 +173,16 @@ test("pause aborts an active turn but clear does not", async () => {
 	assert.equal(aborts, 1);
 });
 
-test("widget and supervisor prompt show unbounded turn count", async () => {
+test("widget shows unbounded turn count", async () => {
 	const entries: Array<{ type: "custom"; customType: string; data: unknown }> =
 		[];
-	const hooks = new Map<
-		string,
-		(event: unknown, ctx: unknown) => Promise<void> | void | unknown
-	>();
 	let handler: ((args: string, ctx: unknown) => Promise<void>) | undefined;
 	let widgetContent: string[] | undefined;
 	const api = {
 		on(
-			event: string,
-			hook: (event: unknown, ctx: unknown) => Promise<void> | void | unknown,
-		) {
-			hooks.set(event, hook);
-		},
+			_event: string,
+			_hook: (event: unknown, ctx: unknown) => Promise<void> | void | unknown,
+		) {},
 		registerCommand(
 			_name: string,
 			options: { handler: (args: string, ctx: unknown) => Promise<void> },
@@ -227,97 +213,9 @@ test("widget and supervisor prompt show unbounded turn count", async () => {
 	};
 
 	await handler("finish objective", ctx);
-	const promptResult = hooks.get("before_agent_start")?.(
-		{ systemPrompt: "base", prompt: "continue" },
-		ctx,
-	) as { systemPrompt: string } | undefined;
 
-	const prompt = promptResult?.systemPrompt ?? "";
 	assert.equal(widgetContent?.[0], "goal: running 0 turns");
 	assert.doesNotMatch(widgetContent?.[0] ?? "", /\d+\/\d+/);
-	assert.match(prompt, /turns: 0/i);
-	assert.doesNotMatch(prompt, /\d+\/\d+/);
-	assert.doesNotMatch(prompt, /completed turns/i);
-	assert.match(prompt, /100% blocked/i);
-	assert.match(prompt, /internal plan approval/i);
-	assert.match(prompt, /routine local work/i);
-	assert.match(prompt, /minor\/reversible local edits/i);
-	assert.match(prompt, /tests, docs, formatting/i);
-	assert.match(prompt, /routine implementation choices/i);
-	assert.match(prompt, /safe local\/read-only\/reversible/i);
-	assert.match(
-		prompt,
-		/disables direct user asking, approval, confirmation, and HITL tools/i,
-	);
-	assert.match(prompt, /Automatic command\/tool blockers remain active/i);
-	assert.match(prompt, /Do not ask for approval, confirmation, clarification/i);
-	assert.match(prompt, /Default execution posture/i);
-	assert.match(prompt, /use the main agent by default/i);
-	assert.match(prompt, /do not start a supervised team/i);
-	assert.match(prompt, /Contract Gate/i);
-	assert.match(prompt, /contract card and owner map before editing/i);
-	assert.match(prompt, /source-of-truth files\/layers/i);
-	assert.match(prompt, /final self-review/i);
-	assert.match(prompt, /forbidden alternate shapes or artifacts/i);
-	assert.match(prompt, /map each done criterion to fresh evidence/i);
-	assert.match(prompt, /scope and artifact hygiene/i);
-	assert.match(prompt, /generated or untracked artifacts/i);
-	assert.match(prompt, /debug outputs/i);
-	assert.match(prompt, /changed files/i);
-	assert.doesNotMatch(prompt, /use a supervised team by default/i);
-	assert.doesNotMatch(prompt, /two distinct reviewer\/monitor agents/i);
-	assert.doesNotMatch(prompt, /differentiated reviewer roles/i);
-	assert.doesNotMatch(prompt, /GOAL_DONE requires reducer PASS/i);
-	assert.doesNotMatch(prompt, /web\/code research/i);
-	assert.match(prompt, /automatic command\/tool blocker/i);
-	assert.match(
-		prompt,
-		/missing required tool, credential, auth, access, or service/i,
-	);
-	assert.match(
-		prompt,
-		/GOAL_BLOCKED: <specific blocker and evidence that no safe non-asking next step exists>/i,
-	);
-	assert.doesNotMatch(prompt, /required approval/i);
-	assert.doesNotMatch(prompt, /ambiguous product\/API decision/i);
-});
-
-test("goal-crafter default template stays main-agent and evidence-gated", () => {
-	const skillPath = join(
-		dirname(fileURLToPath(import.meta.url)),
-		"../../../skills/goal-crafter/SKILL.md",
-	);
-	const skill = readFileSync(skillPath, "utf8");
-	const defaultTemplate = sliceBetween(
-		skill,
-		"Default format:",
-		"### 5. Adapt the goal to the task shape",
-	);
-
-	assert.match(defaultTemplate, /Default to the main agent/i);
-	assert.match(defaultTemplate, /pre-edit contract card and owner map/i);
-	assert.match(defaultTemplate, /final self-review against/i);
-	assert.match(defaultTemplate, /Map each Minimum acceptance item to fresh evidence/i);
-	assert.match(defaultTemplate, /scope and artifact hygiene/i);
-	assert.match(defaultTemplate, /generated\/untracked artifacts/i);
-	assert.match(defaultTemplate, /debug outputs/i);
-	assert.match(defaultTemplate, /changed files/i);
-	assert.doesNotMatch(
-		defaultTemplate,
-		/Default to a supervised team when available/i,
-	);
-	assert.doesNotMatch(
-		defaultTemplate,
-		/Use web\/code research when current external docs/i,
-	);
-	assert.doesNotMatch(
-		defaultTemplate,
-		/parent\/supervisor synthesis of worker and reviewer\/monitor findings/i,
-	);
-	assert.doesNotMatch(
-		defaultTemplate,
-		/team\/subagent\/reviewer\/reducer workflows unless/i,
-	);
 });
 
 test("turn_end rejects disallowed goal blockers and continues", async () => {

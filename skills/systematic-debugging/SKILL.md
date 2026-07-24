@@ -60,24 +60,19 @@ Do not stack fixes on an unverified guess.
 
 Once root cause is supported:
 
-1. Select the TDD scenario.
-2. Add or identify a regression test when behavior changed or bug risk is meaningful.
+1. Use `behavioral-proof` to select the narrowest evidence that would catch the regression.
+2. Capture a reproduction or regression test when it materially improves the proof.
 3. Make the minimal root-cause fix.
-4. Run the narrow reproduction/test.
-5. Run broader relevant checks.
+4. Run the narrow reproduction or selected check.
+5. Run broader checks only when shared risk justifies them.
 
 No “while here” refactors unless the fix requires them.
 
-## When 2 Fix Attempts Fail
+## When Fix Progress Stalls
 
-If two attempted fixes fail or each fix reveals a new symptom:
+Continue only while each attempted fix tests a supported root-cause hypothesis and produces material new evidence or progress. Stop when failures repeat, progress stalls, each change only reveals unrelated symptoms, evidence invalidates the architecture or plan, or a material/protected boundary is reached.
 
-- stop,
-- summarize attempts and evidence,
-- question the architecture or original plan,
-- ask the user before continuing.
-
-This is usually a design/model problem, not a need for one more patch.
+Summarize the attempts and evidence, question the architecture or original plan, and route the next decision through the active decision mode above. Do not use an arbitrary attempt count.
 
 ## Red Flags
 

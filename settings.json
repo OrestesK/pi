@@ -51,7 +51,7 @@
     "artifactRoot": ".scratch/compactions"
   },
   "pi-memory-md": {
-    "enabled": true,
+    "enabled": false,
     "memoryDir": {
       "localPath": "~/.pi/memory-md"
     },
@@ -69,6 +69,9 @@
       "thread": true
     }
   },
+  "skills": [
+    "skills"
+  ],
   "packages": [
     "extensions/claude-ui",
     "git:github.com/nicobailon/pi-intercom@e234a4446e2b3f9c13a1ec3151ae2169315c810f",
@@ -76,7 +79,17 @@
       "source": "git:github.com/aws/agent-toolkit-for-aws@fae975d565b6c1752e3f4795c499fb3951039777",
       "extensions": [],
       "skills": [
-        "skills/core-skills/**",
+        "skills/core-skills/aws-cdk",
+        "skills/core-skills/aws-cloudformation",
+        "skills/core-skills/aws-compute",
+        "skills/core-skills/aws-containers",
+        "skills/core-skills/aws-database",
+        "skills/core-skills/aws-deployment",
+        "skills/core-skills/aws-iam",
+        "skills/core-skills/aws-messaging-and-streaming",
+        "skills/core-skills/aws-observability",
+        "skills/core-skills/aws-serverless",
+        "skills/core-skills/signing-in-to-aws",
         "skills/specialized-skills/operations-skills/troubleshooting-application-failures"
       ],
       "prompts": [],
@@ -85,13 +98,13 @@
     "packages/pi-subagents",
     "npm:pi-mcp-adapter",
     {
-      "source": "packages/pi-lens",
-      "skills": [
-        "ast-grep"
-      ]
+      "source": "packages/pi-lens"
     },
     "npm:pi-web-access",
-    "packages/pi-memory-md",
+    {
+      "source": "packages/pi-memory-md",
+      "skills": []
+    },
     "npm:@aliou/pi-guardrails",
     {
       "source": "npm:pi-ask-user",

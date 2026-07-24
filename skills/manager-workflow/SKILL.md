@@ -1,132 +1,83 @@
 ---
 name: manager-workflow
-description: Core delegation and workflow orchestration — 3-tier task routing with .scratch/ workspace. Use when asked to implement features, build systems, refactor code, create new services, migrate libraries, redesign architecture, or any multi-step implementation work.
+description: Owns approval, stage flow, execution boundaries, and progress for nontrivial implementation work. Use for features, refactors, migrations, services, architecture changes, or multi-step implementation.
 ---
 
 # Manager Workflow
 
-## Tier Assessment
+## Approval model
 
-Before starting any implementation, assess the tier and state the classification in chat.
+Classify the work by behavior and decision risk, not file count.
 
-For non-trivial work, the expanded workflow is:
+### Trivial and unambiguous
 
-```text
-Clarify/Brainstorm → Plan → Approve → Execute → Verify → Review → Finish/Handoff
-```
+Proceed from the direct request when the behavior, owner, scope, and verification are clear and no material choice remains. State a concise objective, non-goals, and verification target. Do not add ceremony merely because several mechanical files participate.
 
-Use the added workflow skills as needed, but do not let them override this planning gate. The planning gate blocks edits, material choices, and unsafe execution; it does not block read-only advisory/recon/reflection subagents. If uncertain, spawn read-only advisors first, then ask the user instead of continuing with assumptions.
+### Nontrivial or material
 
-### Planning Gate
+Before tracked/source/config mutation:
 
-Do not edit code until the user approves if any of these are true:
+1. Present the complete decision-ready draft in chat.
+2. Launch asynchronous plan review while the draft remains inspectable.
+3. Inspect and synthesize the reviewer evidence.
+4. Present the complete revised plan and every material delta.
+5. Ask for implementation approval only on that reviewed plan.
 
-- The user asks to "think where it lives", "decide where", "design", "architecture", or otherwise implies placement/design judgment.
-- The change may touch more than one tracked file.
-- The change requires tests or docs.
-- The change introduces a new config flag, public parameter, environment variable, registry field, API surface, or behavior toggle.
-- There are multiple plausible implementation locations.
+The proposal includes:
 
-For Tier 2 tasks, present a brief table with option, location/files, pros, cons, and recommendation. Include the expected test/verification strategy when known. Then ask for explicit approval.
+- recommendation, observable outcome, previous behavior, and proposed delta;
+- complete material phases plus changed and unchanged behavior;
+- why it is the simplest coherent option, meaningful alternatives, and why rejected;
+- every material assumption, uncertainty, risk, tradeoff, reversibility concern, and safer alternative;
+- evidence, failed/unexecuted checks, verification and review strategy, and focus points;
+- the exact behavioral authorization boundary, exclusions, stop conditions, next separately authorized action, and one focused approval question.
 
-Only Tier 1 may proceed without approval:
+A `.scratch/plans/` artifact may preserve implementation detail but never replaces this presentation. Avoid tables in generated plan artifacts; direct UI/chat may use one only when materially clearer.
 
-- One file
-- Under ~20 changed lines
-- No behavior/config/API surface decision
-- No docs/tests needed
-- Requirements are unambiguous
+### Task contract
 
-If unsure, classify as Tier 2.
+Before mutation, bind the current request and latest correction to:
 
-Before the first mutating tool call, internally verify:
+- observable behavior and non-goals;
+- repository root/worktree and likely implementation owners;
+- proof strategy and focused checks;
+- behavioral approval boundary and protected-action stops.
 
-- [ ] Did I state the tier to the user?
-- [ ] Is there any placement/design decision?
-- [ ] Will this touch tests/docs/config?
-- [ ] Did the user explicitly approve if Tier 2+?
-- [ ] Is the current task intent or contract proportional to risk and bound to the latest user correction?
-- [ ] Which TDD scenario applies if behavior changes?
+Approval binds behavior, outcome, non-goals, material risks, and stop conditions—not exact files, ranges, or line budgets. Those remain optional implementation or concurrent-writer controls. Implement the smallest coherent solution at the canonical owner. Ask before any material expansion, new behavior/API/dependency/config/security/data decision, compatibility path, unexpected persistent artifact, or protected action. Reviewer and diagnostic findings are evidence, not authority.
 
-If any answer requires approval, stop and ask. Do not continue into parent file edits, write-child dispatch, or multi-step execution while a material question is unresolved.
+A later user correction supersedes conflicting terms and stale child work. When the corrected direction is nontrivial/material, re-present and review the amended proposal before mutation resumes.
 
-### Task Intent and Contract
+## Stage flow
 
-Before the first source/config mutation, establish task intent proportional to risk. Use the `task_contract` tool when it is registered; until then, record the active direction in chat when it is not already clear from the request and approval.
+For nontrivial or material work:
 
-For unambiguous Tier 1 work, the explicit request normally supplies authority. Use a concise objective, non-goals, and verification target; do not require another confirmation or invent exact line ranges and budgets merely to complete a template.
+1. **Design/plan:** visible draft → asynchronous review → complete revised plan → implementation approval.
+2. **Implementation:** complete the approved behavior and focused checks; report the stage, evidence, discoveries, and remaining boundaries; continue automatically into review/fix.
+3. **Independent review/fix:** run at least three fresh parallel reviewers with distinct evidence targets. Apply automatically validated, mechanically local, non-material fixes inside the approved behavior. A final `PASS` requires every accepted primary in-scope `must-fix` and `should-fix` to be fixed or explicitly user-deferred; optional/background quality exploration remains nonblocking. Freshly re-review meaningful behavior, correctness, architecture, or proof fixes; tiny mechanical fixes may use direct parent final-diff inspection. Report the review/fix result visibly, then continue without another approval wait unless a material decision or named milestone requires one.
+4. **Final verification:** run safe, bounded, local, non-expensive claim-bound evidence after the last relevant edit; bounded disposable repository-local verification state is allowed, but source/config/dependency/real-data/external/system changes are not. Report `PASS`, `FAIL`, or `INCONCLUSIVE`; stop and await user direction.
+5. **Live/external/expensive validation, commit, deploy, rollout, external mutation, or destructive action:** require separate authorization unless the exact protected action was already approved. Authorization names the target/environment, exact workflow/action, permitted effects, credential/data boundary, and cost/time boundary.
 
-For Tier 2/3 work, state:
+An extra milestone is a wait only when the decision-ready proposal names it and the user approves it. A new material choice interrupts the affected stage; individual tasks, children, edits, reviews, and safe checks are not approval checkpoints.
 
-- requested behavior and observable outcome,
-- explicit non-goals,
-- repository root/worktree,
-- expected files, behavior owners, and new persistent files when known,
-- verification and review mode,
-- approval boundaries and stop conditions.
+## Progress and continuity
 
-Exact file/range envelopes and changed-line budgets are optional controls for user-requested strict scope, high-risk mutations, dirty-worktree isolation, or concurrent writers. They are not universal performance targets.
+For nontrivial work, report at approval/final-result boundaries, material discoveries/blockers, requested updates, and the start of every distinct material work group or stage. Do not narrate tools or skipped groups. Keep the plan/status inspectable while asynchronous work runs.
 
-Implement the smallest coherent solution and investigate broadly enough to find the real owner. Necessary adjacent edits may proceed when they directly support the approved outcome and do not introduce new behavior, public/API contracts, dependencies, security/data decisions, or unexpected persistent files. Report them. Present a delta and obtain approval before material expansion.
-
-Do not silently add unrelated refactoring or cleanup, new abstractions/frameworks, compatibility work, diagnostic-driven edits, dependency/config changes, or extra persistent files. Reviewer and tool findings are evidence to evaluate, not authority to broaden the task.
-
-A later user correction supersedes conflicting task-intent or contract terms. Pause affected mutations, revise the active direction, and interrupt or reissue stale write children before continuing.
-
-### Clarification Checkpoints
-
-Pause for user clarification before continuing when:
-
-- the next action would edit files and the scope is not explicitly approved,
-- there are two or more plausible implementation paths,
-- a task could be solved by changing behavior, tests, docs, config, or workflow and the intended target is unclear,
-- the next step would dispatch a write child with broad instructions,
-- a plan batch contains more than one task and the user has not approved that batch,
-- new information invalidates or materially changes the approved plan.
-
-Ask one focused question, preferably with options and a recommendation. Do not ask questions tools can answer.
-
-### Tier 1 — Just Do It
-
-- Single file, clear intent, < ~20 lines
-- No discussion needed. Make the change, show what you did.
-- Verify before claiming done.
-- Examples: fix a type error, rename a variable, add an import
-
-### Tier 2 — Talk First
-
-- Multi-file or ambiguous intent
-- Present what you'd change, where, and why. Get approval.
-- Include test/verification strategy when behavior changes.
-- No plan files unless the discussion shows the task is really Tier 3.
-- Examples: add a new API endpoint, refactor a module, fix a bug touching 3+ files
-
-### Tier 3 — Write It Down
-
-- Architectural, > 5 files, new systems, irreversible
-- Write plan to `.scratch/plans/YYYY-MM-DD-<slug>.md`
-- Mark every assumption: **[ASSUMPTION: ...]**
-- Present summary. Wait for explicit approval.
-- The parent implements the approved plan. Use write children only when at least two independent implementation areas can proceed concurrently in the shared checkout, with the parent owning at least one area and every writer receiving an exclusive file list and exact edit packet.
-- Examples: redesign a system, migrate libraries, build a new service
-
-The user can always escalate. If they say "wait", "let's talk", or "hold on" — move up a tier.
+Use the native TODO as the concise routing card: claim it when active, update it only when objective, blocker, or next action materially changes, and close it only when work is actually complete. When complex execution needs more mutable detail, use one ignored `.scratch/sessions/` record with the current stage, evidence links, changed assumptions, blockers, unverified boundaries, and next action. After continuation or compaction, recover that state, the approved plan, unresolved child state, and the latest user correction before resuming. Do not create tracked progress files unless the project already requires one or explain continuity using internal token/context-pressure rationale.
 
 ## Workflow Skill Routing
 
 Load or apply these skills when their trigger fits:
 
-| Situation                                                   | Skill                                                                                                             |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Vague idea, new behavior, design/placement decision         | `brainstorming`                                                                                                   |
-| Approved requirements need task breakdown                   | `writing-plans`                                                                                                   |
-| New behavior or logic change                                | `test-driven-development`                                                                                         |
-| Adding/changing tests, test helpers, fixtures, mocks, or test-review feedback | `writing-tests`; use `test-driven-development` too when changing behavior or fixing bugs |
-| Bug, test failure, crash, flaky behavior, unexpected output | `systematic-debugging` first; use TDD for the fix after root cause is supported                                   |
-| Code/spec/plan review or review feedback evaluation         | `review`; use `pi-subagents` reviewer fanout by default unless an explicit parent-only reason is stronger |
-| Before done/fixed/passing claims                            | `verification-before-completion`                                                                                  |
+- Vague idea, behavior shape, design, or placement → `brainstorming`.
+- Approved complex work needing a durable task plan → `writing-plans`.
+- Material behavior evidence strategy → `behavioral-proof`.
+- Tests, helpers, fixtures, mocks, or test-review feedback → `writing-tests`.
+- Bug, failure, crash, flake, or unexpected output → `systematic-debugging`, then `behavioral-proof` for the fix.
+- Code/spec/plan review or review-feedback evaluation → `review`; use `pi-subagents` for detailed fanout.
+- Before done/fixed/passing/ready claims → `verification-before-completion`.
 
-Do not stack blocking workflow on tiny Tier 1 edits. Async advisory/recon/reflection subagents remain the default for hidden-risk checks, cleanup angles, and slack-time reflection when they can run without delaying the edit.
+Do not stack blocking workflows on trivial mechanical work.
 
 ## Subagent Recipe Routing
 
@@ -134,78 +85,49 @@ Do not stack blocking workflow on tiny Tier 1 edits. Async advisory/recon/reflec
 
 Implementation-specific routing rules:
 
-- `manager-workflow` owns visibility, tiering, approval, write safety, and execution batching. It does not decide whether read-only advisory/recon/reflection subagents should spawn.
-- Load `pi-subagents` by default for nontrivial work, uncertainty, planning, review, research, handoff, cleanup, final-readiness pressure, or any waiting/slack period. Read-only/advisory children remain the default for broad investigation; parent implementation is normal.
+- `manager-workflow` owns approval, stage flow, write safety, progress, and execution batching. It does not own detailed child orchestration.
+- Load `pi-subagents` for all nontrivial work unless delegation is concretely unavailable or prohibited. Read-only/advisory children support investigation and decision quality; parent implementation remains normal.
 - Enter review requests through `review`, vague product/design requests through `brainstorming`, and implementation work through this skill before applying any write-capable subagent recipe.
-- Apply fixes from review feedback only when the user explicitly authorizes writing; the parent normally performs each fix pass, followed by fresh read-only review.
-- If the user asks to verify or pressure-test a parent proposal before implementation, complete and inspect the proposal gate before scouting implementation locations or starting implementation.
-- The parent normally implements approved work directly. A write child is permitted only when at least two independent implementation areas can proceed concurrently in the shared checkout, with the parent owning at least one area and every writer receiving an exclusive, non-overlapping file list and exact edit packet.
+- Apply review fixes only under the approved behavioral review/fix boundary. The parent normally performs each coherent fix pass, followed by at least three fresh independent reviewers of the resulting effective change.
+- For every nontrivial proposal, show the draft before asynchronous proposal review, inspect the gate, integrate supported findings, and re-present the complete revised plan before implementation approval.
+- The parent normally implements approved work directly. A write child is permitted when at least two independent implementation areas can proceed concurrently in the shared checkout, with the parent owning one area, or under the narrow quality-worker exception below.
+- **Narrow quality-worker exception:** after the parent validates a simple, behavior-preserving, non-material cleanup/quality fix inside the approved boundary, one worker may own its exact coherent, exclusive assignment—including multiple files—while the parent continues independent non-overlapping work. The parent inspects, integrates, and verifies the result.
 
 ## Delegation Rules
 
-### Plan Execution Batches
+### Approved implementation batch
 
-Before executing an approved plan:
+Before execution:
 
-- Read the full plan.
-- Re-check it against current code and project instructions.
-- Stop if assumptions are stale, unsafe, or incomplete.
-- Confirm approved batch scope before executing more than one task.
+- read the approved proposal/plan and current instructions;
+- re-check assumptions and the real behavior owner;
+- confirm the approved behavior/non-goals, proof surface, protected boundaries, and stop condition;
+- identify likely implementation owners without treating their file list as the user approval boundary;
+- stop for stale evidence or a material scope/behavior conflict.
 
-Default batch size:
-
-- 1 task for risky, ambiguous, tightly coupled, or newly clarified work.
-- Up to 3 tasks only for low-risk independent work when the user approved that batch size.
-
-Progress tracking:
-
-- Use `todo` for multi-session or user-visible state.
-- Use `.scratch/sessions/` for local progress.
-- Use repo-local `progress.md` only when explicitly instructed or already established.
-- Do not create tracked progress files unless the project already uses them.
-
-For each task:
-
-1. Restate task scope.
-2. Select TDD scenario.
-3. Follow the plan exactly unless evidence shows it is wrong.
-4. Run task verification.
-5. Record results and risks.
-
-Batch report:
-
-```text
-Tasks completed: <N>
-Changed files: <paths>
-Verification: <commands/results>
-Review: <status/findings>
-Blocked/risks: <none or details>
-Ready for feedback.
-```
-
-Do not proceed past a requested checkpoint without feedback.
+For each coherent edit group, implement the smallest approved behavior, run applicable non-unit static/discovery proof that can detect drift, inspect the effective change, and record material results. Run unit tests after the complete implementation batch, except for one deliberately selected focused reproduction/test-first check when it is the most efficient proof. After the batch and focused checks, report the stage, evidence, discoveries, and remaining boundaries, then continue automatically into independent review/fix.
 
 ### Subagent Execution Policy
 
-For exceptional concurrent write execution with subagents:
+For exceptional write execution with subagents:
 
-- Use write workers only when at least two independent implementation areas will run concurrently in the shared checkout. The parent must own at least one area; assign one fresh worker to each additional area with an exclusive, non-overlapping file list.
-- Give every write child an exact edit packet: assigned files and symbols, required behavior, non-goals, TDD scenario when applicable, validation commands and evidence, and prohibited product/API/compatibility/scope decisions.
+- Use write workers when at least two independent implementation areas will run concurrently in the shared checkout and the parent owns one area, or use one worker under the narrow quality-worker exception. Every worker receives an exclusive, non-overlapping file list.
+- Give every write child an exact edit packet: assigned files and symbols, required behavior, non-goals, selected proof strategy, validation commands and evidence, and prohibited product/API/compatibility/scope decisions.
 - Require each child to stop before touching an unassigned file and contact the parent only for a real blocker, discovered file overlap, or an unapproved product/API/compatibility/scope decision.
 - Do not run repository-wide mutating formatters, code generators, migrations, or equivalent commands while concurrent writes are active.
 - Workers write summaries to `.scratch/` or explicit output paths. The parent inspects their diffs, integrates their changes, and verifies the combined result.
 - Dispatch read-only `reviewer` agents after implementation:
   1. spec compliance review against the approved task/design,
   2. code quality review when needed.
-- The parent applies must-fix findings that directly support the current task intent and stay within approved boundaries, then re-reviews the affected mode. Ask before material expansion. Use write children for fixes only when at least two independent fix areas satisfy the same concurrent-write contract.
-- If two focused fix attempts fail, stop and ask; the plan likely needs redesign.
+- The parent applies validated primary in-scope `must-fix` and accepted `should-fix` findings that directly support the task intent and stay within approved boundaries, then re-reviews meaningful fixes. `PASS` requires those accepted findings fixed or explicitly user-deferred. Route material expansion through the active decision mode above. Use write children for fixes only under the concurrent-write contract or narrow quality-worker exception.
+- Continue focused fixes only while each attempt tests a supported root-cause hypothesis and produces material progress. Stop when failures repeat, progress stalls, evidence invalidates the plan, or a material/protected boundary is reached; then route the next decision through the active decision mode above.
 
 ### Research Phase
 
 - For nontrivial, ambiguous, high-impact, externally grounded, or multi-step work, use quality-first fanout by default. Treat fanout as the normal planning substrate, not an exceptional escalation.
 - Route ordinary user language to the matching `pi-subagents` recipe; the user does not need to name a slash command. Keep detailed recipe examples in the `pi-subagents` skill so this workflow does not become a second routing authority.
 - Dispatch scout agents for codebase exploration.
-- Scouts can run in parallel (e.g., 5 scouts analyzing different modules) when their scopes are distinct.
+- Scouts can run in parallel when their scopes and evidence targets are distinct; size the group from the actual independent surfaces.
 - Give each child a distinct angle and output contract; avoid duplicate vague agents.
 - For parallel scouts, pass `output: false` for concise findings or give every scout an explicit unique output path. Do not rely on a shared default artifact path.
 - Scouts return findings inline or through parent-managed `.scratch/research/` output artifacts only when an explicit unique output path is provided.
@@ -223,8 +145,8 @@ Before editing behavior, identify the behavior owner:
 Do not start from helper or abstraction design. Start from the existing owner path and observable behavior.
 
 - The parent normally implements approved changes and directly reads the precise files and symbols it edits.
-- Use write workers only under the exceptional concurrent-write policy above.
-- Give every write worker an exact edit packet: current task-contract revision, assigned files and baseline symbols/ranges, required behavior, non-goals, TDD scenario when applicable, validation commands and evidence, and prohibited product/API/compatibility/scope decisions.
+- Use write workers only under the exceptional concurrent-write policy or narrow quality-worker exception above.
+- Give every write worker an exact edit packet: current task-contract revision, assigned files and baseline symbols/ranges, required behavior, non-goals, selected proof strategy, validation commands and evidence, and prohibited product/API/compatibility/scope decisions.
 - If the edit packet cannot specify those boundaries exactly, or its revision is stale, go back to planning.
 - Concurrent writers must have exclusive, non-overlapping file lists. Each child stops before an unassigned file and communicates only a real blocker, discovered overlap, or an unapproved product/API/compatibility/scope decision.
 - Do not run repository-wide mutating formatters, code generators, migrations, or equivalent commands while concurrent writes are active.
@@ -233,19 +155,18 @@ Do not start from helper or abstraction design. Start from the existing owner pa
 
 ### Review Phase
 
-- Dispatch read-only reviewer agents after implementation by default. Skip review only when the change is truly Tier 1/trivial, the user requested no review, or there is an explicit parent-only reason.
-- Prefer a fresh-context parallel review gate for nontrivial work: correctness/regressions, tests/verification, and simplicity/maintainability. Add security, ops/resource, UX, or architecture reviewers when relevant.
-- Use `/parallel-review` or `/quality-gate` patterns directly through `subagent(...)` when they fit.
-- Use `/quick-adversarial-check` before committing to a diagnosis, architecture direction, or user-facing claim that has meaningful uncertainty.
-- Reviewer checks against the plan and coding standards.
-- For plan execution, prefer spec compliance review first, then code quality review when needed.
-- Reviewer writes findings to `.scratch/reviews/` or returns concise inline output when artifacts are unnecessary.
-- Parent synthesizes reviewer disagreements; do not blindly apply every suggestion.
-- Findings cannot amend material scope. Address must-fix findings that directly support the approved outcome; ask before new behavior, public/API contracts, dependencies, compatibility, security/data decisions, unexpected persistent files, or another approval boundary.
+- Dispatch at least three fresh parallel read-only reviewers after nontrivial implementation. Skip review only for truly trivial work, an explicit no-review constraint, or a concrete unavailable evidence surface that is reported.
+- Give every reviewer the approved behavior, non-goals, relevant decisions, actual target/effective change, required proof and available evidence, one distinct angle/evidence target, and a stop condition.
+- Select at least three genuinely distinct primary angles from the actual risk surfaces; add security, ops/resource, UX, architecture, or other specialists only when relevant.
+- Reviewers never edit or become writers. Use `/parallel-review` or `/quality-gate` patterns through `subagent(...)` when they fit.
+- Reviewer output separates primary in-scope required findings, incidental material adjacent risks, and incidental optional cleanup/polish. Reviewers actively hunt only the primary assigned scope unless cleanup/adjacent analysis was explicitly requested as primary.
+- The parent validates each candidate's scope, producer/reachability, impact, proof, and behavior preservation before disposition; it synthesizes `PASS`, `FAIL`, or `INCONCLUSIVE` rather than blindly applying suggestions.
+- Automatically apply only validated, mechanically local, non-material fixes inside the approved behavior, then run at least three fresh reviewers again. Continue while a round produces material progress; stop clean, incidental-only, stalled/repeated, blocked, or approval-gated—not at an arbitrary round count.
+- Findings cannot amend material scope. Ask before new behavior, public/API contracts, dependencies, compatibility, security/data decisions, unexpected persistent artifacts, or another approval boundary.
 
 ### Completion Phase
 
-- Run required checks and report evidence.
+- Run safe, bounded, local, non-mutating, non-expensive required checks automatically and report evidence.
 - Verify worker/subagent claims from actual output, diffs, or rerun checks before reporting completion.
 - If the current branch has an open PR and the user explicitly asks to update the PR description/body, load the github skill and update only that PR description/body with what changed and how it was tested.
 - Without an explicit user request for that exact PR description/body update, draft suggested PR text instead of mutating GitHub.
@@ -253,7 +174,7 @@ Do not start from helper or abstraction design. Start from the existing owner pa
 
 ## .scratch/ Workspace
 
-Use `.scratch/` for workflow artifacts when artifact creation is allowed and useful. Ensure it exists and is gitignored before workflows that require persistent plans, research, reviews, sessions, or run logs. Do not make unrelated setup edits such as adding `.scratch/` to `.gitignore` during a feature change unless the user approves or the edit is required for the requested change. If a required workflow needs persistent artifacts but the task forbids artifacts, stop and ask.
+Use `.scratch/` for workflow artifacts when artifact creation is allowed and useful. Ensure it exists and is gitignored before workflows that require persistent plans, research, reviews, sessions, or run logs. Do not make unrelated setup edits such as adding `.scratch/` to `.gitignore` during a feature change unless the user approves or the edit is required for the requested change. If a required workflow needs persistent artifacts but the task forbids artifacts, stop and ask whether to relax the constraint.
 
 Organized:
 
@@ -268,7 +189,7 @@ Check for existing .scratch/ files before re-researching.
 
 ## Stop Conditions
 
-Stop and ask instead of improvising when:
+Stop instead of improvising when:
 
 - requirements conflict
 - the approved plan is wrong
@@ -276,3 +197,5 @@ Stop and ask instead of improvising when:
 - implementation needs an unapproved product or architecture decision
 - tests fail repeatedly and root cause is unclear
 - a tool or plan asks for mutating git commands
+
+Present the evidence and ask one focused question.

@@ -32,7 +32,7 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 - Local role prompts in [`agents/`](agents/) override packaged roles with the same name.
 - Skills expose short descriptions and load their full instructions only when needed.
 - Extensions under [`extensions/`](extensions/) are auto-discovered.
-- Memory is supplied by `pi-memory-md`.
+- Durable Memory is disabled; `pi-memory-md` remains configured for Tape continuity.
 - Safety combines prompt policy with configured guardrails. `permissions.json` is
   retained as an inactive artifact and does not control Pi 0.80.6 permissions.
 

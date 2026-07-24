@@ -47,9 +47,9 @@ While a goal is active:
 
 - Continuations use `pi.sendMessage(..., { deliverAs: "followUp", triggerTurn: true })`.
 - There is no automatic stop after a fixed number of turns, repeated no-progress turns, or elapsed time.
-- The goal prompt tells the agent not to ask for approval, confirmation, clarification, or product/workflow decisions while safe local, read-only, or reversible work remains.
-- The main agent is used by default. The prompt does not direct it to start a supervised team or child-agent workflow.
-- Nontrivial implementation, refactor, migration, PR-sized, schema/API, docs-surface, and cross-file goals use a Contract Gate: a contract card and owner map before editing, followed by final self-review against the contract, evidence, scope, and generated artifacts.
+- Goal mode uses the normal session configuration, tools, skills, subagents, parent-write ownership, proof, review, reflection, progress, and safety boundaries.
+- When a normal session would ask an in-scope material engineering, product, or workflow question, the agent instead runs substantial review with at least three distinct relevant advisors, gathers more evidence as needed, chooses the best supported answer, and records the decision. Decision ambiguity never blocks the goal, and advisors cannot authorize protected actions.
+- Nontrivial implementation, refactor, migration, PR-sized, schema/API, docs-surface, and cross-file goals use the normal Contract Gate: a contract card and owner map before editing, followed by final review against the contract, evidence, scope, and generated artifacts.
 - Before `GOAL_DONE`, each done criterion must map to fresh evidence, including changed, generated, untracked, and debug artifacts.
 
 ## Completion and blockers
@@ -63,7 +63,7 @@ GOAL_BLOCKED: <specific blocker and evidence that no safe non-asking next step e
 
 `GOAL_DONE` is not accepted on self-claim alone. The extension runs deterministic prechecks and then a model-backed judge when available. Judge failures fail closed as inconclusive or blocked.
 
-`GOAL_BLOCKED` is accepted only for an automatic command or tool blocker, or a missing required tool, credential, authentication, access, or service after no safe non-asking step remains. Permission, approval, confirmation, clarification, and product or workflow decisions are not accepted blocker classes.
+`GOAL_BLOCKED` is accepted only after no safe non-asking path remains and the blocker is an automatic command/tool/runtime guardrail; a missing required tool, resource, credential, authentication, access, or service; or a required protected action that is not authorized and has no safe alternative. The protected-action class must use `GOAL_BLOCKED: required protected action not authorized; no safe alternative: action=<specific action>; effect=<required effect>; evidence=<evidence>`. Decision ambiguity, ordinary approval, confirmation, clarification, and product or workflow questions are not blocker classes; forced decision review must choose the best supported in-scope answer.
 
 A marker-sourced blocker is not terminal. The goal resumes on the next qualifying agent prompt or explicit `/goal resume`. Judge or model failures require `/goal resume`; `/goal status` only reports state. Only `/goal clear` and approved completion terminate the goal.
 

@@ -53,26 +53,31 @@ export function isAllowedGoalBlocker(reason: string): boolean {
 		return false;
 	}
 	const automaticBlocker =
-		/\b(automatic|runtime|tool|command|guardrail)\b.*\b(blocked|blocker|denied|rejected)\b/.test(
-			normalized,
-		) ||
-		/\b(blocked|blocker|denied|rejected)\b.*\b(automatic|runtime|tool|command|guardrail)\b/.test(
+		/^(?=.*\b(?:automatic|runtime|tool|command)\b)(?=.*\b(?:blocker|guardrail)\b)(?=.*\b(?:blocked|denied|rejected)\b).+$/.test(
 			normalized,
 		);
 	if (automaticBlocker) return true;
+	if (
+		/^required protected action not authorized; no safe alternative:\s*action=\S[^;]*;\s*effect=\S[^;]*;\s*evidence=\S.+$/.test(
+			normalized,
+		)
+	)
+		return true;
 	if (
 		/\b(unapproved|approval|approve|approved|permission|confirm|confirmation)\b/.test(
 			normalized,
 		)
 	)
 		return false;
+	if (/\boptional\b/.test(normalized)) return false;
 	const missingCapability =
-		/\b(missing|unavailable|lacking|lack|no)\b.*\b(tool|credential|credentials|auth|access|service)\b/.test(
+		/^(?:missing|lacking|no)\s+required\s+(?:tool|resource|resources|credential|credentials|auth|access|service)(?:\s+(?:for|to)\b.*)?$/.test(
 			normalized,
 		) ||
-		/\b(tool|credential|credentials|auth|access|service)\b.*\b(missing|unavailable|required|needed)\b/.test(
+		/^required\s+(?:tool|resource|resources|credential|credentials|auth|access|service)\s+(?:is|are)\s+(?:missing|unavailable|lacking)$/.test(
 			normalized,
-		);
+		) ||
+		/^auth\b.*\bexpired$/.test(normalized);
 	return missingCapability;
 }
 
