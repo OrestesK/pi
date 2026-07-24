@@ -60,6 +60,7 @@ Rules:
 - Extract all questions that require user input
 - Keep questions in the order they appeared
 - Be concise with question text
+- Write question and context text in plain human language. Avoid unnecessary or unexplained jargon, but preserve precise technical terms required by the source.
 - Include context only when it provides essential information for answering
 - If no questions are found, return {"questions": []}
 
