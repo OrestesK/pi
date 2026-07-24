@@ -16,6 +16,7 @@ These files are copied verbatim or closely adapted from upstream repositories. T
 | [`skills/session-reader/scripts/read_session.py`](skills/session-reader/scripts/read_session.py) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/session-reader/scripts/read_session.py` | Copied verbatim | MIT |
 | [`skills/self-improve/SKILL.md`](skills/self-improve/SKILL.md) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/self-improve/SKILL.md` | Closely adapted | MIT |
 | [`skills/session-reader/SKILL.md`](skills/session-reader/SKILL.md) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/session-reader/SKILL.md` | Closely adapted | MIT |
+| [`skills/tech-spec/SKILL.md`](skills/tech-spec/SKILL.md) | [`dmmulroy/skills`](https://github.com/dmmulroy/skills/blob/8603380821fee6a77c82639f364ce8fe4f5a92be/tech-spec/SKILL.md) | Locally modified adaptation | MIT |
 
 ## Local runtime surfaces
 

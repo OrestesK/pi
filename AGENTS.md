@@ -294,7 +294,7 @@ Detailed procedure lives in the named canonical owner. Load specialized workflow
 
 - Vague idea, feature shape, design, or placement → `brainstorming`.
 - Nontrivial implementation, refactor, migration, service, or multi-step work → `manager-workflow`.
-- Approved complex work needing a durable implementation plan → `writing-plans`.
+- Approved complex work needing a separately requested durable implementation plan → `writing-plans`. A reviewed tech spec inside the `manager-workflow` proposal is sufficient for implementation approval and does not route through `writing-plans`.
 - Material behavior evidence strategy → `behavioral-proof`.
 - Tests, helpers, fixtures, mocks, or test-review feedback → `writing-tests`.
 - Nontrivial bug, failure, crash, flake, or unexpected output → `systematic-debugging`, then `behavioral-proof` for the fix.

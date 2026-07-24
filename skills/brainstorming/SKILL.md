@@ -24,6 +24,17 @@ Not allowed:
 - Making architectural/product decisions without user approval.
 - Running mutating git commands.
 
+## Manager-routed tech-spec clarification
+
+Use this mode only when `manager-workflow` explicitly invokes `brainstorming` to resolve material intent before a tech spec.
+
+- Remain inside the manager's existing design/plan stage.
+- Apply only the current-state inspection and focused clarification parts of this skill until the goal, observable behavior, non-goals, constraints, affected workflows, acceptance conditions, and user-owned decisions are sufficient for architecture work.
+- Return that resolved intent and any remaining open questions to `manager-workflow` so it can load `tech-spec`.
+- Do not produce this skill's standalone full design, launch its separate design review, request approval, or hand off to `writing-plans` or implementation.
+
+The normal brainstorming process and handoff remain unchanged for standalone brainstorming work.
+
 ## Process
 
 ### 1. Understand the current state

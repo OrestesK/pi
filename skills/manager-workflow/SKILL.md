@@ -70,6 +70,7 @@ Use the native TODO as the concise routing card: claim it when active, update it
 Load or apply these skills when their trigger fits:
 
 - Vague idea, behavior shape, design, or placement → `brainstorming`.
+- Architecture-heavy design, or an ordinary-language request for a full typed spec → `tech-spec` inside this workflow's existing design/plan stage.
 - Approved complex work needing a durable task plan → `writing-plans`.
 - Material behavior evidence strategy → `behavioral-proof`.
 - Tests, helpers, fixtures, mocks, or test-review feedback → `writing-tests`.
@@ -78,6 +79,33 @@ Load or apply these skills when their trigger fits:
 - Before done/fixed/passing/ready claims → `verification-before-completion`.
 
 Do not stack blocking workflows on trivial mechanical work.
+
+## Tech-spec routing
+
+`manager-workflow` owns the activation decision. If material product/design intent or another user-owned choice is unresolved, apply `brainstorming` first. Load `tech-spec` only after that intent is sufficient for architecture work.
+
+Then load `tech-spec` automatically when architecture detail can materially change the decision, including:
+
+- a change crossing a material ownership or data-flow boundary;
+- public APIs, schemas, protocols, persistence models, migrations, or external integrations;
+- transactions, concurrency, retries, cancellation, idempotency, authorization flow, or shared state machines;
+- several credible architectures with different contracts, seams, or runtime topology.
+
+Also load it when the user asks for a tech spec in ordinary language.
+
+Do not activate it automatically only because work is nontrivial or touches several files. Skip it for small local fixes, wording or style changes, mechanical refactors, simple config edits, isolated test corrections, isolated bug fixes with a clear owner and proof path, ordinary implementation with no changed boundary, review/verification/test-only work that introduces no architecture, and clearly single-owner changes unless the user asks.
+
+When active:
+
+- inspect current code and docs before specifying contracts or call stacks;
+- use `tech-spec` for the architecture body of the existing decision-ready proposal;
+- keep the visible draft, asynchronous plan review, revised proposal, and single implementation approval required by this workflow;
+- use `behavioral-proof` for relevance-based evidence rather than imposing universal test-first work;
+- include enough implementation ownership and proof sequencing in the reviewed tech spec to proceed after the single approval.
+
+Do not route an approved tech spec through `writing-plans` as a second approval flow. A separate later user request for a durable implementation plan remains governed by the existing `writing-plans` workflow.
+
+The tech spec does not create another stage, approval wait, or implementation authority.
 
 ## Subagent Recipe Routing
 
