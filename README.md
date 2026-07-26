@@ -46,14 +46,14 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 | `descope` | lazy remote OAuth | Descope identity management |
 | `notion` | lazy remote OAuth | Notion access |
 | `google_docs` | lazy local OAuth | Google Docs and Drive-capable operations |
-| `slack` | lazy local OAuth | Slack access through the patched local server |
+| `slack` | lazy remote OAuth | Slack access through Slack's official hosted MCP server |
 | `retool` | lazy remote | Retool apps, resources, and organization access through the MCP proxy |
 | `excalidraw-local` | lazy local | Excalidraw diagrams |
 | `docent` | lazy local | Agent-run analysis and reports |
 
 OAuth environment and token files are ignored. External/private MCP access and mutations are governed by [`AGENTS.md`](AGENTS.md).
 
-The patched Slack server supports reduced scopes. The intended setup uses `SLACK_MCP_CHANNEL_TYPES=public_channel`, `SLACK_MCP_ADD_MESSAGE_TOOL` with explicit channel IDs, and the scopes `chat:write`, `channels:read`, `channels:history`, `users:read`, and `search:read`.
+The official Slack MCP entry requests every scope currently advertised by Slack's OAuth metadata: `search:read.public`, `search:read.private`, `search:read.mpim`, `search:read.im`, `search:read.files`, `search:read.users`, `chat:write`, `channels:history`, `groups:history`, `mpim:history`, `im:history`, `canvases:read`, `canvases:write`, `users:read`, `users:read.email`, `reactions:write`, `reactions:read`, `emoji:read`, `files:read`, `channels:write`, `groups:write`, `im:write`, `mpim:write`, `channels:read`, `groups:read`, and `mpim:read`. Tracked config contains the public Slack app client ID and fixed PKCE callback, but no client secret or token. Authentication remains incomplete until OAuth is completed.
 
 ## Setup
 
