@@ -1,7 +1,7 @@
 {
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
-  "defaultThinkingLevel": "max",
+  "defaultThinkingLevel": "high",
   "theme": "gruvbox-custom",
   "quietStartup": true,
   "defaultProjectTrust": "always",
@@ -96,6 +96,7 @@
       "themes": []
     },
     "packages/pi-subagents",
+    "packages/pi-fff",
     "npm:pi-mcp-adapter",
     {
       "source": "packages/pi-lens"

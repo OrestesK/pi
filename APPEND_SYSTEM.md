@@ -29,7 +29,7 @@
 | Python env/packages        | `uv`                    | `pip`, `venv`, `virtualenv`           |
 | TypeScript packages        | `pnpm`                  | `npm`                                 |
 | Structural search/refactor | `ast-grep`, `sg`        | grep/sed for code structure           |
-| File discovery             | Pi `find` tool / `fd`   | shell `find` when Pi tools fit        |
+| File/content discovery     | Pi `find`/`grep` (FFF-backed) for fuzzy/ranked work; constrain path/glob/literal for exact work | shell search when Pi tools fit |
 | File display               | Pi `read` tool / `bat`  | `cat`                                 |
 | Text replacement           | `sd`                    | `sed` for broad edits                 |
 | Shell validation           | `shellcheck`            | manual-only shell review              |

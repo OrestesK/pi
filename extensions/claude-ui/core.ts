@@ -5500,52 +5500,6 @@ function registerClaudeToolRenderers(pi: ExtensionAPI): void {
 	});
 
 	pi.registerTool({
-		name: "grep",
-		label: bootstrap.grep.label,
-		description: bootstrap.grep.description,
-		parameters: bootstrap.grep.parameters,
-		prepareArguments: bootstrap.grep.prepareArguments,
-		executionMode: bootstrap.grep.executionMode,
-		renderShell: "self",
-		execute: (toolCallId, params, signal, onUpdate, ctx) =>
-			getBuiltInTools(ctx.cwd, pi).grep.execute(
-				toolCallId,
-				params,
-				signal,
-				onUpdate,
-			),
-		renderCall: (args, theme, context) =>
-			setText(
-				context.lastComponent,
-				formatGrepCall(args, theme, isToolPending(context)),
-			),
-		renderResult: renderGrepResult,
-	});
-
-	pi.registerTool({
-		name: "find",
-		label: bootstrap.find.label,
-		description: bootstrap.find.description,
-		parameters: bootstrap.find.parameters,
-		prepareArguments: bootstrap.find.prepareArguments,
-		executionMode: bootstrap.find.executionMode,
-		renderShell: "self",
-		execute: (toolCallId, params, signal, onUpdate, ctx) =>
-			getBuiltInTools(ctx.cwd, pi).find.execute(
-				toolCallId,
-				params,
-				signal,
-				onUpdate,
-			),
-		renderCall: (args, theme, context) =>
-			setText(
-				context.lastComponent,
-				formatFindCall(args, theme, isToolPending(context)),
-			),
-		renderResult: renderFindResult,
-	});
-
-	pi.registerTool({
 		name: "ls",
 		label: bootstrap.ls.label,
 		description: bootstrap.ls.description,
