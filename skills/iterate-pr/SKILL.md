@@ -9,14 +9,14 @@ Automate the fix -> present -> user pushes -> monitor -> check -> fix cycle for 
 
 ## Workflow
 
-1. **Check current state**: use `gh pr checks --json name,bucket,state,workflow,link` as the source of truth for PR-attached checks; use `gh pr view --json number,url,headRefName,baseRefName,state` for PR metadata.
+1. **Check current state**: load and follow `github`; select the target PR and start its PR evidence identity snapshot. Use `gh pr checks <number> --json name,bucket,state,workflow,link` with the retained PR number as the source of truth for PR-attached checks.
 2. **Identify failures**: read CI logs, PR review comments, and issue discussion comments. Extract the first actionable error before fixing.
 3. **Fix issues**: the parent normally implements validated fixes. Use write workers only for at least two independent concurrent areas under exclusive internal file ownership, with the parent owning one area.
 4. **Verify locally**: run the same safe focused check or nearest local equivalent that CI runs.
 5. **Review**: for nontrivial fixes, run at least three fresh parallel reviewers with distinct evidence targets; automatically apply only validated local fixes inside the approved behavior, then re-review while progress continues.
 6. **Present changes**: show the behavior fixed, effective change, review disposition, and validation evidence to the user.
 7. **User pushes**: user runs the appropriate version-control command; the agent never pushes or mutates git state.
-8. **Monitor after user push**: use `gh pr checks --watch --fail-fast` when checks are pending, then re-run `gh pr checks --json name,bucket,state,workflow,link` to inspect the full check set.
+8. **Monitor after user push**: after the pushed head is visible on the retained PR number, start a new PR evidence identity snapshot before monitoring. Use `gh pr checks <number> --watch --fail-fast` when checks are pending, then re-run `gh pr checks <number> --json name,bucket,state,workflow,link` for the retained PR to inspect the full check set. Apply the `github` identity recheck before reporting PR readiness.
 9. **Repeat** if new failures appear and the next round has a concrete evidence-producing action.
 
 ## Rules

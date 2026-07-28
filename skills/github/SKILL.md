@@ -12,14 +12,26 @@ Use the `gh` CLI for all GitHub operations. Never use the GitHub MCP server.
 Read-only PR and CI inspection:
 
 - `gh pr list`, `gh pr view <number>`
-- `gh pr view --json number,url,headRefName,baseRefName,state`
-- `gh pr checks --json name,bucket,state,workflow,link`
-- `gh pr checks --watch --fail-fast` when checks are pending
+- `gh pr view <number> --json number,url,state,headRefName,headRefOid,baseRefName,baseRefOid`
+- `gh pr checks <number> --json name,bucket,state,workflow,link`
+- `gh pr checks <number> --watch --fail-fast` when checks are pending
 - `gh run list`, `gh run view <id>`, `gh run view <id> --log-failed`, `gh run watch <id>`
 - `gh api repos/{owner}/{repo}/pulls/{number}/comments` for PR review comments
 - `gh api repos/{owner}/{repo}/issues/{number}/comments` for PR discussion comments
 - `gh issue list`, `gh issue view <number>`
 - `gh api repos/{owner}/{repo}/...` for other read-only API queries
+
+## PR Evidence Identity
+
+For a readiness claim or review that depends on current PR content:
+
+1. Select the target PR, then resolve and retain its number, URL, state, head name/OID, and base name/OID with the `gh pr view <number> --json` command above.
+2. Use the retained PR number for every subsequent metadata, diff, check, and review query; gather the applicable evidence for that observed identity.
+3. Immediately before the final claim or an authorized claim-bearing post, resolve the same fields again using the retained PR number.
+4. If the state or any head/base name or OID changed, do not make the claim or post. Reassess the PR state, discard the affected PR-content-dependent evidence, recapture the applicable evidence for the new identity, and repeat the identity check before proceeding.
+5. Report the final identity as `PR <number> <url>; head <name>@<OID>; base <name>@<OID>` with the result.
+
+This is an observational freshness check, not an atomic lock on the PR. It applies only when a conclusion depends on PR content; metadata-only inspection and non-PR reviews do not gain this gate.
 
 Mutating operations require the user to explicitly ask for that exact action. One requested GitHub mutation does not authorize another. This skill documents command categories; it does not permit any mutation blocked by AGENTS.md or project rules:
 
