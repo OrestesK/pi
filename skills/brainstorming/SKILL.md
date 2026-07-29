@@ -96,7 +96,7 @@ The only default normal-mode wait is after the complete draft, asynchronous revi
 Before requesting approval on a nontrivial complete design:
 
 1. Present the full decision-ready draft directly.
-2. Launch at least three fresh parallel plan/design reviewers with distinct evidence targets.
+2. Return the complete draft to `manager-workflow` for its review and approval stage.
 3. Inspect and validate their evidence.
 4. Integrate supported changes and keep incidental adjacent/cleanup findings separate.
 5. Re-present the complete revised design and every material delta.

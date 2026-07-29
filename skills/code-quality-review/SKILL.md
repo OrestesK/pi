@@ -11,7 +11,7 @@ This is not a style pass and not a contest to minimize lines. “Simple” means
 
 Use this specialized skill when the user explicitly requests a deep structural/simplification review; that request makes behavior-preserving simplification the primary in-scope target. It may also run opportunistically during ordinary nontrivial work when a concrete useful quality, structure, simplicity, or ownership question warrants a read-only background lane. Opportunistic review is nonblocking, does not require a known defect, stops when no novel useful target remains, and cannot authorize fixes or delay readiness unless the parent validates and accepts a concrete finding into the primary scope.
 
-Use `review` alone for ordinary claim-bound code review and `pi-subagents`’ cleanup workflow for cleanup-only requests. Load and follow `review` for finding partitions and standards, `pi-subagents` for orchestration, and `manager-workflow` before any fix pass.
+Use `review` for finding partitions and standards. Route cleanup-only requests and every fix pass through `manager-workflow`; this skill does not own orchestration.
 
 ## Default boundary
 
@@ -127,11 +127,11 @@ Use `module_report`, `read_symbol`, and `read_enclosing` for code structure and 
 
 ### 5. Use independent reviewers without outsourcing judgment
 
-After the parent locks scope, intent, and the behavior-preservation contract, launch at least three fresh parallel read-only reviewers with genuinely distinct evidence targets—for example by subsystem, affected path, caller/callee set, contract/test surface, safe runtime evidence, or simplification lens. Keep dependent traces sequential, avoid duplicate coverage, and fan in before parent validation.
+After the parent locks scope, intent, and the behavior-preservation contract, enter the review stage owned by `manager-workflow`. This skill supplies the code-quality evidence targets; it does not own reviewer selection or fanout.
 
-Every reviewer receives the approved behavior/non-goals, relevant decisions, target/effective change, proof/evidence, assigned angle/evidence target, and stop condition. Add more reviewers only for another distinct material surface. The parent's direct inspection is mandatory but does not replace the three independent reviewers.
+Every selected reviewer receives the approved behavior/non-goals, relevant decisions, target/effective change, proof/evidence, assigned angle/evidence target, and stop condition. The parent's direct inspection remains mandatory.
 
-Scale beyond the minimum by risk and shape:
+Scale evidence targets by risk and shape:
 
 - broad or cross-cutting diff: sectioned reviewers by subsystem and concern;
 - high-risk or disputed findings: targeted validators or skeptics;
@@ -229,8 +229,8 @@ When fixes are explicitly authorized:
 5. For behavior changes or bug fixes, use `behavioral-proof` to select proportionate evidence.
 6. After each meaningful fix group, run the narrowest proof that can detect drift, then relevant broader checks.
 7. Inspect the new effective diff for accidental churn.
-8. Run a fresh focused re-review after material fixes.
-9. Continue re-review only while validated in-scope findings yield material progress. Stop when clean, incidental-only, stalled/repeated, blocked, or approval-gated; if validated findings remain unresolved, return `FAIL` with residual risks. Do not stop merely at an arbitrary round count or loop for optional polish.
+8. Return validated findings and fix evidence to `manager-workflow` for follow-up.
+9. If validated findings remain unresolved, return `FAIL` with residual risks. Do not loop for optional polish.
 
 Never claim “behavior preserved” from intention alone. Cite tests, traces, contracts, diagnostics, or live observations.
 

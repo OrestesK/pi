@@ -73,7 +73,7 @@ Which tasks depend on others.
 
 ## Proof, review, and approval boundary
 
-Selected behavioral proof; at least three distinct plan/final reviewer angles for nontrivial work; protected actions, exclusions, stop conditions, and next separately authorized action.
+Selected behavioral proof; review focus points for the parent workflow; protected actions, exclusions, stop conditions, and next separately authorized action.
 ```
 
 Keep the plan concrete. Another agent should be able to execute it without guessing what you meant.

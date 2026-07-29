@@ -53,7 +53,7 @@ For nontrivial or material work:
 
 1. **Design/plan:** visible draft → asynchronous review → complete revised plan → implementation approval.
 2. **Implementation:** complete the approved behavior and focused checks; report the stage, evidence, discoveries, and remaining boundaries; continue automatically into review/fix.
-3. **Independent review/fix:** run at least three fresh parallel reviewers with distinct evidence targets. Apply automatically validated, mechanically local, non-material fixes inside the approved behavior. A final `PASS` requires every accepted primary in-scope `must-fix` and `should-fix` to be fixed or explicitly user-deferred; optional/background quality exploration remains nonblocking. Freshly re-review meaningful behavior, correctness, architecture, or proof fixes; tiny mechanical fixes may use direct parent final-diff inspection. Report the review/fix result visibly, then continue without another approval wait unless a material decision or named milestone requires one.
+3. **Independent review/fix:** enter independent review after the implementation batch, apply only validated mechanically local, non-material fixes inside the approved behavior, and use the canonical `pi-subagents` policy for initial fanout and proportionate post-fix follow-up. A final `PASS` requires every accepted primary in-scope `must-fix` and `should-fix` to be fixed or explicitly user-deferred; optional/background quality exploration remains nonblocking. Report the review/fix result visibly, then continue without another approval wait unless a material decision or named milestone requires one.
 4. **Final verification:** run safe, bounded, local, non-expensive claim-bound evidence after the last relevant edit; bounded disposable repository-local verification state is allowed, but source/config/dependency/real-data/external/system changes are not. Report `PASS`, `FAIL`, or `INCONCLUSIVE`; stop and await user direction.
 5. **Live/external/expensive validation, commit, deploy, rollout, external mutation, or destructive action:** require separate authorization unless the exact protected action was already approved. Authorization names the target/environment, exact workflow/action, permitted effects, credential/data boundary, and cost/time boundary.
 
@@ -116,7 +116,7 @@ Implementation-specific routing rules:
 - `manager-workflow` owns approval, stage flow, write safety, progress, and execution batching. It does not own detailed child orchestration.
 - Load `pi-subagents` for all nontrivial work unless delegation is concretely unavailable or prohibited. Read-only/advisory children support investigation and decision quality; parent implementation remains normal.
 - Enter review requests through `review`, vague product/design requests through `brainstorming`, and implementation work through this skill before applying any write-capable subagent recipe.
-- Apply review fixes only under the approved behavioral review/fix boundary. The parent normally performs each coherent fix pass, followed by at least three fresh independent reviewers of the resulting effective change.
+- Apply review fixes only under the approved behavioral review/fix boundary. The parent normally performs each coherent fix pass, then uses the proportionate follow-up selected by the canonical `pi-subagents` policy.
 - For every nontrivial proposal, show the draft before asynchronous proposal review, inspect the gate, integrate supported findings, and re-present the complete revised plan before implementation approval.
 - The parent normally implements approved work directly. A write child is permitted when at least two independent implementation areas can proceed concurrently in the shared checkout, with the parent owning one area, or under the narrow quality-worker exception below.
 - **Narrow quality-worker exception:** after the parent validates a simple, behavior-preserving, non-material cleanup/quality fix inside the approved boundary, one worker may own its exact coherent, exclusive assignment—including multiple files—while the parent continues independent non-overlapping work. The parent inspects, integrates, and verifies the result.
@@ -147,7 +147,7 @@ For exceptional write execution with subagents:
 - Dispatch read-only `reviewer` agents after implementation:
   1. spec compliance review against the approved task/design,
   2. code quality review when needed.
-- The parent applies validated primary in-scope `must-fix` and accepted `should-fix` findings that directly support the task intent and stay within approved boundaries, then re-reviews meaningful fixes. `PASS` requires those accepted findings fixed or explicitly user-deferred. Route material expansion through the active decision mode above. Use write children for fixes only under the concurrent-write contract or narrow quality-worker exception.
+- The parent applies validated primary in-scope `must-fix` and accepted `should-fix` findings that directly support the task intent and stay within approved boundaries, then uses the post-fix follow-up selected by `pi-subagents`. `PASS` requires those accepted findings fixed or explicitly user-deferred. Route material expansion through the active decision mode above. Use write children for fixes only under the concurrent-write contract or narrow quality-worker exception.
 - Continue focused fixes only while each attempt tests a supported root-cause hypothesis and produces material progress. Stop when failures repeat, progress stalls, evidence invalidates the plan, or a material/protected boundary is reached; then route the next decision through the active decision mode above.
 
 ### Research Phase
@@ -183,13 +183,11 @@ Do not start from helper or abstraction design. Start from the existing owner pa
 
 ### Review Phase
 
-- Dispatch at least three fresh parallel read-only reviewers after nontrivial implementation. Skip review only for truly trivial work, an explicit no-review constraint, or a concrete unavailable evidence surface that is reported.
-- Give every reviewer the approved behavior, non-goals, relevant decisions, actual target/effective change, required proof and available evidence, one distinct angle/evidence target, and a stop condition.
-- Select at least three genuinely distinct primary angles from the actual risk surfaces; add security, ops/resource, UX, architecture, or other specialists only when relevant.
-- Reviewers never edit or become writers. Use `/parallel-review` or `/quality-gate` patterns through `subagent(...)` when they fit.
+- Enter one initial independent readiness review after nontrivial implementation. Skip review only for truly trivial work, an explicit no-review constraint, or a concrete unavailable evidence surface that is reported.
+- `pi-subagents` exclusively owns reviewer count, packets, evidence targets, and post-fix follow-up sizing. Reviewers never edit or become writers.
 - Reviewer output separates primary in-scope required findings, incidental material adjacent risks, and incidental optional cleanup/polish. Reviewers actively hunt only the primary assigned scope unless cleanup/adjacent analysis was explicitly requested as primary.
 - The parent validates each candidate's scope, producer/reachability, impact, proof, and behavior preservation before disposition; it synthesizes `PASS`, `FAIL`, or `INCONCLUSIVE` rather than blindly applying suggestions.
-- Automatically apply only validated, mechanically local, non-material fixes inside the approved behavior, then run at least three fresh reviewers again. Continue while a round produces material progress; stop clean, incidental-only, stalled/repeated, blocked, or approval-gated—not at an arbitrary round count.
+- Automatically apply only validated, mechanically local, non-material fixes inside the approved behavior, then use the follow-up tier selected by `pi-subagents`. Continue only while a new validated in-scope primary finding produces a material correction; stop clean, incidental-only, rejected, repeated/stalled, blocked, or approval-gated—not at an arbitrary round count.
 - Findings cannot amend material scope. Ask before new behavior, public/API contracts, dependencies, compatibility, security/data decisions, unexpected persistent artifacts, or another approval boundary.
 
 ### Completion Phase

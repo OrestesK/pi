@@ -51,7 +51,7 @@ Avoid tables in generated plan Markdown. Every implementation plan should includ
 **Unchanged behavior / non-goals:** <preserved boundaries>
 **Constraints:** <protected actions, no mutating git, project conventions>
 **Proof strategy:** <behavioral evidence selected for each material claim>
-**Review strategy:** <at least three distinct reviewer angles for nontrivial review>
+**Review handoff:** <evidence targets and risks for `manager-workflow` to review>
 **Behavioral approval boundary:** <outcome, risks, stops; not an exact file list>
 
 ## Alternatives and rationale
@@ -96,7 +96,7 @@ These locations guide execution and concurrent ownership; they are not the user 
 
 **Review:**
 
-- Approved behavior/non-goals, relevant decisions, proof/evidence packet, at least three distinct reviewer evidence targets, and stop conditions.
+- Approved behavior/non-goals, relevant decisions, proof/evidence packet, review focus points, and stop conditions.
 
 ## Approval and stop conditions
 
@@ -146,7 +146,7 @@ If a handoff command is useful, label it as **User-run only** and prefer copying
 For a nontrivial plan:
 
 1. Present the complete decision-ready draft directly in chat; the path is supporting evidence only.
-2. Launch at least three fresh parallel plan reviewers with distinct evidence targets while the draft remains inspectable.
+2. Return the complete plan to `manager-workflow` for its review and approval stage while the draft remains inspectable.
 3. Give each reviewer the behavior, non-goals, relevant decisions, plan, proof/evidence, assigned angle, and stop condition.
 4. Inspect and validate the findings, integrate only supported changes, and keep incidental adjacent risks or cleanup separate.
 5. Re-present the complete revised plan and every material delta directly in chat.

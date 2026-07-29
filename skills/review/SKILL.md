@@ -9,11 +9,11 @@ Review is evidence gathering, not rubber-stamping.
 
 ## Independent review routing
 
-For every nontrivial review or nontrivial implemented result, load `pi-subagents` and dispatch at least three fresh parallel read-only reviewers with genuinely distinct evidence targets. Add more only for another distinct material surface. The parent directly inspects the target and returned evidence, validates findings, synthesizes `PASS`, `FAIL`, or `INCONCLUSIVE`, and owns every decision.
+For every nontrivial review or nontrivial implemented result, follow the review stage owned by `manager-workflow`. The parent directly inspects the target and returned evidence, validates findings, synthesizes `PASS`, `FAIL`, or `INCONCLUSIVE`, and owns every decision.
 
 Every reviewer receives the approved behavior, non-goals, relevant decisions, actual target/effective change, required proof and available evidence, one assigned angle/evidence target, and a stop condition. Reviewers never edit, become writers, amend the behavioral contract, or authorize scope expansion.
 
-Proposal verification starts only after the complete draft is visible and finishes before implementation approval; after synthesis, the parent presents the complete revised plan and every material delta. Review/fix work follows `manager-workflow`: only validated, mechanically local, non-material fixes inside the approved behavior may be automatic. Re-review with at least three fresh reviewers after fixes and continue only while each round makes material progress. Detailed dispatch, artifact, async, reducer, and writer-isolation mechanics live only in `pi-subagents`.
+Proposal verification and review/fix stage timing follow `manager-workflow`. Only validated, mechanically local, non-material fixes inside the approved behavior may be automatic. This skill owns review standards and finding classification, not orchestration.
 
 ## Review Modes
 
@@ -94,7 +94,7 @@ For each item:
    - `needs-discussion`: unclear feedback or feedback that would change behavior, architecture, tests, security, or scope.
 4. Push back with evidence when feedback is wrong or conflicts with approved scope.
 5. Ask one focused question when feedback changes behavior, architecture, tests, security, or scope.
-6. Do not apply fixes from a standalone review-only request. In an approved implementation review/fix stage, the parent may automatically apply validated, mechanically local, non-material fixes inside the approved behavior, then run at least three fresh reviewers. Other fixes route through a reviewed behavioral amendment.
+6. Do not apply fixes from a standalone review-only request. In an approved implementation review/fix stage, the parent may automatically apply validated, mechanically local, non-material fixes inside the approved behavior, then return control to `manager-workflow`. Other fixes route through a reviewed behavioral amendment.
 
 Structural feedback is not automatically correct. Verify that the proposed simplification is concrete, behavior-preserving, and compatible with approved scope. If it changes architecture, behavior, schema, config, security, data mutation, or public contracts, ask before implementing.
 
@@ -126,7 +126,7 @@ Within each populated partition, use `must-fix`, `should-fix`, `nit`, `note`, or
 
 When dispatching a reviewer subagent, treat `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/agents/reviewer.md` as the authoritative child contract. The reviewer agent does not inherit this skill by default, so standards that must apply inside delegated reviews must exist in the reviewer agent prompt or be included explicitly in the subagent task.
 
-Use at least three delegated reviewers for every nontrivial inspection of a plan, proposed solution, implementation, or final result. Prefer fresh context and give each reviewer a distinct packet: approved behavior, non-goals, relevant decisions, target/effective change, proof/evidence, assigned angle/evidence target, and stop condition.
+For delegated review, give each selected reviewer a distinct packet: approved behavior, non-goals, relevant decisions, target/effective change, proof/evidence, assigned angle/evidence target, and stop condition.
 
 The parent session owns synthesis and decisions. It validates every candidate finding against scope, producer/reachability, concrete impact, proof, local fit, and behavior preservation. Reviewer findings are evidence, not orders. Do not let a reviewer expand scope, approve architecture changes, or trigger implementation. Feedback requiring a material behavior, architecture, schema, config, security, data, or public-contract decision returns to the user.
 

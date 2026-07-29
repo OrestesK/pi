@@ -90,7 +90,7 @@ For nontrivial or material work:
 
 1. **Design/plan:** show the complete draft, review it asynchronously while it remains inspectable, show the complete revised plan, and wait for implementation approval.
 2. **Implementation:** complete the approved behavior and focused checks; report the implementation stage, evidence, discoveries, and remaining boundaries; continue automatically into independent review/fix.
-3. **Independent review/fix:** run at least three fresh parallel reviewers with distinct evidence targets. Automatically apply validated, mechanically local, non-material fixes inside the approved behavior. A final `PASS` requires every accepted primary in-scope `must-fix` and `should-fix` finding to be fixed or explicitly deferred by the user; optional/background quality exploration never blocks readiness. Freshly re-review meaningful behavior, correctness, architecture, or proof fixes; tiny mechanical fixes may use direct parent final-diff inspection. Report a visible review/fix summary, but do not add another approval wait unless a material decision or named milestone requires one. Continue automatically into safe final verification.
+3. **Independent review/fix:** enter the review/fix stage defined by `manager-workflow`. Report a visible review/fix summary, but do not add another approval wait unless a material decision or named milestone requires one. Continue automatically into safe final verification.
 4. **Final verification:** run safe, bounded, local, non-expensive claim-bound evidence after the last relevant edit; report `PASS`, `FAIL`, or `INCONCLUSIVE`; stop and await direction. Verification may create bounded disposable repository-local state when needed, but not source/config changes, dependency-policy changes, real-data changes, external effects, or broader system state without authorization.
 5. **Live/external/expensive validation, commit, deploy, rollout, external mutation, or destructive action:** obtain separate explicit authorization unless the exact protected action was already approved. The authorization names the target/environment, exact workflow/action, permitted effects, credential/data boundary, and cost/time boundary.
 
@@ -299,7 +299,7 @@ Detailed procedure lives in the named canonical owner. Load specialized workflow
 - Material behavior evidence strategy → `behavioral-proof`.
 - Tests, helpers, fixtures, mocks, or test-review feedback → `writing-tests`.
 - Nontrivial bug, failure, crash, flake, or unexpected output → `systematic-debugging`, then `behavioral-proof` for the fix.
-- Nontrivial plan/code/feedback review → `review`; detailed fanout through `pi-subagents`.
+- Nontrivial plan/code/feedback review → `review` through `manager-workflow`.
 - Explicit deep simplification/structure review → `code-quality-review`; concrete useful quality review may also run opportunistically as a read-only nonblocking lane during ordinary work.
 - Done/fixed/passing/ready claim → `verification-before-completion`.
 - Nontrivial subagents and waiting reflection → `pi-subagents`.
