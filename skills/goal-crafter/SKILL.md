@@ -9,7 +9,7 @@ Craft one high-quality `/goal` command for Pi's local `pi-goal-supervisor`.
 
 This skill writes a goal contract. It does not start the goal, implement the work, or run an autonomous loop.
 
-When the user explicitly asked for goal crafting, goal-skill iteration, broad session-history mining, or research for goal design, do not ask permission for safe local read-only research, subagent research/review, or creating/updating the requested local skill artifact. Use `.scratch/` notes only when artifacts are permitted by the active task; strict no-artifact/no-file constraints mean no `.scratch/` writes. Keep moving until evidence is sufficient or a true safety/permission blocker exists.
+When the user explicitly asks for goal crafting, goal-skill iteration, broad session-history research, or goal-design research, do not ask permission for read-only research, subagent research/review, or creating or updating the requested local skill artifact. Put temporary notes under `.scratch/`; a strict no-file or no-artifact instruction forbids them. Keep working until the evidence is sufficient or a real safety or permission blocker stops the task.
 
 ## Trigger
 
@@ -51,7 +51,7 @@ When crafting or supervising goals, keep the normal-session resource posture and
 
 - Follow the normal subagent, parent-write, proof, review, progress, and verification rules. Goal mode does not add another general swarm or workflow layer merely because it is active.
 - For every in-scope material choice that would normally ask the user, run a substantial review of that exact question with at least three distinct relevant advisors—reviewer, researcher, planner, adversarial, or another fitting role. Gather further evidence or review angles as needed, validate and synthesize the results, choose the best supported in-scope answer, and record the decision, evidence, assumptions, uncertainty, and rejected alternatives. The gate always chooses; it never returns `INCONCLUSIVE` or blocks on ambiguity.
-- Advisors cannot grant permission for destructive, externally mutating, deployment, disclosure/export/persistence, materially effectful private, or other protected actions. Credentials alone do not make a genuinely read-only action protected. Stay within already authorized boundaries. If a protected action is required and no safe alternative can complete the goal, emit only the supervisor-supported protected-action blocker.
+- Advisors cannot authorize destructive actions, external mutations, deployment, disclosure, export, persistence, or other protected actions. Read-only work follows the global rule. If a protected action is required and no safe alternative can complete the goal, emit only the supervisor-supported blocker.
 - For nontrivial, multi-owner, behavior/API/schema, PR-sized, migration, cross-file, or otherwise risk-bearing goals, create the same visible contract card, plan, and owner map required by the normal workflow before editing. Replace the normal user approval question with the forced decision-review gate.
 - The contract card should name previous behavior, desired outcome, public behavior/API/schema/config/env names, compatibility boundaries, required docs/tests surfaces, explicit non-goals, protected actions, and forbidden alternate shapes or artifacts.
 - Use Tape/session readers, relevant `.scratch` artifacts, current repo files, and context-mode for large session/log outputs when they materially improve correctness.
@@ -59,7 +59,7 @@ When crafting or supervising goals, keep the normal-session resource posture and
 - Use the normal `manager-workflow` review stage for every nontrivial plan and final-readiness review. Give reviewers the full goal contract, non-goals, relevant decisions, target, proof/evidence, angle, and stop condition.
 - Judge design quality across the complete repeated lifecycle, including failure recovery, deployment, verification, cleanup, and final state. Prefer the best, cleanest, most cohesive complete design; minimize components only when doing so omits no required lifecycle behavior.
 - Automatically apply only validated, mechanically local, non-material fixes inside the goal behavior, then return control to `manager-workflow`.
-- Run safe local verification and genuinely read-only authenticated/private verification automatically. Live validation that mutates, discloses/exports/persists data, creates material production load, cost/time, privacy/legal impact, deployment effects, destruction, or another protected effect requires an already-approved exact boundary; advisors cannot self-authorize it.
+- Run all relevant read-only verification automatically. Mutating validation, disclosure, export, persistence, deployment, or destruction requires an already approved exact boundary; advisors cannot authorize it.
 
 ## Evidence priority
 

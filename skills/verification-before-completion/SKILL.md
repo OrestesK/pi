@@ -11,16 +11,14 @@ Do not claim success without fresh evidence.
 
 Before saying work is done, fixed, passing, ready, clean, or complete:
 
-- [ ] **Identify** what evidence proves the claim.
-- [ ] **Assess** every materially relevant completion category below.
-- [ ] **Run or inspect** the evidence after the latest relevant edit.
-- [ ] **Read** the output/result, including exit code and failures.
-- [ ] **Compare** evidence to the actual claim.
-- [ ] **Report** `PASS`, `FAIL`, or `INCONCLUSIVE` with evidence and limitations.
+- [ ] **Identify** what evidence proves the claim
+- [ ] **Assess** every materially relevant completion category below
+- [ ] **Run or inspect** the evidence after the latest relevant edit
+- [ ] **Read** the output/result, including exit code and failures
+- [ ] **Compare** evidence to the actual claim
+- [ ] **Report** `PASS`, `FAIL`, or `INCONCLUSIVE` with evidence and limitations
 
-Run safe, bounded, local, non-expensive verification automatically. It may create bounded disposable repository-local state, but may not change source/config, dependency policy, real data, external systems, or broader system state without authorization.
-
-Credentials or private access alone do not make a genuinely read-only verification action protected. Obtain explicit authorization when validation mutates, discloses/exports/persists data, creates material production load, cost/time, privacy/legal impact, deployment effects, destruction, or another protected external effect. Unless already approved, the authorization states the target/environment, exact workflow/action, permitted effects, credential/data boundary, and cost/time boundary.
+Run all relevant read-only verification automatically. Store temporary data and scripts under `.scratch/`. For mutating verification, follow the authorization rules in `AGENTS.md`.
 
 If you cannot run a required check, say so. Do not convert inability to verify into confidence.
 
@@ -28,13 +26,13 @@ If you cannot run a required check, say so. Do not convert inability to verify i
 
 Assess each category when it can materially change the readiness claim; do not perform speculative security/data hardening or irrelevant ritual to fill the list:
 
-- **Requested observable behavior:** the approved outcome and non-goals are satisfied.
-- **Canonical ownership and reachable consumers:** the behavior lives at its actual owner and every materially affected caller/consumer is accounted for.
-- **Real boundaries and failure states:** demonstrated trust, lifecycle, concurrency, protocol, platform, or external-service boundaries behave correctly; impossible producer-owned states are not invented.
-- **Simplicity:** no avoidable concept, branch, mode, wrapper, fallback, compatibility path, or duplicated owner was added.
-- **Fresh claim-bound evidence:** proof was captured after the latest relevant edit with a method proportionate to the claim.
-- **Public representations:** affected API/schema/config/docs/comments/user-facing names and examples match behavior that actually exists.
-- **Final effective change and delegated-work disposition:** the parent inspected the final change, every readiness-relevant output, accepted/rejected findings, and remaining incidental/background work.
+- **Requested observable behavior:** the approved outcome and non-goals are satisfied
+- **Canonical ownership and reachable consumers:** the behavior lives at its actual owner and every materially affected caller/consumer is accounted for
+- **Real boundaries and failure states:** demonstrated trust, lifecycle, concurrency, protocol, platform, or external-service boundaries behave correctly; impossible producer-owned states are not invented
+- **Simplicity:** no avoidable concept, branch, mode, wrapper, fallback, compatibility path, or duplicated owner was added
+- **Fresh claim-bound evidence:** proof was captured after the latest relevant edit with a method proportionate to the claim
+- **Public representations:** affected API/schema/config/docs/comments/user-facing names and examples match behavior that actually exists
+- **Final effective change and delegated-work disposition:** the parent inspected the final change, every readiness-relevant output, accepted/rejected findings, and remaining incidental/background work
 
 A materially expected category may be inapplicable, but state why. Do not silently skip it.
 
@@ -72,7 +70,7 @@ Do not use claim verification for vague claims such as “cleaner” or “bette
 - **Feature complete:** approved behavior checklist plus relevant proof.
 - **CLI/TUI behavior:** repo-native harness, tmux/PTY transcript, or screen capture showing the expected state change.
 - **Subagent completed task:** parent inspected the child output, actual target/effective change, and verification.
-- **Config/skill valid:** frontmatter/path/reference validation, effective discovery, or explicit inspection.
+- **Config/skill valid:** run the relevant parse, frontmatter, path, reference, and effective-discovery checks.
 - **Behavioral boundary preserved:** final effective change supports the approved outcome/non-goals; new material behavior is reported rather than hidden behind implementation-location bookkeeping.
 - **No behavior change:** effective change inspection and relevant proof show the observable contract is unchanged.
 
@@ -130,13 +128,3 @@ Stop before claiming success if you are about to say:
 - tests should pass
 
 Replace with evidence or uncertainty.
-
-## Config/Prompt Work
-
-For agent config, skills, and prompts, verification may be inspection-based. Still make it explicit:
-
-- skill directory name matches `name`,
-- frontmatter has `name` and `description`,
-- referenced skill names/files exist,
-- JSON parses,
-- package/resource discovery command ran if safe.

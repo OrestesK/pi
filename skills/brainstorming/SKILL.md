@@ -24,16 +24,16 @@ Not allowed:
 - Making architectural/product decisions without user approval.
 - Running mutating git commands.
 
-## Manager-routed tech-spec clarification
+## Tech-spec clarification
 
-Use this mode only when `manager-workflow` explicitly invokes `brainstorming` to resolve material intent before a tech spec.
+When `manager-workflow` uses this skill only to clarify intent before a tech spec:
 
-- Remain inside the manager's existing design/plan stage.
-- Apply only the current-state inspection and focused clarification parts of this skill until the goal, observable behavior, non-goals, constraints, affected workflows, acceptance conditions, and user-owned decisions are sufficient for architecture work.
-- Return that resolved intent and any remaining open questions to `manager-workflow` so it can load `tech-spec`.
-- Do not produce this skill's standalone full design, launch its separate design review, request approval, or hand off to `writing-plans` or implementation.
+- Stay in the manager's current design stage
+- Inspect the current state and ask only the questions needed for architecture work
+- Return the resolved goal, behavior, limits, acceptance conditions, and open questions to the manager
+- Do not start another design, review, approval, plan, or implementation flow
 
-The normal brainstorming process and handoff remain unchanged for standalone brainstorming work.
+Standalone brainstorming still uses the normal process below.
 
 ## Process
 
@@ -54,9 +54,9 @@ Ask only what tools cannot answer. If evidence does not settle user intent, defe
 
 Rules:
 
-- Ask one focused question per `ask_user` call.
-- Ask only material user-owned choices after tools and evidence have resolved factual/routine questions.
-- For behavior/configuration/workflow/approval choices, give a concise card with verified previous behavior (or that none exists), proposed behavior, observable delta, recommendation, and tradeoff. Omit dimensions that cannot change the decision.
+- Ask one focused question per `ask_user` call
+- Ask only material user-owned choices after tools and evidence resolve factual or routine questions
+- Briefly explain why the choice matters, recommend an option when useful, and ask in normal language
 - Proactively map and verify materially reachable workflows, roles, states, failure paths, and consequences. Ask about unresolved reachable behavior; do not invent impossible hypotheticals or ask questions tools can answer.
 - When cost, time, downtime, rollout, production load, or resource tolerance could materially change the design, show the consequence and ask whether it is acceptable instead of silently optimizing around it.
 - Do not proceed from clarification to planning or implementation while a material requirement, scope boundary, or design choice remains unresolved.
@@ -78,7 +78,7 @@ Clarify:
 
 Present only credible, materially different approaches; do not force an arbitrary count. Lead with the recommendation and confidence level. Explain observable differences, tradeoffs, risks, and why the preferred option is the simplest coherent solution. If one option is clearly wrong, say so and explain why.
 
-Use bullets or labeled decision cards in generated Markdown. A table is allowed only in direct UI/chat when it materially improves comparison clarity.
+Use bullets or short labeled options in generated Markdown. Use a table in direct chat only when it makes the choice clearer.
 
 ### 4. Validate design
 
@@ -127,7 +127,7 @@ After reviewed design approval:
 
 - For multi-step work, use `writing-plans`.
 - For an approved implementation, return to `manager-workflow` execution.
-- For unresolved material design choices, keep asking one focused question at a time with prior behavior and recommendation.
+- For unresolved material design choices, ask one clear question at a time and recommend an option when useful.
 
 ## Quality Bar
 

@@ -32,7 +32,7 @@ The proposal includes:
 - evidence, failed/unexecuted checks, verification and review strategy, and focus points;
 - the exact behavioral authorization boundary, exclusions, stop conditions, next separately authorized action, and one focused approval question.
 
-A `.scratch/plans/` artifact may preserve implementation detail but never replaces this presentation. Avoid tables in generated plan artifacts; direct UI/chat may use one only when materially clearer.
+A saved plan can preserve implementation detail, but the complete proposal must remain in chat.
 
 ### Task contract
 
@@ -54,9 +54,8 @@ For nontrivial or material work:
 1. **Design/plan:** visible draft → asynchronous review → complete revised plan → implementation approval.
 2. **Implementation:** complete the approved behavior and focused checks; report the stage, evidence, discoveries, and remaining boundaries; continue automatically into review/fix.
 3. **Independent review/fix:** enter independent review after the implementation batch, apply only validated mechanically local, non-material fixes inside the approved behavior, and use the canonical `pi-subagents` policy for initial fanout and proportionate post-fix follow-up. A final `PASS` requires every accepted primary in-scope `must-fix` and `should-fix` to be fixed or explicitly user-deferred; optional/background quality exploration remains nonblocking. Report the review/fix result visibly, then continue without another approval wait unless a material decision or named milestone requires one.
-4. **Final verification:** run safe, bounded, local, non-expensive claim-bound evidence after the last relevant edit; bounded disposable repository-local verification state is allowed, but source/config/dependency/real-data/external/system changes are not. Report `PASS`, `FAIL`, or `INCONCLUSIVE`; stop and await user direction.
-5. **Live/external/expensive validation, commit, deploy, rollout, external mutation, or destructive action:** require separate authorization unless the exact protected action was already approved. Authorization names the target/environment, exact workflow/action, permitted effects, credential/data boundary, and cost/time boundary.
-
+4. **Final verification:** run all relevant read-only evidence after the last edit. Put temporary files under `.scratch/`. Report `PASS`, `FAIL`, or `INCONCLUSIVE`, then stop and await user direction.
+5. **Mutating validation, commit, deploy, rollout, external mutation, or destructive action:** require separate authorization unless the exact action was already approved. Name the target, action, expected effects, credential/data boundary, and cost/time boundary.
 An extra milestone is a wait only when the decision-ready proposal names it and the user approves it. A new material choice interrupts the affected stage; individual tasks, children, edits, reviews, and safe checks are not approval checkpoints.
 
 ## Progress and continuity
@@ -82,7 +81,7 @@ Do not stack blocking workflows on trivial mechanical work.
 
 ## Tech-spec routing
 
-`manager-workflow` owns the activation decision. If material product/design intent or another user-owned choice is unresolved, apply `brainstorming` first. Load `tech-spec` only after that intent is sufficient for architecture work.
+`manager-workflow` decides when a tech spec is needed. If a material product or design choice is unresolved, use `brainstorming` first. Load `tech-spec` only when the intent is clear enough for architecture work.
 
 Then load `tech-spec` automatically when architecture detail can materially change the decision, including:
 
@@ -192,26 +191,11 @@ Do not start from helper or abstraction design. Start from the existing owner pa
 
 ### Completion Phase
 
-- Run safe, bounded, local, non-mutating, non-expensive required checks automatically and report evidence.
+- Run all relevant read-only checks automatically and report the evidence. Put temporary files under `.scratch/`.
 - Verify worker/subagent claims from actual output, diffs, or rerun checks before reporting completion.
 - If the current branch has an open PR and the user explicitly asks to update the PR description/body, load the github skill and update only that PR description/body with what changed and how it was tested.
 - Without an explicit user request for that exact PR description/body update, draft suggested PR text instead of mutating GitHub.
 - When performing a requested PR body update, merge or append; never overwrite unrelated content.
-
-## .scratch/ Workspace
-
-Use `.scratch/` for workflow artifacts when artifact creation is allowed and useful. Ensure it exists and is gitignored before workflows that require persistent plans, research, reviews, sessions, or run logs. Do not make unrelated setup edits such as adding `.scratch/` to `.gitignore` during a feature change unless the user approves or the edit is required for the requested change. If a required workflow needs persistent artifacts but the task forbids artifacts, stop and ask whether to relax the constraint.
-
-Organized:
-
-- `research/` — scout findings
-- `plans/` — draft-for-approval and approved plans with [ASSUMPTION] annotations
-- `reviews/` — reviewer output
-- `sessions/` — session state for continuation
-- `runs/` — long-running command logs/status when artifacts are allowed
-
-Quick lookups stay in context. Deeper research goes to files.
-Check for existing .scratch/ files before re-researching.
 
 ## Stop Conditions
 
