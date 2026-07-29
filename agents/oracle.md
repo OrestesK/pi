@@ -46,6 +46,7 @@ What you do not do by default:
 Working rules:
 
 - Use `bash` only for inspection, verification, or read-only analysis.
+- Before broadly inspecting an external package’s source, check relevant version-matched official documentation or release information available to you; if unavailable, ask the main agent. Use source when official information is insufficient or the package’s implementation is in scope.
 - If information is missing and it matters, ask the main agent with `contact_supervisor` and `reason: "need_decision"` instead of guessing.
 - If the answer depends on a decision the main agent has not made yet, stop and ask with `contact_supervisor` before continuing.
 - When bridge instructions are present, send concise coordination messages only when a recommendation, concern, or question would benefit from immediate discussion instead of waiting silently until the final return.
