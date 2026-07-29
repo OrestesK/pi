@@ -53,7 +53,7 @@ For nontrivial or material work:
 
 1. **Design/plan:** visible draft → asynchronous review → complete revised plan → implementation approval.
 2. **Implementation:** complete the approved behavior and focused checks; report the stage, evidence, discoveries, and remaining boundaries; continue automatically into review/fix.
-3. **Independent review/fix:** enter independent review after the implementation batch, apply only validated mechanically local, non-material fixes inside the approved behavior, and use the canonical `pi-subagents` policy for initial fanout and proportionate post-fix follow-up. A final `PASS` requires every accepted primary in-scope `must-fix` and `should-fix` to be fixed or explicitly user-deferred; optional/background quality exploration remains nonblocking. Report the review/fix result visibly, then continue without another approval wait unless a material decision or named milestone requires one.
+3. **Independent review/fix:** enter independent review after the implementation batch and follow `review` for initial fanout and proportionate post-fix follow-up. Apply only validated mechanically local, non-material fixes inside the approved behavior. A final `PASS` requires every accepted primary in-scope `must-fix` and `should-fix` to be fixed or explicitly user-deferred; optional/background quality exploration remains nonblocking. Report the review/fix result visibly, then continue without another approval wait unless a material decision or named milestone requires one.
 4. **Final verification:** run all relevant read-only evidence after the last edit. Put temporary files under `.scratch/`. Report `PASS`, `FAIL`, or `INCONCLUSIVE`, then stop and await user direction.
 5. **Mutating validation, commit, deploy, rollout, external mutation, or destructive action:** require separate authorization unless the exact action was already approved. Name the target, action, expected effects, credential/data boundary, and cost/time boundary.
 An extra milestone is a wait only when the decision-ready proposal names it and the user approves it. A new material choice interrupts the affected stage; individual tasks, children, edits, reviews, and safe checks are not approval checkpoints.
@@ -74,7 +74,7 @@ Load or apply these skills when their trigger fits:
 - Material behavior evidence strategy → `behavioral-proof`.
 - Tests, helpers, fixtures, mocks, or test-review feedback → `writing-tests`.
 - Bug, failure, crash, flake, or unexpected output → `systematic-debugging`, then `behavioral-proof` for the fix.
-- Code/spec/plan review or review-feedback evaluation → `review`; use `pi-subagents` for detailed fanout.
+- Code/spec/plan review or review-feedback evaluation → `review`; use `delegation` to dispatch the selected roles.
 - Before done/fixed/passing/ready claims → `verification-before-completion`.
 
 Do not stack blocking workflows on trivial mechanical work.
@@ -106,96 +106,45 @@ Do not route an approved tech spec through `writing-plans` as a second approval 
 
 The tech spec does not create another stage, approval wait, or implementation authority.
 
-## Subagent Recipe Routing
+## Delegation
 
-`pi-subagents` owns detailed natural-language recipe routing, prompt shortcut semantics, and proposal-verification mechanics. Do not duplicate its full recipe matrix here.
+Load `delegation` for nontrivial work unless delegation is unavailable or prohibited.
 
-Implementation-specific routing rules:
+- This skill owns approval, stage timing, progress, and execution boundaries.
+- `delegation` owns role selection, parent-child write boundaries, async handling, MCP routing, and supervisor coordination.
+- `review` owns reviewer count, packets, finding partitions, synthesis rules, and post-fix follow-up.
+- The Pi Subagents package owns dispatch, chains, async execution, and agent discovery.
+- Enter review requests through `review`, vague design requests through `brainstorming`, and implementation work through this skill.
 
-- `manager-workflow` owns approval, stage flow, write safety, progress, and execution batching. It does not own detailed child orchestration.
-- Load `pi-subagents` for all nontrivial work unless delegation is concretely unavailable or prohibited. Read-only/advisory children support investigation and decision quality; parent implementation remains normal.
-- Enter review requests through `review`, vague product/design requests through `brainstorming`, and implementation work through this skill before applying any write-capable subagent recipe.
-- Apply review fixes only under the approved behavioral review/fix boundary. The parent normally performs each coherent fix pass, then uses the proportionate follow-up selected by the canonical `pi-subagents` policy.
-- For every nontrivial proposal, show the draft before asynchronous proposal review, inspect the gate, integrate supported findings, and re-present the complete revised plan before implementation approval.
-- The parent normally implements approved work directly. A write child is permitted when at least two independent implementation areas can proceed concurrently in the shared checkout, with the parent owning one area, or under the narrow quality-worker exception below.
-- **Narrow quality-worker exception:** after the parent validates a simple, behavior-preserving, non-material cleanup/quality fix inside the approved boundary, one worker may own its exact coherent, exclusive assignment—including multiple files—while the parent continues independent non-overlapping work. The parent inspects, integrates, and verifies the result.
+## Implementation
 
-## Delegation Rules
+Before editing, identify:
 
-### Approved implementation batch
+- the observable behavior;
+- its normal entrypoint and canonical owner;
+- the approved non-goals and protected boundaries;
+- the smallest proof that could disprove a wrong implementation.
 
-Before execution:
+The parent normally implements and directly reads every file or symbol it edits. Use a worker only under the exception defined in `delegation`.
 
-- read the approved proposal/plan and current instructions;
-- re-check assumptions and the real behavior owner;
-- confirm the approved behavior/non-goals, proof surface, protected boundaries, and stop condition;
-- identify likely implementation owners without treating their file list as the user approval boundary;
-- stop for stale evidence or a material scope/behavior conflict.
+For each coherent edit group:
 
-For each coherent edit group, implement the smallest approved behavior, run applicable non-unit static/discovery proof that can detect drift, inspect the effective change, and record material results. Run unit tests after the complete implementation batch, except for one deliberately selected focused reproduction/test-first check when it is the most efficient proof. After the batch and focused checks, report the stage, evidence, discoveries, and remaining boundaries, then continue automatically into independent review/fix.
+1. implement the smallest approved change at the existing owner;
+2. run applicable static, discovery, or diagnostic evidence;
+3. inspect the effective diff;
+4. stop for stale evidence, a material scope conflict, or a protected action.
 
-### Subagent Execution Policy
+Run focused unit tests after the complete implementation batch unless one test-first reproduction is the clearest proof. Report the implementation evidence and continue automatically into review/fix.
 
-For exceptional write execution with subagents:
+## Review and completion
 
-- Use write workers when at least two independent implementation areas will run concurrently in the shared checkout and the parent owns one area, or use one worker under the narrow quality-worker exception. Every worker receives an exclusive, non-overlapping file list.
-- Give every write child an exact edit packet: assigned files and symbols, required behavior, non-goals, selected proof strategy, validation commands and evidence, and prohibited product/API/compatibility/scope decisions.
-- Require each child to stop before touching an unassigned file and contact the parent only for a real blocker, discovered file overlap, or an unapproved product/API/compatibility/scope decision.
-- Do not run repository-wide mutating formatters, code generators, migrations, or equivalent commands while concurrent writes are active.
-- Workers write summaries to `.scratch/` or explicit output paths. The parent inspects their diffs, integrates their changes, and verifies the combined result.
-- Dispatch read-only `reviewer` agents after implementation:
-  1. spec compliance review against the approved task/design,
-  2. code quality review when needed.
-- The parent applies validated primary in-scope `must-fix` and accepted `should-fix` findings that directly support the task intent and stay within approved boundaries, then uses the post-fix follow-up selected by `pi-subagents`. `PASS` requires those accepted findings fixed or explicitly user-deferred. Route material expansion through the active decision mode above. Use write children for fixes only under the concurrent-write contract or narrow quality-worker exception.
-- Continue focused fixes only while each attempt tests a supported root-cause hypothesis and produces material progress. Stop when failures repeat, progress stalls, evidence invalidates the plan, or a material/protected boundary is reached; then route the next decision through the active decision mode above.
+After nontrivial implementation, enter the independent review stage. `review` selects the initial fanout and the proportionate follow-up after fixes. The parent validates findings, applies only mechanically local and non-material fixes inside the approved behavior, and asks before material expansion.
 
-### Research Phase
+A final `PASS` requires every accepted primary `must-fix` and `should-fix` finding to be fixed or explicitly deferred by the user. Stop when review is clean, only incidental feedback remains, evidence blocks progress, or a new approval boundary appears.
 
-- For nontrivial, ambiguous, high-impact, externally grounded, or multi-step work, use quality-first fanout by default. Treat fanout as the normal planning substrate, not an exceptional escalation.
-- Route ordinary user language to the matching `pi-subagents` recipe; the user does not need to name a slash command. Keep detailed recipe examples in the `pi-subagents` skill so this workflow does not become a second routing authority.
-- Dispatch scout agents for codebase exploration.
-- Scouts can run in parallel when their scopes and evidence targets are distinct; size the group from the actual independent surfaces.
-- Give each child a distinct angle and output contract; avoid duplicate vague agents.
-- For parallel scouts, pass `output: false` for concise findings or give every scout an explicit unique output path. Do not rely on a shared default artifact path.
-- Scouts return findings inline or through parent-managed `.scratch/research/` output artifacts only when an explicit unique output path is provided.
-- Read scout/research findings before planning.
+After the last edit and review fix, run all relevant read-only verification. Verify child claims from actual output, diffs, or rerun checks. Put temporary files under `.scratch/`.
 
-### Implementation Phase
-
-Before editing behavior, identify the behavior owner:
-
-- Observable behavior: what user/system-visible behavior should change?
-- Normal entrypoint: what command, route, UI action, function, job, or workflow exercises it?
-- Canonical owner: which existing module/component owns this behavior today?
-- Proof surface: what focused check would prove the behavior changed?
-
-Do not start from helper or abstraction design. Start from the existing owner path and observable behavior.
-
-- The parent normally implements approved changes and directly reads the precise files and symbols it edits.
-- Use write workers only under the exceptional concurrent-write policy or narrow quality-worker exception above.
-- Give every write worker an exact edit packet: current task-contract revision, assigned files and baseline symbols/ranges, required behavior, non-goals, selected proof strategy, validation commands and evidence, and prohibited product/API/compatibility/scope decisions.
-- If the edit packet cannot specify those boundaries exactly, or its revision is stale, go back to planning.
-- Concurrent writers must have exclusive, non-overlapping file lists. Each child stops before an unassigned file and communicates only a real blocker, discovered overlap, or an unapproved product/API/compatibility/scope decision.
-- Do not run repository-wide mutating formatters, code generators, migrations, or equivalent commands while concurrent writes are active.
-- The parent and workers run focused checks; the parent inspects and integrates worker diffs, then verifies the combined result.
-- Workers write results to `.scratch/`, not back to main context.
-
-### Review Phase
-
-- Enter one initial independent readiness review after nontrivial implementation. Skip review only for truly trivial work, an explicit no-review constraint, or a concrete unavailable evidence surface that is reported.
-- `pi-subagents` exclusively owns reviewer count, packets, evidence targets, and post-fix follow-up sizing. Reviewers never edit or become writers.
-- Reviewer output separates primary in-scope required findings, incidental material adjacent risks, and incidental optional cleanup/polish. Reviewers actively hunt only the primary assigned scope unless cleanup/adjacent analysis was explicitly requested as primary.
-- The parent validates each candidate's scope, producer/reachability, impact, proof, and behavior preservation before disposition; it synthesizes `PASS`, `FAIL`, or `INCONCLUSIVE` rather than blindly applying suggestions.
-- Automatically apply only validated, mechanically local, non-material fixes inside the approved behavior, then use the follow-up tier selected by `pi-subagents`. Continue only while a new validated in-scope primary finding produces a material correction; stop clean, incidental-only, rejected, repeated/stalled, blocked, or approval-gated—not at an arbitrary round count.
-- Findings cannot amend material scope. Ask before new behavior, public/API contracts, dependencies, compatibility, security/data decisions, unexpected persistent artifacts, or another approval boundary.
-
-### Completion Phase
-
-- Run all relevant read-only checks automatically and report the evidence. Put temporary files under `.scratch/`.
-- Verify worker/subagent claims from actual output, diffs, or rerun checks before reporting completion.
-- If the current branch has an open PR and the user explicitly asks to update the PR description/body, load the github skill and update only that PR description/body with what changed and how it was tested.
-- Without an explicit user request for that exact PR description/body update, draft suggested PR text instead of mutating GitHub.
-- When performing a requested PR body update, merge or append; never overwrite unrelated content.
+Update a GitHub PR description only when the user explicitly requests that exact external mutation. Otherwise provide draft text.
 
 ## Stop Conditions
 

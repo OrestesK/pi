@@ -9,7 +9,6 @@ INSTALL_ROOTS=(
 	"packages/pi-fff"
 	"packages/pi-lens"
 	"packages/pi-memory-md"
-	"packages/pi-openai-service-tier"
 	"packages/pi-subagents"
 )
 

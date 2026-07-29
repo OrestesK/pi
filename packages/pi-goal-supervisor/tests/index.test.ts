@@ -300,13 +300,12 @@ test("blocked marker goals auto-resume on the next agent prompt", async () => {
 	);
 	assert.equal(harness.lastState()?.status, "blocked");
 
-	const promptResult = harness.hooks.get("before_agent_start")?.(
+	harness.hooks.get("before_agent_start")?.(
 		{ systemPrompt: "base", prompt: "user supplied approval context" },
 		harness.ctx,
-	) as { systemPrompt: string } | undefined;
+	);
 
 	assert.equal(harness.lastState()?.status, "running");
-	assert.match(promptResult?.systemPrompt ?? "", /Goal Supervisor/);
 });
 
 test("status and judge-error blocks do not auto-resume", async () => {

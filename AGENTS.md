@@ -79,13 +79,14 @@ Use a native TODO as the concise routing card for work that may outlive the turn
 
 ### Orchestration boundary
 
-Load and follow `pi-subagents` for all nontrivial work unless delegation is concretely unavailable or prohibited. It is the canonical owner of dispatch packets, async lifecycle, fanout and reduction, artifact policy, writer isolation, reviewer packets, native supervisor coordination, and reflection admission.
+Load `delegation` for all nontrivial work unless delegation is unavailable or prohibited. The Pi Subagents package owns execution and agent discovery; the local skill owns when and how this setup delegates.
 
 - The parent normally implements, fixes, integrates, and verifies; it directly reads every file it edits and every delegated diff.
-- The parent never calls `intercom`; use the native supervisor path defined by `pi-subagents`.
+- Use native supervisor coordination, not `intercom`.
+- `manager-workflow` owns stage timing. `review` owns review method. `delegation` owns general parent-child boundaries and async handling.
 - Ask when a material choice remains unresolved.
 
-Before every intended yield, run the canonical `pi-subagents` pre-yield Reflection scan. Pending children alone are neither qualifying work nor meaningful interaction. Yield only when the scan finds no qualifying work and no meaningful child interaction remains.
+Before yielding, follow the useful-work scan in `delegation`. Pending children alone do not justify more work or prevent a yield.
 
 ## Hard safety rules
 
@@ -190,23 +191,13 @@ For file mutations, use Edit for modifications and Write only for new files or e
 
 ### Code intelligence
 
-For code tasks, code-intelligence evidence is mandatory when code structure, behavior, types, or diagnostics are material. Use semantic code-intelligence tools instead of manual full-file reading or text search whenever those tools can answer the question. Choose the shortest sufficient tool sequence; there is no universal order. This applies to code-capable agents and parent sessions with symbol and module tools, AST tools, and LSP tools. Non-code specialist agents that lack those tools, such as run monitors or external researchers, MUST report tool unavailability instead of attempting code work or faking compliance.
+Load `code-intelligence` when code ownership, structure, behavior, types, relationships, or diagnostics are material.
 
-Treat ownership/navigation, LSP semantics/relationships, AST structure/search/refactor, and diagnostics as separate relevance-gated evidence groups. Use every group that answers a material question; do not call irrelevant groups mechanically. If a materially expected group is unavailable or inapplicable, state why.
-
-- Use `symbol_search` and `module_report` for ranked ownership, likely files, module shape, dependents, and recommended reads
-- Use `read_symbol` and `read_enclosing` for the exact implementation body after a symbol or relevant line is known
-- Use `module_report` for declarations and file structure, and `ast_grep_outline` when a syntax-only view is sufficient
-- Use `ast_grep_search` / `ast_grep_replace` for structural code patterns and refactors; dry-run replacements first
-- Use LSP navigation for types, definitions, references, implementations, call relationships, and language-aware refactors
-- Use `lens_diagnostics` for aggregate current/session diagnostics and LSP diagnostics for targeted file or directory evidence
-- Read before editing. Before changing an identifiable function, class, method, or symbol, read its body with `read_symbol` or `read_enclosing` unless the edit is purely mechanical and already localized by exact line evidence
-- Inspect relevant file/symbol structure before multi-file code edits, using the tool that answers the ownership or structure question
-- Run targeted LSP diagnostics when available after each coherent, internally consistent code-edit group and freshly after the final relevant edit; do not run them after every tiny edit. State why unavailable or inapplicable diagnostics were skipped.
-- Use grep/find/ls only for plain strings, comments, logs, config text, filenames, or when structural/semantic tools do not fit
-- If required code-intelligence evidence is unavailable or skipped, explicitly report the concrete reason in the final response or review finding
-- Code-intelligence is not satisfied by tool use alone. Every call must answer a concrete implementation or review question; gather only the minimum sufficient evidence
-- Do not re-read or grep for a fact already returned by code-intelligence unless the file changed after that result, the earlier result was incomplete, or you state the concrete reason the plain read/search is still needed
+- Use semantic tools instead of broad text search or full-file reading when they answer the question.
+- Gather only the evidence needed for ownership, implementation, or correctness; do not call tool groups mechanically.
+- Read the actual symbol body before editing it and run focused diagnostics after coherent code edits.
+- Code-capable child tasks receive `skill: "code-intelligence"` because children do not inherit the skill catalog.
+- State the concrete reason when a required semantic or diagnostic surface is unavailable.
 
 ### Docs and web
 
@@ -220,15 +211,13 @@ Treat ownership/navigation, LSP semantics/relationships, AST structure/search/re
 
 ### Shell and command output
 
-- Prefer normal tools for small file reads/edits and exact source inspection
-- Use context-mode for large outputs: logs, tests, builds, broad searches, data/API processing, dependency audits, cloud/CI output, large docs, or MCP output likely over ~20 lines
-- Use bash only for commands that need shell execution: tests, builds, package managers, read-only git, cloud CLIs, database CLIs, and small scripts
-- Do not use bash for file browsing/searching/reading/slicing when normal tools fit
-- Keep bash commands bounded and single-purpose
-- For any command likely to run long, produce large or streaming output, wait on external services, start/watch a server, tail logs, run tests/builds with uncertain duration, or require interactive/TUI observation: use a named `tmux` session and capture output to an inspectable log/status file under `.scratch/runs/` or another task-appropriate path instead of one silent blocking `bash` call. When monitoring is warranted, follow the canonical `pi-subagents` run-monitor procedure; the parent does not sleep-poll, and the monitor remains read-only.
-- For commands with Rich/TUI/progress output that should remain visible to users, preserve the command's TTY in tmux: do not pipe the command through `tee`; start it directly in tmux and, if logging is needed, attach logging with `tmux pipe-pane -o ...` so `tmux capture-pane` and the log remain inspectable without disabling live rendering
-- Do not use `tmux`/log artifacts when the task forbids file artifacts, live probes, or sensitive output capture; ask or provide a user-run command instead
-- Do not use `rm`/`rm -rf` without exact approval for the deletion scope, except if for 100% temporary files
+- Prefer normal tools for small reads, edits, searches, and exact source inspection.
+- Load `context-mode` for large command, test, log, API, document, browser, data, or MCP output.
+- Use bash only for commands that need shell execution. Keep commands bounded and single-purpose.
+- Use a named tmux session and an inspectable `.scratch/runs/` log for long, streaming, interactive, or uncertain commands. Use `run-monitor` through `delegation` when monitoring is useful.
+- Preserve a command's TTY when its live UI matters; use `tmux pipe-pane` instead of piping the command through `tee`.
+- Do not capture sensitive output or create artifacts when the task forbids it.
+- Do not use `rm` or `rm -rf` without exact approval, except for files created only as temporary task artifacts.
 
 ### Diffs and changed files
 
@@ -264,7 +253,8 @@ Detailed procedure lives in the named canonical owner. Load specialized workflow
 - Nontrivial plan/code/feedback review → `review` through `manager-workflow`.
 - Explicit deep simplification/structure review → `code-quality-review`; concrete useful quality review may also run opportunistically as a read-only nonblocking lane during ordinary work.
 - Done/fixed/passing/ready claim → `verification-before-completion`.
-- Nontrivial subagents and waiting reflection → `pi-subagents`.
+- Nontrivial subagents and waiting reflection → `delegation`.
+- Code ownership, structure, types, relationships, or diagnostics → `code-intelligence`.
 - First work in an unfamiliar repository → `learn-codebase`.
 - Large output/log/test/build/data processing → `context-mode`.
 - Session JSONL analysis → `session-reader`.

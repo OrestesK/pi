@@ -14,11 +14,7 @@
 	path = packages/pi-slipstream-compact
 	url = https://github.com/OrestesK/pi-slipstream-compact.git
 	branch = main
-[submodule "packages/pi-openai-service-tier"]
-	path = packages/pi-openai-service-tier
-	url = https://github.com/OrestesK/pi-openai-service-tier.git
-	branch = ok/local
 [submodule "packages/pi-lens"]
 	path = packages/pi-lens
-	url = https://github.com/OrestesK/pi-lens.git
-	branch = ok/local
+	url = https://github.com/apmantza/pi-lens.git
+	branch = master

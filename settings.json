@@ -95,11 +95,16 @@
       "prompts": [],
       "themes": []
     },
-    "packages/pi-subagents",
+    {
+      "source": "packages/pi-subagents",
+      "skills": [],
+      "prompts": []
+    },
     "packages/pi-fff",
     "npm:pi-mcp-adapter",
     {
-      "source": "packages/pi-lens"
+      "source": "packages/pi-lens",
+      "skills": []
     },
     "npm:pi-web-access",
     {
@@ -115,7 +120,6 @@
     {
       "source": "packages/context-mode",
       "skills": [
-        "context-mode",
         "ctx-doctor"
       ]
     },
@@ -123,7 +127,6 @@
     "packages/pi-goal-supervisor",
     "packages/pisesh",
     "npm:pi-btw",
-    "packages/pi-openai-service-tier",
     "packages/pi-sixel",
     "npm:@carter-mcalister/pi-codex-image-gen@0.2.0"
   ],
