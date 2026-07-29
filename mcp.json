@@ -23,6 +23,14 @@
       "auth": "oauth",
       "lifecycle": "lazy"
     },
+    "figma": {
+      "url": "https://mcp.figma.com/mcp",
+      "auth": "oauth",
+      "oauth": {
+        "clientName": "Codex"
+      },
+      "lifecycle": "lazy"
+    },
     "notion": {
       "url": "https://mcp.notion.com/mcp",
       "lifecycle": "lazy"
