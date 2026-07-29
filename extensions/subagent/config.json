@@ -3,7 +3,7 @@
   "toolDescriptionMode": "compact",
   "toolExtensions": {
     "mcp": {
-      "description": "Regular MCP access for research roles",
+      "description": "On-demand generic MCP access for delegated work. When an eligible child needs a configured server, add this bundle with requiresCapabilities: [\"mcp\"] instead of keeping the work in the parent or creating a one-off agent.",
       "builtinTools": ["mcp"],
       "allowedAgents": ["scout", "researcher", "context-builder"]
     }
