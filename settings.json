@@ -104,7 +104,8 @@
     "npm:pi-mcp-adapter",
     {
       "source": "packages/pi-lens",
-      "skills": []
+      "autoload": false,
+      "extensions": ["+dist/index.js"]
     },
     "npm:pi-web-access",
     {
