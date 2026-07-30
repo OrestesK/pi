@@ -32,7 +32,7 @@ This workflow distills:
 - Google code review guidance: explain reasoning, comment on code not people, balance direct guidance with letting the author decide, label optional vs required feedback.
 - GitHub staff guidance: be specific, distinguish blockers from preferences, cite repo patterns, ask questions when author context may matter.
 - Codex/Claude-style PR review skills: use current head SHA, build one atomic review payload, verify inline anchors, and ask before mutation.
-- User preference captured in local tape: casual language; every item should be general or inline; each item should include what is wrong, evidence, verification done, and proposed fix or question; avoid "what if" nits; heavily favor simplicity/dedupe/typing/design/architecture/structure; allow nits in those areas, but route other minor nits through the user before posting.
+- User preference: casual language; every item should be general or inline; each item should include what is wrong, evidence, verification done, and proposed fix or question; avoid "what if" nits; heavily favor simplicity/dedupe/typing/design/architecture/structure; allow nits in those areas, but route other minor nits through the user before posting.
 
 ## Preflight Checklist
 

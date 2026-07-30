@@ -13,7 +13,7 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 | --- | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | Executable policy | Always-loaded agent rules and workflow routing |
 | [`APPEND_SYSTEM.md`](APPEND_SYSTEM.md) | Executable policy | Host, toolchain, and language overlay |
-| [`settings.json`](settings.json) | Runtime config | Models, packages, UI, memory, and compaction |
+| [`settings.json`](settings.json) | Runtime config | Models, packages, UI, and compaction |
 | [`models.json`](models.json) | Runtime config | Custom model definitions |
 | [`mcp.json`](mcp.json) | Runtime config | MCP server registry |
 | [`permissions.json`](permissions.json) | Inactive artifact | Not consumed by Pi 0.80.6 or the loaded extensions |
@@ -32,7 +32,6 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 - Local role prompts in [`agents/`](agents/) override packaged roles with the same name.
 - Skills expose short descriptions and load their full instructions only when needed.
 - Extensions under [`extensions/`](extensions/) are auto-discovered.
-- Durable Memory is disabled; `pi-memory-md` remains configured for Tape continuity.
 - Safety combines prompt policy with configured guardrails. `permissions.json` is
   retained as an inactive artifact and does not control Pi 0.80.6 permissions.
 
@@ -81,7 +80,7 @@ export PI_CODING_AGENT_DIR="$HOME/.config/pi"
 
 Persist `PI_CODING_AGENT_DIR` in your shell startup file before opening Pi. Run `setup.sh` from a normal terminal outside Pi, then restart Pi; dependency installation replaces local package trees that an active process may have loaded. The script requires the variable to resolve to its own checkout and does not create or modify `~/.pi/agent`.
 
-The script repairs an ordinary non-recursive clone, synchronizes submodule URLs, installs the locked runtime dependencies for Pi Lens, `pi-memory-md`, and `pi-subagents`, then runs each checked-in `profiles/*/setup.sh` hook. It never installs system tools, global npm packages, credentials, OAuth state, or optional integrations.
+The script repairs an ordinary non-recursive clone, synchronizes submodule URLs, installs the locked runtime dependencies for Pi Lens and `pi-subagents`, then runs each checked-in `profiles/*/setup.sh` hook. It never installs system tools, global npm packages, credentials, OAuth state, or optional integrations.
 
 ## Untracked runtime data
 

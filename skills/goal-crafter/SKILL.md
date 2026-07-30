@@ -1,6 +1,6 @@
 ---
 name: goal-crafter
-description: "Use when the user explicitly asks to write, review, refine, or turn current work into a /goal command. Crafts one paste-ready, evidence-grounded Pi /goal from current session context, Tape/session history, compactions, todos, artifacts, and relevant repo/docs as re-verifiable pointers, without hardcoding old context or starting/implementing the goal."
+description: "Use when the user explicitly asks to write, review, refine, or turn current work into a /goal command. Crafts one paste-ready, evidence-grounded Pi /goal from current session context, session history, compactions, todos, artifacts, and relevant repo/docs as re-verifiable pointers, without hardcoding old context or starting/implementing the goal."
 ---
 
 # Goal Crafter
@@ -54,7 +54,7 @@ When crafting or supervising goals, keep the normal-session resource posture and
 - Advisors cannot authorize destructive actions, external mutations, deployment, disclosure, export, persistence, or other protected actions. Read-only work follows the global rule. If a protected action is required and no safe alternative can complete the goal, emit only the supervisor-supported blocker.
 - For nontrivial, multi-owner, behavior/API/schema, PR-sized, migration, cross-file, or otherwise risk-bearing goals, create the same visible contract card, plan, and owner map required by the normal workflow before editing. Replace the normal user approval question with the forced decision-review gate.
 - The contract card should name previous behavior, desired outcome, public behavior/API/schema/config/env names, compatibility boundaries, required docs/tests surfaces, explicit non-goals, protected actions, and forbidden alternate shapes or artifacts.
-- Use Tape/session readers, relevant `.scratch` artifacts, current repo files, and context-mode for large session/log outputs when they materially improve correctness.
+- Use session readers, relevant `.scratch` artifacts, current repo files, and context-mode for large session/log outputs when they materially improve correctness.
 - Include web/code research when the objective needs current external facts or local evidence is insufficient.
 - Use the normal `manager-workflow` review stage for every nontrivial plan and final-readiness review. Give reviewers the full goal contract, non-goals, relevant decisions, target, proof/evidence, angle, and stop condition.
 - Judge design quality across the complete repeated lifecycle, including failure recovery, deployment, verification, cleanup, and final state. Prefer the best, cleanest, most cohesive complete design; minimize components only when doing so omits no required lifecycle behavior.
@@ -71,7 +71,7 @@ Build the goal from evidence in this order:
 4. Active TODOs/task trackers.
 5. Current `.scratch/` artifacts, run outputs, plans, reviews, and handoffs.
 6. Most recent compaction or `Continuation card:`.
-7. Relevant Tape/session history directly tied to the same task.
+7. Relevant session history directly tied to the same task.
 8. External docs or best-practice sources.
 9. Community examples.
 
@@ -79,7 +79,7 @@ Rules:
 
 - Newer and primary evidence beats older summaries.
 - If the user pauses or redirects a hypothesis, mark that branch stale and make the new branch current.
-- Compactions, Tape/session history, TODOs, `.scratch` files, and historical artifact paths are recovery indexes, not final authority, fixed scope, or required execution order.
+- Compactions, session history, TODOs, `.scratch` files, and historical artifact paths are recovery indexes, not final authority, fixed scope, or required execution order.
 - Existence-check and read historical artifact refs before treating their contents as evidence.
 - Prefer search terms, source-of-truth discovery, and evidence trails over hardcoded lists of old paths or old findings inside the final goal.
 - Separate current facts from historical continuity.
@@ -112,13 +112,13 @@ Inspect:
 - current cwd/repo/instruction constraints,
 - relevant files/docs named by the task.
 
-Use Tape/session history only when it is directly relevant to the current task. Stable agent behavior belongs in `AGENTS.md`, repository-local Pi decisions in `DECISIONS.md`, and temporary research in `.scratch/`; do not create another persistence path from inferred preferences or raw transcripts. Research/review artifacts should be curated and safe: do not include raw secrets or secret-like values, and if a scanner flags an artifact, require redaction/rewrite before treating it as final evidence.
+Use session history only when it is directly relevant to the current task. Stable agent behavior belongs in `AGENTS.md`, repository-local Pi decisions in `DECISIONS.md`, and temporary research in `.scratch/`; do not create another persistence path from inferred preferences or raw transcripts. Research/review artifacts should be curated and safe: do not include raw secrets or secret-like values, and if a scanner flags an artifact, require redaction/rewrite before treating it as final evidence.
 
 ### 3. Gather continuity evidence
 
 When the user asks to use "current session", "previous conversation", "compaction", "where we left off", or similar, inspect the relevant continuity sources:
 
-- recent session messages and Tape,
+- recent session messages,
 - compaction summaries and `Continuation card:` sections,
 - saved `.scratch/` research/plans/reviews/sessions/runs artifacts,
 - prior session examples only when topic-matched.
@@ -133,8 +133,8 @@ Default format:
 /goal <one measurable objective>.
 
 Context discovery:
-- Reconstruct the current task context from the latest user request, current repo/docs/config, relevant Tape/TODO/compaction/session history, and relevant `.scratch` artifacts.
-- Treat Tape, TODOs, compactions, prior sessions, and `.scratch` artifacts as discovery pointers, not authority, mandatory execution order, fixed scope, or hardcoded goal content.
+- Reconstruct the current task context from the latest user request, current repo/docs/config, relevant TODO/compaction/session history, and relevant `.scratch` artifacts.
+- Treat TODOs, compactions, prior sessions, and `.scratch` artifacts as discovery pointers, not authority, mandatory execution order, fixed scope, or hardcoded goal content.
 - Re-verify important historical claims from current source, docs, config, transcript evidence, or fresh checks before relying on them.
 - Use search terms, source-of-truth discovery, and evidence trails instead of hardcoded lists of old paths or old findings.
 
@@ -274,9 +274,9 @@ Use the expanded continuity form for explicit resume/high-risk/cross-session req
 Context discovery:
 - Current task: <fresh current-session task>
 - Known current state: <confirmed facts with file/session/artifact refs>
-- Historical continuity: <prior Tape/session/compaction facts, explicitly marked historical>
+- Historical continuity: <prior session/compaction facts, explicitly marked historical>
 - Stale branches to ignore: <superseded work, if any>
-- Discovery rule: treat Tape, TODOs, compactions, prior sessions, and `.scratch` artifacts as pointers to re-verify, not as hardcoded required paths, stale findings, fixed scope, or mandatory execution order.
+- Discovery rule: treat TODOs, compactions, prior sessions, and `.scratch` artifacts as pointers to re-verify, not as hardcoded required paths, stale findings, fixed scope, or mandatory execution order.
 
 Scope:
 - In scope: <bounded areas plus safe source-of-truth discovery and quality ratchet work>
@@ -379,7 +379,7 @@ Before output, check:
 - Stop/block rules match Pi's accepted `GOAL_BLOCKED` classes.
 - Current facts are separated from historical continuity.
 - Stale/contradicted context is not treated as active work.
-- Tape/session history, TODOs, compactions, and `.scratch` artifacts are used as pointers, not hardcoded requirements or execution order.
+- Session history, TODOs, compactions, and `.scratch` artifacts are used as pointers, not hardcoded requirements or execution order.
 - The goal has a continuation policy that keeps working past first-pass success until the user ends it or safe useful in-scope options are exhausted.
 - No unsupported budgets, no-progress stops, calendar cadence, or vague terminal rules are presented as enforced.
 - If goal-making research influenced the shape, experienced/practitioner/frontier/primary sources carried more weight than beginner/framework listicles.
@@ -391,7 +391,7 @@ Reject or revise goals with these anti-patterns:
 - "make it better", "clean everything up", "do whatever it takes", "use every tool".
 - Success without proof path.
 - Scope of "whole repo" without an enumerable source or boundary.
-- Hardcoded historical context: stale file paths, old TODOs, prior-session findings, Tape/compaction summaries, or `.scratch` artifacts pasted into the goal as mandatory truth without re-verification.
+- Hardcoded historical context: stale file paths, old TODOs, prior-session findings, session/compaction summaries, or `.scratch` artifacts pasted into the goal as mandatory truth without re-verification.
 - Rigid execution order copied from old plans/todos instead of adaptive source-of-truth discovery.
 - Stop-if rules, calendar cadence, or fixed budgets that are subjective or unsupported by local supervisor behavior.
 - Verification postponed until the very end when intermediate checks are possible.

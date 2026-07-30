@@ -1,6 +1,6 @@
 {
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-sol",
+  "defaultProvider": "amazon-bedrock",
+  "defaultModel": "amazon.nova-2-lite-v1:0",
   "defaultThinkingLevel": "high",
   "theme": "gruvbox-custom",
   "quietStartup": true,
@@ -50,25 +50,6 @@
     "pendingTtlMs": 300000,
     "artifactRoot": ".scratch/compactions"
   },
-  "pi-memory-md": {
-    "enabled": false,
-    "memoryDir": {
-      "localPath": "~/.pi/memory-md"
-    },
-    "delivery": "message-append",
-    "hooks": {
-      "sessionStart": [],
-      "sessionEnd": [],
-      "beforeAgentStart": [
-        "sessionBridge"
-      ]
-    },
-    "tape": {
-      "enabled": true,
-      "onlyGit": false,
-      "thread": true
-    }
-  },
   "skills": [
     "skills"
   ],
@@ -105,13 +86,11 @@
     {
       "source": "packages/pi-lens",
       "autoload": false,
-      "extensions": ["+dist/index.js"]
+      "extensions": [
+        "+dist/index.js"
+      ]
     },
     "npm:pi-web-access",
-    {
-      "source": "packages/pi-memory-md",
-      "skills": []
-    },
     "npm:@aliou/pi-guardrails",
     {
       "source": "npm:pi-ask-user",
@@ -143,5 +122,14 @@
   "autocompleteMaxVisible": 10,
   "doubleEscapeAction": "tree",
   "treeFilterMode": "no-tools",
-  "httpIdleTimeoutMs": 3600000
+  "httpIdleTimeoutMs": 3600000,
+  "enabledModels": [
+    "openai-codex/gpt-5.3-codex-spark",
+    "openai-codex/gpt-5.4",
+    "openai-codex/gpt-5.4-mini",
+    "openai-codex/gpt-5.5",
+    "openai-codex/gpt-5.6-luna",
+    "openai-codex/gpt-5.6-sol",
+    "openai-codex/gpt-5.6-terra"
+  ]
 }

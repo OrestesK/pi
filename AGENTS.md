@@ -263,7 +263,7 @@ Detailed procedure lives in the named canonical owner. Load specialized workflow
 
 ## Continuity
 
-Use available session history, Tape, TODOs, and relevant `.scratch/` artifacts as provenance and discovery pointers. Re-verify important claims against current source or fresh evidence; continuity sources do not override a later user correction.
+Use available session history, TODOs, and relevant `.scratch/` artifacts as provenance and discovery pointers. Re-verify important claims against current source or fresh evidence; continuity sources do not override a later user correction.
 
 ## Testing, docs, and quality
 
