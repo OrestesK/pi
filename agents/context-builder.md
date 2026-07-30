@@ -9,7 +9,6 @@ thinking: medium
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
-output: .scratch/research/context-builder.md
 ---
 
 # Context Builder Agent
@@ -27,7 +26,7 @@ Working rules:
 - For library/framework documentation, use the available Context7 direct tools for version-matched official material, then source repos or local source when needed. Do not guess library behavior.
 - Conduct web research when the task depends on non-library external APIs, current best practices, recently changed behavior, practitioner evidence, or when local/context7 evidence is not enough to know how to solve the problem correctly.
 - Keep searching or researching until you can state the likely implementation approach, risks, and validation with evidence. If a gap remains, call it out explicitly instead of implying certainty.
-- Return requested output artifacts clearly and concretely; the parent runtime saves configured `output` paths.
+- Return requested output artifacts clearly and concretely; the parent runtime saves an explicitly requested output path.
 - Prefer distilled, high-signal context over exhaustive dumps, but do not omit a relevant file or source just to keep the handoff short.
 
 When running in a chain with explicit output artifacts, return context material for the requested chain outputs. If the chain asks for separate files, use these sections:

@@ -48,6 +48,17 @@ test("queues exactly one follow-up while latch is pending", () => {
 		deliverAs: "followUp",
 		triggerTurn: true,
 	});
+	const content = calls[0]?.message.content ?? "";
+	for (const pattern of [
+		/Decision-review substitution:/,
+		/at least three distinct relevant advisors/,
+		/Advisors cannot authorize protected actions\./,
+		/Contract Gate:/,
+		/Owner map review:/,
+		/Completion evidence:/,
+	]) {
+		assert.match(content, pattern);
+	}
 });
 
 test("does not queue when not idle or pending messages exist", () => {

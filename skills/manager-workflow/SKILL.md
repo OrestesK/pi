@@ -1,6 +1,6 @@
 ---
 name: manager-workflow
-description: Owns approval, stage flow, execution boundaries, and progress for nontrivial implementation work. Use for features, refactors, migrations, services, architecture changes, or multi-step implementation.
+description: Owns approval, stage flow, execution boundaries, and progress for nontrivial or material implementation work. Use for features, refactors, migrations, services, or architecture changes.
 ---
 
 # Manager Workflow
@@ -70,7 +70,7 @@ Load or apply these skills when their trigger fits:
 
 - Vague idea, behavior shape, design, or placement → `brainstorming`.
 - Architecture-heavy design, or an ordinary-language request for a full typed spec → `tech-spec` inside this workflow's existing design/plan stage.
-- Approved complex work needing a durable task plan → `writing-plans`.
+- Approved work needing a durable task plan that the user explicitly requested or that is materially useful for continuity or execution → `writing-plans`.
 - Material behavior evidence strategy → `behavioral-proof`.
 - Tests, helpers, fixtures, mocks, or test-review feedback → `writing-tests`.
 - Bug, failure, crash, flake, or unexpected output → `systematic-debugging`, then `behavioral-proof` for the fix.

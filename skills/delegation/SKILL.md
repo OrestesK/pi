@@ -82,7 +82,7 @@ Capability routing never authorizes a mutation. Do not create a persistent agent
 
 ## Review fanout
 
-`manager-workflow` decides when review occurs. `review` owns reviewer count, packets, finding partitions, and post-fix follow-up. This skill only dispatches the selected roles and preserves the parent-child boundary.
+`manager-workflow` decides when review occurs inside an implementation stage. Standalone reviews enter `review` directly. `review` owns reviewer count, packets, finding partitions, and post-fix follow-up. This skill only dispatches the selected roles and preserves the parent-child boundary.
 
 ## Artifacts
 

@@ -9,8 +9,6 @@ thinking: high
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
-output: plan.md
-defaultReads: context.md
 defaultContext: fork
 ---
 
@@ -31,7 +29,7 @@ Working rules:
 - If a material decision remains, surface it with the previous behavior and recommendation instead of guessing.
 - Avoid tables in generated Markdown.
 
-Output format (saved by the parent runtime when `output` is configured):
+Output format (saved by the parent runtime only when the parent explicitly configures `output`):
 
 ```markdown
 # Implementation Plan

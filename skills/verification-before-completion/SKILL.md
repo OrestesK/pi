@@ -82,7 +82,7 @@ Do not trust “worker/reviewer says done” by itself.
 
 The parent inspects the actual target/effective change, relevant child outputs, and fresh claim-bound evidence. For nontrivial readiness, the review/fix stage required by `manager-workflow` must be complete. Reviewer packet and fanout details are outside this skill.
 
-The parent validates candidate findings for scope, producer/reachability, impact, proof, and behavior preservation before disposition. Reviewer output is partitioned into primary in-scope required findings, incidental material adjacent risks, and incidental optional cleanup/polish. Every accepted primary in-scope `must-fix` and `should-fix` finding must be fixed or explicitly user-deferred before `PASS`; optional/background quality exploration remains nonblocking. If the parent cannot verify directly, report the exact unverified boundary and return `INCONCLUSIVE` where it affects the claim.
+The parent validates candidate findings for scope, producer/reachability, impact, proof, and behavior preservation before disposition. `review` owns review method and finding partitions; accepted in-scope required findings must be fixed or explicitly user-deferred before `PASS`. If the parent cannot verify directly, report the exact unverified boundary and return `INCONCLUSIVE` where it affects the claim.
 
 ## Completion Report Format
 

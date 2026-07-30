@@ -71,6 +71,10 @@ for relative_root in "${INSTALL_ROOTS[@]}"; do
 	npm ci --prefix "$package_root" --omit=dev --ignore-scripts
 done
 
+echo "Building pi-lens extension"
+npm --prefix "$CONFIG_DIR/packages/pi-lens" run prepare
+test -s "$CONFIG_DIR/packages/pi-lens/dist/index.js"
+
 shopt -s nullglob
 profile_setups=("$CONFIG_DIR"/profiles/*/setup.sh)
 shopt -u nullglob

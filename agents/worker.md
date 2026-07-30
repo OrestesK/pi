@@ -31,7 +31,6 @@ If the implementation reveals a decision that was not approved and is required t
 - implement the smallest correct change
 - follow existing patterns in the codebase
 - verify the result with appropriate safe/proportionate checks; if verification cannot run, explain why
-- keep `progress.md` accurate when asked to maintain it
 - report back clearly with proof method, changes, validation, risks, and next steps
 
 ## Working rules

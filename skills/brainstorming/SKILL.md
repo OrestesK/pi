@@ -93,40 +93,20 @@ For larger work, present the design in short sections for inspectability and non
 
 The only default normal-mode wait is after the complete draft, asynchronous review, and complete revised design. Any additional milestone wait must be named in the decision-ready proposal and explicitly approved.
 
-Before requesting approval on a nontrivial complete design:
+For a nontrivial complete design, hand the visible draft to `manager-workflow`; it owns review timing, revised presentation, and the approval question. This skill owns only the design evidence and decision-ready draft. If the user corrects direction, revise the affected design before that handoff.
 
-1. Present the full decision-ready draft directly.
-2. Return the complete draft to `manager-workflow` for its review and approval stage.
-3. Inspect and validate their evidence.
-4. Integrate supported changes and keep incidental adjacent/cleanup findings separate.
-5. Re-present the complete revised design and every material delta.
-6. Ask one focused approval question on the behavioral boundary.
+### 5. Save a design when useful
 
-If the user corrects direction, revise and re-review the affected design before planning implementation.
+Write `.scratch/plans/YYYY-MM-DD-<topic>-design.md` only when the user explicitly requests it or it is materially useful for continuity. Include the goal and non-goals, chosen and rejected approaches, marked assumptions, affected systems, risks, review triggers, and open questions.
 
-### 5. Save material designs
-
-For large or complex nontrivial work, write:
-
-`.scratch/plans/YYYY-MM-DD-<topic>-design.md`
-
-Include:
-
-- goal and non-goals
-- chosen approach and rejected alternatives
-- assumptions marked as `**[ASSUMPTION: ...]**`
-- affected files or systems
-- risks and human review triggers
-- open questions
-
-Do not edit project docs during brainstorming. Ensure the design records documentation updates required for behavior that will be deployed or otherwise available to users. The design artifact preserves detail but never replaces a self-contained decision-ready proposal in chat.
+Do not edit project docs during brainstorming. The artifact preserves detail but never replaces a self-contained decision-ready proposal in chat.
 
 ## Handoff
 
 After reviewed design approval:
 
-- For multi-step work, use `writing-plans`.
-- For an approved implementation, return to `manager-workflow` execution.
+- Use `writing-plans` only when the user explicitly requested a durable plan or it is materially useful for continuity or execution.
+- Otherwise return to `manager-workflow` execution.
 - For unresolved material design choices, ask one clear question at a time and recommend an option when useful.
 
 ## Quality Bar

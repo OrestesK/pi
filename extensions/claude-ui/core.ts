@@ -1627,11 +1627,6 @@ const EXTENSION_TOOL_WRAPPER_ALLOWLIST = new Set([
 	"read_enclosing",
 	"lsp_navigation",
 	"lsp_diagnostics",
-	"memory_search",
-	"memory_write",
-	"memory_list",
-	"memory_check",
-	"memory_sync",
 	"tool_result_outline",
 	"tool_result_get",
 	"tool_result_search",
@@ -2344,36 +2339,6 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
 					? plural(argArrayCount(args, "filePaths") ?? 0, "file")
 					: undefined,
 			]);
-		case "memory_search":
-			return joinBodyParts(theme, [
-				argValueLabel(args, "query")
-					? pathText(
-							theme,
-							compactOneLine(argValueLabel(args, "query") ?? "…", 70),
-						)
-					: undefined,
-				argValueLabel(args, "grep")
-					? `grep ${argValueLabel(args, "grep")}`
-					: undefined,
-				argValueLabel(args, "rg")
-					? `rg ${argValueLabel(args, "rg")}`
-					: undefined,
-			]);
-		case "memory_write":
-			return joinBodyParts(theme, [
-				compactPathList(args, theme),
-				argValueLabel(args, "description"),
-			]);
-		case "memory_list": {
-			const directory = argValueLabel(args, "directory");
-			return directory
-				? pathText(theme, compactOneLine(directory, 70))
-				: (compactPathList(args, theme) ?? muted(theme, "all"));
-		}
-		case "memory_check":
-			return muted(theme, "project");
-		case "memory_sync":
-			return pathText(theme, argValueLabel(args, "action") ?? "status");
 		case "tool_result_outline":
 			return joinBodyParts(theme, [
 				pathText(theme, argValueLabel(args, "sourceId") ?? "…"),
@@ -2482,16 +2447,6 @@ function webToolTitle(name: string): string {
 			return "LSP";
 		case "lsp_diagnostics":
 			return "LSP Diagnostics";
-		case "memory_search":
-			return "Memory Search";
-		case "memory_write":
-			return "Memory Write";
-		case "memory_list":
-			return "Memory List";
-		case "memory_check":
-			return "Memory Check";
-		case "memory_sync":
-			return "Memory Sync";
 		case "tool_result_outline":
 			return "Tool Result Outline";
 		case "tool_result_get":
@@ -2567,21 +2522,6 @@ function todoListSummary(output: string): string | undefined {
 	return `${plural(open, "open todo", "open todos")} · ${assigned} assigned · ${closed} closed`;
 }
 
-function memoryListSummary(output: string): string | undefined {
-	const firstLine = contentLines(output).find((line) => line.trim().length > 0);
-	const match = firstLine?.match(/Memory files \((\d+)\):/);
-	return match ? plural(Number(match[1]), "file") : undefined;
-}
-
-function memoryListSummaryFromDetails(details: unknown): string | undefined {
-	const count = detailNumber(details, "count");
-	if (count !== undefined) return plural(count, "file");
-	if (isRecord(details) && Array.isArray(details.files)) {
-		return plural(details.files.length, "file");
-	}
-	return undefined;
-}
-
 function subagentListSummary(output: string): string | undefined {
 	const agentCount = contentLines(output).filter((line) =>
 		line.startsWith("- "),
@@ -2607,16 +2547,6 @@ function pendingToolLabel(
 			return "Navigating";
 		case "ast_grep_replace":
 			return "Checking";
-		case "memory_search":
-			return "Searching Memory";
-		case "memory_write":
-			return "Writing Memory";
-		case "memory_list":
-			return "Listing Memory";
-		case "memory_check":
-			return "Checking Memory";
-		case "memory_sync":
-			return "Syncing Memory";
 		case "tool_result_outline":
 			return "Outlining Tool Result";
 		case "tool_result_get":
@@ -2705,14 +2635,6 @@ function todoPreviewLines(output: string): string[] | undefined {
 		}),
 	);
 	return lines;
-}
-
-function memoryListPreviewLines(output: string): string[] | undefined {
-	const lines = contentLines(output)
-		.map((line) => line.trim())
-		.filter((line) => line.startsWith("- "))
-		.map((line) => line.slice(2));
-	return lines.length > 0 ? lines : undefined;
 }
 
 function subagentListPreviewLines(output: string): string[] | undefined {
@@ -3692,13 +3614,6 @@ function toolPreviewBlock(
 				expanded,
 				EXPANDED_PREVIEW_LINES,
 			);
-		case "memory_list":
-			return previewLinesBlock(
-				memoryListPreviewLines(output) ?? [],
-				theme,
-				expanded,
-				EXPANDED_PREVIEW_LINES,
-			);
 		case "subagent":
 			return previewLinesBlock(
 				subagentListPreviewLines(output) ?? contentLines(output),
@@ -3743,12 +3658,6 @@ function resultDetailSummary(
 		case "todo":
 			return (
 				todoListSummary(output) ?? (lines > 0 ? plural(lines, "line") : "done")
-			);
-		case "memory_list":
-			return (
-				memoryListSummaryFromDetails(details) ??
-				memoryListSummary(output) ??
-				(lines > 0 ? plural(lines, "line") : "done")
 			);
 		case "subagent":
 		case "subagent_list":

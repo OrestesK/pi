@@ -9,7 +9,6 @@ thinking: medium
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: false
-output: .scratch/research/research.md
 ---
 
 # Researcher Agent

@@ -9,7 +9,7 @@ Review is evidence gathering, not rubber-stamping.
 
 ## Independent review routing
 
-`manager-workflow` decides when review occurs. This skill owns review method. `delegation` dispatches the selected roles, and the Pi Subagents package executes them.
+`manager-workflow` decides when review occurs inside an implementation stage. Standalone reviews enter this skill directly. This skill owns review method. `delegation` dispatches the selected roles, and the Pi Subagents package executes them.
 
 For every nontrivial plan review, nontrivial review request, and first implementation-readiness review, use at least three fresh parallel reviewers with genuinely different evidence targets. Add more only for another useful surface. The parent also inspects the target, validates findings, synthesizes `PASS`, `FAIL`, or `INCONCLUSIVE`, and owns every decision.
 

@@ -56,6 +56,7 @@ For all nontrivial tasks, periodically summarize:
 - **Material:** changes observable behavior, API/schema/protocol, architectural ownership, dependencies, a demonstrated compatibility or trust/data boundary, external effects, or an approval boundary.
 - **Nontrivial:** has an unclear owner/root cause, meaningful behavior or workflow change, multiple affected owners, multiple viable approaches, public/external effects, or meaningful verification risk. File count alone does not decide.
 - **Useful:** can change the decision, implementation, risk classification, verification, or completion claim.
+- **Protected action:** any action that requires explicit user approval under these rules. The safety sections define its exact authorization requirements.
 
 ### User authority
 
@@ -245,12 +246,12 @@ Use git diff/status normally for repo work; do not add a separate checkout prech
 Detailed procedure lives in the named canonical owner. Load specialized workflows only when their trigger is materially relevant; mechanical work may skip them when no meaningful behavior, uncertainty, or verification surface exists.
 
 - Vague idea, feature shape, design, or placement → `brainstorming`.
-- Nontrivial implementation, refactor, migration, service, or multi-step work → `manager-workflow`.
-- Approved complex work needing a separately requested durable implementation plan → `writing-plans`. A reviewed tech spec inside the `manager-workflow` proposal is sufficient for implementation approval and does not route through `writing-plans`.
+- Nontrivial or material implementation, refactor, migration, or service work → `manager-workflow`. Multiple mechanical steps alone are not a trigger.
+- Approved work needing a durable implementation plan that the user explicitly requested or that is materially useful for continuity or execution → `writing-plans`. A reviewed tech spec inside the `manager-workflow` proposal is sufficient for implementation approval and does not route through `writing-plans`.
 - Material behavior evidence strategy → `behavioral-proof`.
 - Tests, helpers, fixtures, mocks, or test-review feedback → `writing-tests`.
 - Nontrivial bug, failure, crash, flake, or unexpected output → `systematic-debugging`, then `behavioral-proof` for the fix.
-- Nontrivial plan/code/feedback review → `review` through `manager-workflow`.
+- Standalone nontrivial plan/code/feedback review → `review`. Implementation-stage review remains a `manager-workflow` stage using `review`.
 - Explicit deep simplification/structure review → `code-quality-review`; concrete useful quality review may also run opportunistically as a read-only nonblocking lane during ordinary work.
 - Done/fixed/passing/ready claim → `verification-before-completion`.
 - Nontrivial subagents and waiting reflection → `delegation`.
@@ -271,7 +272,7 @@ Before a nontrivial readiness claim, load `verification-before-completion` and a
 
 - Run only changed or directly relevant tests; broaden only when shared code, common infrastructure, or demonstrated risk justifies it.
 - Run unit tests after the complete approved implementation batch, not after each small change. One deliberately selected focused failing reproduction/test-first test may run earlier when it is the most efficient way to prove a nontrivial behavior change.
-- Run non-unit parsing, formatting, lint, type, LSP, and discovery checks after coherent logical edit groups, not after every tiny edit.
+- Run relevant available parsing, formatting, lint, type, LSP, and discovery checks after coherent logical edit groups, not after every tiny edit.
 - For explicitly requested live validation, cover affected reachable workflows and consumers within the approved scope; mark paths verified only at lower fidelity or unavailable at that boundary as unverified for that boundary.
 - Do not rerun a check after a green/clean result unless files changed, the prior run was invalid/truncated, or you state a concrete reason
 - Validation output must distinguish clean passes from warnings, failures, skipped checks, and truncated/partial results. Warning-only nonzero exits are not unqualified passes

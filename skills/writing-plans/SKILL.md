@@ -1,13 +1,13 @@
 ---
 name: writing-plans
-description: Use after requirements or design are approved and complex work benefits from a durable plan. Produces precise .scratch implementation tasks, behavioral-proof strategy, verification commands, and review checkpoints.
+description: Use after requirements or design are approved when the user explicitly requests a durable plan or it is materially useful. Produces precise .scratch implementation tasks, behavioral-proof strategy, verification commands, and review checkpoints.
 ---
 
 # Writing Plans
 
 Create implementation plans that can be executed without implicit design decisions.
 
-Use this when approved complex work benefits from a durable task breakdown or when the user explicitly asks for a written plan. A plan file is not required for routine work whose approved chat proposal is sufficient.
+Use this when the user explicitly asks for a durable task breakdown or one is materially useful for continuity or execution. A plan file is not required for routine work whose approved chat proposal is sufficient.
 
 Plans live in `.scratch/plans/` unless the user explicitly asks for project documentation. The artifact supports continuity; the complete user-facing plan is still presented directly.
 
@@ -51,7 +51,7 @@ Avoid tables in generated plan Markdown. Every implementation plan should includ
 **Unchanged behavior / non-goals:** <preserved boundaries>
 **Constraints:** <protected actions, no mutating git, project conventions>
 **Proof strategy:** <behavioral evidence selected for each material claim>
-**Review handoff:** <evidence targets and risks for `manager-workflow` to review>
+**Review handoff:** <plan-only: return the plan and stop; standalone nontrivial plan review: `review`; manager-attached plan: active `manager-workflow` stage>
 **Behavioral approval boundary:** <outcome, risks, stops; not an exact file list>
 
 ## Alternatives and rationale
@@ -143,12 +143,10 @@ If a handoff command is useful, label it as **User-run only** and prefer copying
 
 ## Handoff
 
-For a nontrivial plan:
+Choose the path that matches the request:
 
-1. Present the complete decision-ready draft directly in chat; the path is supporting evidence only.
-2. Return the complete plan to `manager-workflow` for its review and approval stage while the draft remains inspectable.
-3. Give each reviewer the behavior, non-goals, relevant decisions, plan, proof/evidence, assigned angle, and stop condition.
-4. Inspect and validate the findings, integrate only supported changes, and keep incidental adjacent risks or cleanup separate.
-5. Re-present the complete revised plan and every material delta directly in chat.
-6. Ask one focused implementation-approval question on the reviewed behavioral boundary.
-7. On approval, use `manager-workflow` stage and execution rules.
+- **Plan only:** present the complete plan directly in chat, save it only when requested or materially useful, then stop. Do not start implementation or approval flow.
+- **Standalone nontrivial plan review:** route directly to `review`. Its three fresh reviewers remain required; `delegation` dispatches them.
+- **Manager-attached plan:** return the task breakdown to the active `manager-workflow` stage. It does not add review or approval unless it introduces a material behavioral delta.
+
+This skill owns the executable task breakdown and proof detail.

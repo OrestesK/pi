@@ -300,12 +300,23 @@ test("blocked marker goals auto-resume on the next agent prompt", async () => {
 	);
 	assert.equal(harness.lastState()?.status, "blocked");
 
-	harness.hooks.get("before_agent_start")?.(
+	const promptResult = harness.hooks.get("before_agent_start")?.(
 		{ systemPrompt: "base", prompt: "user supplied approval context" },
 		harness.ctx,
-	);
+	) as { systemPrompt: string } | undefined;
 
 	assert.equal(harness.lastState()?.status, "running");
+	const systemPrompt = promptResult?.systemPrompt ?? "";
+	for (const pattern of [
+		/Decision-review substitution:/,
+		/at least three distinct relevant advisors/,
+		/Advisors cannot authorize protected actions\./,
+		/Contract Gate:/,
+		/Owner map review:/,
+		/Completion evidence:/,
+	]) {
+		assert.match(systemPrompt, pattern);
+	}
 });
 
 test("status and judge-error blocks do not auto-resume", async () => {
