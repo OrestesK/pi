@@ -5,38 +5,72 @@ description: Use subagents for nontrivial work, review support, research, reconn
 
 # Delegation
 
-The Pi Subagents package owns dispatch, chains, async execution, supervisor messaging, and agent discovery. This skill owns how this setup uses those capabilities.
+This skill describes how and when to use subagents
 
-Use subagents for nontrivial work unless delegation is unavailable, prohibited, or a strict no-artifact instruction forbids child-session artifacts. The parent remains the decision maker and normally implements, integrates, fixes, and verifies.
+The Pi Subagents package owns dispatch, chains, async execution, supervisor messaging, and agent discovery. .
 
-## Choose a role
+Use subagents for nontrivial work unless delegation is unavailable, prohibited, or a strict no-artifact instruction forbids child-session artifacts. The parent owns user communication, decisions, integration, and final verification.
 
-- `scout`: fast repository reconnaissance
-- `researcher`: current external evidence
-- `context-builder`: focused implementation or handoff context
-- `planner`: a plan after requirements are clear
-- `reviewer`: independent evidence and findings
-- `oracle`: high-context consistency and direction checks
-- `run-monitor`: read-only monitoring of long commands and logs
-- `delegate`: small read-only tasks without a specialist contract
-- `worker`: exceptional approved implementation with exclusive ownership
+## Workflow routing
+
+Use this flow only to select delegation topology. Follow `manager-workflow` for stages and approval, and `review` for review fanout and method.
+
+```text
+Request
+├─ Direct answer or one simple bounded task you can complete
+│  └─ Handle it yourself; do not delegate.
+└─ Delegation can materially improve the result
+   ├─ One atomic focused deliverable
+   │  └─ Launch the matching specialist directly.
+   └─ Any other bounded coherent task
+      └─ clone owns the task.
+
+Clone task
+├─ Later work needs concrete output from earlier work
+│  └─ Chain
+├─ Work is independent
+│  └─ Parallel fanout
+└─ One focused specialist output is sufficient
+   └─ Single child
+
+Clone fanout
+├─ Needs repository reconnaissance
+│  └─ scout
+├─ Needs current external evidence
+│  └─ researcher
+├─ Needs implementation or handoff context
+│  └─ context-builder
+├─ Needs a plan after requirements are clear
+│  └─ planner
+├─ Needs inherited-context direction or consistency review
+│  └─ oracle
+├─ Needs independent review evidence
+│  └─ reviewer
+└─ Needs non-subagent long-command monitoring
+   └─ run-monitor
+
+Fanout output
+├─ Informs a recommendation, plan, approval decision, or completion claim
+│  └─ Synthesize the concrete outputs first.
+│     Use a reducer only when it materially helps with a bounded comparison;
+│     it does not make decisions or claims.
+└─ Does not inform a decision
+   └─ Inspect the output only when it becomes relevant.
+```
+
+Run independent top-level clones and direct specialists in parallel. Use clone by default for every bounded coherent task that is not one atomic specialist deliverable. A clone owns its task-level implementation area and may use every required file in the shared project. The parent and other active task owners must avoid that task area. The clone stops and asks its immediate parent before touching a file owned by another active task, making a decision, handling a contradiction, or changing scope. Never launch a nested clone.
 
 Use only distinct roles or evidence targets that can change the decision, implementation, risk, or proof. Do not launch duplicate children to satisfy a number. Honor a feasible explicit number requested by the user when the work can be divided safely.
 
-For code-capable child tasks, pass `skill: "code-intelligence"` when code structure, types, relationships, or diagnostics are material. Children do not inherit the skill catalog automatically.
+For code-capable child tasks, pass `skill: "code-intelligence"` when code structure, types, relationships, or diagnostics are material. Clone inherits the skill catalog; specialists receive only explicitly supplied skills.
+
+Use the smallest topology that preserves dependencies and synthesis.
 
 ## Parent and child ownership
 
-The parent normally writes. It directly reads every file it edits and every delegated diff.
+Assign clone one bounded coherent task. Continue useful non-overlapping work while it runs; do not duplicate its implementation or poll it. Read every file you edit and every completed clone diff before integration.
 
-A worker may write only when:
-
-- at least two independent implementation areas can proceed concurrently and the parent owns one area; or
-- the parent has validated one simple, behavior-preserving, non-material cleanup inside the approved boundary and continues independent non-overlapping work.
-
-Give each writer one exclusive file or symbol area. State the approved behavior, non-goals, proof, prohibited decisions, and stop conditions. A file assignment prevents collisions; it is not the user's approval boundary.
-
-The worker stops for overlap, a stale contract, a real blocker, or an unapproved behavior, API, compatibility, security, data, dependency, architecture, or scope decision. The parent inspects and verifies the combined result. Do not run repository-wide mutating formatters, generators, or migrations while writers are active.
+Clone runs the applicable verification and independent review policy before completion. It returns changed files, child evidence, verification and review results, open risks, and the next integration step. The parent makes the final decision and performs the proportionate integration check.
 
 ## Child task contract
 
@@ -51,7 +85,7 @@ Give each child:
 - the expected response shape;
 - an output path only when an artifact is useful and allowed.
 
-Review tasks also follow the packet and output contract in `review`. Reviewer findings are evidence, not edit or approval authority.
+For review tasks, follow the packet and output contract in `review`. Treat reviewer findings as evidence, not edit or approval authority.
 
 ## Async work
 
@@ -78,15 +112,15 @@ When a delegable task needs a configured MCP server and an eligible child can us
 4. For read-only work, say directly that the child must not edit or modify files.
 5. Require the child to report the tool used, evidence, actual effects, and unverified boundaries.
 
-Capability routing never authorizes a mutation. Do not create a persistent agent to obtain one-off MCP access.
+Never treat capability routing as mutation authorization. Do not create a persistent agent to obtain one-off MCP access.
 
 ## Review fanout
 
-`manager-workflow` decides when review occurs inside an implementation stage. Standalone reviews enter `review` directly. `review` owns reviewer count, packets, finding partitions, and post-fix follow-up. This skill only dispatches the selected roles and preserves the parent-child boundary.
+For implementation reviews, follow `manager-workflow`; for standalone reviews, follow `review`. Dispatch only the roles those skills select and preserve the parent-child boundary.
 
 ## Artifacts
 
-Use `.scratch/` for allowed project artifacts. Project-scoped Pi Subagents runtime files use `.scratch/pi-subagents/`; package code owns that path. A strict no-file or no-artifact instruction forbids subagent runs because child sessions and logs are artifacts. A repository-only no-artifact instruction may still allow child runs with repository output and progress artifacts disabled.
+Put allowed project artifacts under `.scratch/`; use `.scratch/pi-subagents/` for Pi Subagents runtime artifacts. A strict no-file or no-artifact instruction forbids subagent runs because child sessions and logs are artifacts. A repository-only no-artifact instruction may still allow child runs with repository output and progress artifacts disabled.
 
 ## Before yielding
 

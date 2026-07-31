@@ -83,7 +83,7 @@ Use a native TODO as the concise routing card for work that may outlive the turn
 
 Load `delegation` for all nontrivial work unless delegation is unavailable or prohibited. The Pi Subagents package owns execution and agent discovery; the local skill owns when and how this setup delegates.
 
-- The parent normally implements, fixes, integrates, and verifies; it directly reads every file it edits and every delegated diff.
+- The parent owns task selection, user communication, decisions, integration, and verification. `clone` normally executes bounded coherent tasks; the parent directly reads every file it edits and every completed clone diff.
 - Use native supervisor coordination, not `intercom`.
 - `manager-workflow` owns stage timing. `review` owns review method. `delegation` owns general parent-child boundaries and async handling.
 - Ask when a material choice remains unresolved.

@@ -125,7 +125,7 @@ Before editing, identify:
 - the approved non-goals and protected boundaries;
 - the smallest proof that could disprove a wrong implementation.
 
-The parent normally implements and directly reads every file or symbol it edits. Use a worker only under the exception defined in `delegation`.
+The parent assigns bounded coherent implementation tasks to `clone` and directly reads every file or symbol it edits and every completed clone diff. The parent retains user communication, decisions, integration, and verification.
 
 For each coherent edit group:
 
@@ -138,7 +138,7 @@ Run focused unit tests after the complete implementation batch unless one test-f
 
 ## Review and completion
 
-After nontrivial implementation, enter the independent review stage. `review` selects the initial fanout and the proportionate follow-up after fixes. The parent validates findings, applies only mechanically local and non-material fixes inside the approved behavior, and asks before material expansion.
+After nontrivial implementation, enter the independent review stage. `review` selects the initial fanout and the proportionate follow-up after fixes. The parent validates findings, directs eligible in-scope fixes to the current task owner, and asks before material expansion.
 
 A final `PASS` requires every accepted primary `must-fix` and `should-fix` finding to be fixed or explicitly deferred by the user. Stop when review is clean, only incidental feedback remains, evidence blocks progress, or a new approval boundary appears.
 
