@@ -8,7 +8,10 @@ import {
 	createTelemetrySink,
 	resolveTelemetryEnabled,
 } from "../src/telemetry.ts";
-import { markerLines, withRegisteredExtension } from "./test-helpers.ts";
+import {
+	largeMarkerLines,
+	withRegisteredExtension,
+} from "./test-helpers.ts";
 
 test("telemetry is disabled unless explicitly opted in", async () => {
 	assert.equal(resolveTelemetryEnabled({}), false);
@@ -169,7 +172,7 @@ test("extension records content-free virtualization, retrieval, and compaction e
 	try {
 		await withRegisteredExtension(
 			async ({ dir, runContext, runTool, runToolResult }) => {
-				const visibleContent = markerLines("PRIVATE_CONTENT", 250);
+				const visibleContent = largeMarkerLines("PRIVATE_CONTENT", 250);
 				const patch = (await runToolResult({
 					toolName: "MALICIOUS_TOOL_NAME",
 					toolCallId: "PRIVATE_TOOL_CALL_ID",

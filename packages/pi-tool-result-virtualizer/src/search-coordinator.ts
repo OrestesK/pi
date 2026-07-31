@@ -24,7 +24,8 @@ export class SearchCoordinator {
 
 	async candidateSources(
 		query: string,
-		entries: StoredSourceMetadata[],
+		visibleEntries: StoredSourceMetadata[],
+		allEntries: StoredSourceMetadata[],
 	): Promise<StoredSourceMetadata[] | undefined> {
 		if (
 			this.#searchIndexDisabled ||
@@ -35,11 +36,13 @@ export class SearchCoordinator {
 			return undefined;
 		try {
 			const searchIndex = await this.getSearchIndex();
-			if (searchIndex === undefined) return undefined;
-			const candidateIds = new Set(
-				searchIndex.candidateSourceIds(query, entries),
-			);
-			return [...entries]
+			if (
+				searchIndex === undefined ||
+				!searchIndex.isCurrent(allEntries)
+			)
+				return undefined;
+			const candidateIds = new Set(searchIndex.candidateSourceIds(query));
+			return [...visibleEntries]
 				.reverse()
 				.filter((entry) => candidateIds.has(entry.sourceId));
 		} catch {
@@ -48,22 +51,12 @@ export class SearchCoordinator {
 		}
 	}
 
-	async append(metadata: StoredSourceMetadata, text: string): Promise<void> {
-		if (this.#searchIndexDisabled || this.#searchIndexPromise === undefined)
-			return;
-		try {
-			const searchIndex = await this.getSearchIndex();
-			searchIndex?.append(metadata, text);
-		} catch {
-			this.#searchIndexDisabled = true;
-		}
-	}
 
 	private async getSearchIndex(): Promise<SearchIndex | undefined> {
 		if (this.#searchIndexDisabled) return undefined;
 		this.#searchIndexPromise ??= this.#searchIndexFactory(this.#root);
 		const searchIndex = await this.#searchIndexPromise;
-		if (searchIndex === undefined) this.#searchIndexDisabled = true;
+		if (searchIndex === undefined) this.#searchIndexPromise = undefined;
 		return searchIndex;
 	}
 }

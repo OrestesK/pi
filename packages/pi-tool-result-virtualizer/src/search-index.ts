@@ -13,13 +13,19 @@ type IndexRow = {
 	sha256: string;
 };
 
+type IndexState = {
+	entryCount: number;
+	lastSourceId: string | null;
+	lastSha256: string | null;
+};
+
 export type SearchIndexInspection = {
 	status: "missing" | "healthy" | "mismatch" | "unavailable";
 	mismatchSourceIds: string[];
 };
 
 const SEARCH_INDEX_FILE = "search-index.sqlite";
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 function stringField(
 	row: Record<string, unknown>,
@@ -87,6 +93,17 @@ export class SearchIndex {
 		let db: DatabaseSync | undefined;
 		try {
 			db = new sqlite.DatabaseSync(dbPath, { readOnly: true });
+			const versionRow = db.prepare("PRAGMA user_version").get();
+			if (versionRow === undefined)
+				return {
+					status: "mismatch",
+					mismatchSourceIds: entries.map((entry) => entry.sourceId),
+				};
+			if (numberField(versionRow, "user_version") !== SCHEMA_VERSION)
+				return {
+					status: "mismatch",
+					mismatchSourceIds: entries.map((entry) => entry.sourceId),
+				};
 			const rows = db
 				.prepare(
 					"SELECT id, source_id, sha256 FROM indexed_sources ORDER BY id",
@@ -119,26 +136,55 @@ export class SearchIndex {
 		}
 	}
 
-	static async create(root: string): Promise<SearchIndex | undefined> {
+	static async open(root: string): Promise<SearchIndex | undefined> {
+		const dbPath = join(root, SEARCH_INDEX_FILE);
+		try {
+			await stat(dbPath);
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				"code" in error &&
+				error.code === "ENOENT"
+			)
+				return undefined;
+			throw error;
+		}
 		let sqlite: SqliteModule;
 		try {
 			sqlite = await import("node:sqlite");
 		} catch {
 			return undefined;
 		}
-		await mkdir(root, { recursive: true, mode: 0o700 });
-		await chmod(root, 0o700);
-		const dbPath = join(root, SEARCH_INDEX_FILE);
 		let db: DatabaseSync | undefined;
 		try {
-			db = new sqlite.DatabaseSync(dbPath);
-			const index = new SearchIndex(db, dbPath);
-			index.initialize();
-			await chmod(dbPath, 0o600);
-			return index;
+			db = new sqlite.DatabaseSync(dbPath, { readOnly: true });
+			return new SearchIndex(db, dbPath);
 		} catch {
 			db?.close();
 			return undefined;
+		}
+	}
+
+	static async rebuildOffline(
+		root: string,
+		entries: StoredSourceMetadata[],
+	): Promise<void> {
+		let sqlite: SqliteModule;
+		try {
+			sqlite = await import("node:sqlite");
+		} catch {
+			throw new Error("SQLite FTS is unavailable");
+		}
+		await mkdir(root, { recursive: true, mode: 0o700 });
+		await chmod(root, 0o700);
+		const dbPath = join(root, SEARCH_INDEX_FILE);
+		const db = new sqlite.DatabaseSync(dbPath);
+		try {
+			const index = new SearchIndex(db, dbPath);
+			index.rebuild(entries);
+			await chmod(dbPath, 0o600);
+		} finally {
+			db.close();
 		}
 	}
 
@@ -146,18 +192,18 @@ export class SearchIndex {
 		this.db.close();
 	}
 
-	sync(entries: StoredSourceMetadata[]): void {
-		this.ensureSchema();
-		const rows = this.indexRows();
-		if (!this.matchesPrefix(rows, entries) || !this.matchesFtsRows(rows)) {
-			this.rebuild(entries);
-			return;
+	isCurrent(entries: StoredSourceMetadata[]): boolean {
+		try {
+			return (
+				this.schemaVersion() === SCHEMA_VERSION &&
+				this.matchesState(this.indexState(), entries)
+			);
+		} catch {
+			return false;
 		}
-		if (rows.length < entries.length) this.indexEntries(entries, rows.length);
 	}
 
-	candidateSourceIds(query: string, entries: StoredSourceMetadata[]): string[] {
-		this.sync(entries);
+	candidateSourceIds(query: string): string[] {
 		const rows = this.db
 			.prepare(
 				[
@@ -176,27 +222,6 @@ export class SearchIndex {
 		return ids;
 	}
 
-	append(entry: StoredSourceMetadata, text: string): void {
-		this.ensureSchema();
-		const rows = this.indexRows();
-		if (rows.some((row) => row.sourceId === entry.sourceId)) return;
-		this.db.exec("BEGIN");
-		try {
-			this.indexEntry(entry, text, rows.length + 1);
-			this.db.exec("COMMIT");
-		} catch (error) {
-			this.db.exec("ROLLBACK");
-			throw error;
-		}
-	}
-
-	private initialize(): void {
-		this.ensureSchema();
-		this.db.exec(
-			"CREATE VIRTUAL TABLE __trigram_probe USING fts5(value, tokenize='trigram')",
-		);
-		this.db.exec("DROP TABLE __trigram_probe");
-	}
 
 	private ensureSchema(): void {
 		const version = this.schemaVersion();
@@ -213,6 +238,7 @@ export class SearchIndex {
 				"sha256 TEXT NOT NULL",
 				");",
 				"CREATE VIRTUAL TABLE IF NOT EXISTS sources_fts USING fts5(text, content='', tokenize='trigram');",
+				"CREATE TABLE IF NOT EXISTS index_state (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), entry_count INTEGER NOT NULL, last_source_id TEXT, last_sha256 TEXT);",
 				`PRAGMA user_version=${SCHEMA_VERSION};`,
 			].join("\n"),
 		);
@@ -228,47 +254,56 @@ export class SearchIndex {
 			[
 				"DROP TABLE IF EXISTS sources_fts;",
 				"DROP TABLE IF EXISTS indexed_sources;",
+				"DROP TABLE IF EXISTS index_state;",
 				"PRAGMA user_version=0;",
 			].join("\n"),
 		);
 	}
 
-	private indexRows(): IndexRow[] {
-		const rows = this.db
-			.prepare("SELECT id, source_id, sha256 FROM indexed_sources ORDER BY id")
-			.all();
-		return rows.map(toIndexRow).filter((row) => row !== undefined);
+	private indexState(): IndexState | undefined {
+		const row = this.db
+			.prepare("SELECT entry_count, last_source_id, last_sha256 FROM index_state WHERE singleton = 1")
+			.get() as Record<string, unknown> | undefined;
+		if (row === undefined) return undefined;
+		const entryCount = numberField(row, "entry_count");
+		const lastSourceId = row.last_source_id === null ? null : stringField(row, "last_source_id");
+		const lastSha256 = row.last_sha256 === null ? null : stringField(row, "last_sha256");
+		return entryCount === undefined || lastSourceId === undefined || lastSha256 === undefined
+			? undefined
+			: { entryCount, lastSourceId, lastSha256 };
 	}
 
-	private matchesPrefix(
-		rows: IndexRow[],
+	private matchesState(
+		state: IndexState | undefined,
 		entries: StoredSourceMetadata[],
 	): boolean {
-		if (rows.length > entries.length) return false;
-		return rows.every((row, index) => {
-			const entry = entries[index];
-			return (
-				entry !== undefined &&
-				row.id === index + 1 &&
-				row.sourceId === entry.sourceId &&
-				row.sha256 === entry.sha256
-			);
-		});
+		if (state === undefined) return false;
+		const last = entries.at(-1);
+		const indexedCount = this.rowCount("indexed_sources");
+		const ftsCount = this.rowCount("sources_fts");
+		return state.entryCount === entries.length &&
+			state.lastSourceId === (last?.sourceId ?? null) &&
+			state.lastSha256 === (last?.sha256 ?? null) &&
+			indexedCount === entries.length &&
+			ftsCount === entries.length;
 	}
 
-	private matchesFtsRows(rows: IndexRow[]): boolean {
-		const ftsRows = this.db
-			.prepare("SELECT rowid FROM sources_fts ORDER BY rowid")
-			.all();
-		if (ftsRows.length !== rows.length) return false;
-		return ftsRows.every(
-			(row, index) => numberField(row, "rowid") === rows[index]?.id,
-		);
+	private rowCount(table: "indexed_sources" | "sources_fts"): number {
+		const row = this.db.prepare(`SELECT count(*) AS count FROM ${table}`).get() as Record<string, unknown> | undefined;
+		return row === undefined ? -1 : (numberField(row, "count") ?? -1);
+	}
+
+	private writeState(entries: StoredSourceMetadata[]): void {
+		const last = entries.at(-1);
+		this.db.prepare(
+			"INSERT OR REPLACE INTO index_state(singleton, entry_count, last_source_id, last_sha256) VALUES (1, ?, ?, ?)",
+		).run(entries.length, last?.sourceId ?? null, last?.sha256 ?? null);
 	}
 
 	private rebuild(entries: StoredSourceMetadata[]): void {
 		this.db.exec("DROP TABLE IF EXISTS sources_fts");
 		this.db.exec("DROP TABLE IF EXISTS indexed_sources");
+		this.db.exec("DROP TABLE IF EXISTS index_state");
 		this.ensureSchema();
 		this.indexEntries(entries, 0);
 	}
@@ -277,7 +312,10 @@ export class SearchIndex {
 		entries: StoredSourceMetadata[],
 		startIndex: number,
 	): void {
-		if (startIndex >= entries.length) return;
+		if (startIndex >= entries.length) {
+			this.writeState(entries);
+			return;
+		}
 		this.db.exec("BEGIN");
 		try {
 			for (let index = startIndex; index < entries.length; index += 1) {
@@ -285,6 +323,7 @@ export class SearchIndex {
 				if (entry === undefined) continue;
 				this.indexEntry(entry, readFileSync(entry.textPath, "utf8"), index + 1);
 			}
+			this.writeState(entries);
 			this.db.exec("COMMIT");
 		} catch (error) {
 			this.db.exec("ROLLBACK");

@@ -134,6 +134,43 @@ test("bash virtualization captures details.fullOutputPath, strips truncation con
 	assert.equal(stored.metadata.toolCallId, "call_bash_1");
 });
 
+test("receipt projection omits session ID while stored metadata retains it", async () => {
+	const { store, dir } = await makeStore();
+	const result = await virtualizeToolResult(
+		{
+			toolName: "bash",
+			content: [
+				{
+					type: "text",
+					text: markerLines(`SESSION_PROJECTION_${"X".repeat(40)}`, 300),
+				},
+			],
+		},
+		store,
+		{
+			cwd: dir,
+			provenance: {
+				scope: "project",
+				projectId: "c".repeat(64),
+				classification: "unclassified-local",
+				sessionId: "private-session-id",
+			},
+		},
+	);
+	assert.ok(result);
+	const receipt = result.content[0];
+	assert.equal(receipt?.type, "text");
+	assert.doesNotMatch(receipt?.text ?? "", /private-session-id/);
+	const parsed = parseToolResultVirtualizerReceipt(receipt?.text ?? "");
+	assert.equal(parsed?.kind, "stored");
+	assert.deepEqual(parsed?.decisionCard?.resultRef.scope, {
+		kind: "project",
+		projectId: "c".repeat(64),
+	});
+	const stored = await store.readSource(parsed?.sourceId ?? "");
+	assert.equal(stored.metadata.sessionId, "private-session-id");
+});
+
 test("empty visible text still captures bash details.fullOutputPath", async () => {
 	const { store, dir } = await makeStore();
 	const fullOutputPath = join(dir, "empty-visible-full.log");
@@ -220,13 +257,13 @@ test("receipt preview merges overlapping samples and caps long preview lines", a
 	assert.equal(receipt.match(/SMALL_FULL line 0011/g)?.length, 1);
 });
 
-test("normal single-line outputs below the researched byte threshold are not virtualized", async () => {
+test("single-line outputs below the byte threshold are not virtualized", async () => {
 	const { store, dir } = await makeStore();
 	const result = await virtualizeToolResult(
 		{
 			toolName: "synthetic_medium_text",
 			toolCallId: "below_researched_threshold",
-			content: [{ type: "text", text: "M".repeat(30_000) }],
+			content: [{ type: "text", text: "M".repeat(49_999) }],
 		},
 		store,
 		{ cwd: dir },
@@ -234,6 +271,41 @@ test("normal single-line outputs below the researched byte threshold are not vir
 
 	assert.equal(result, undefined);
 	assert.deepEqual(await store.listSources(), []);
+});
+
+test("line threshold requires the visible byte floor", async () => {
+	const { store, dir } = await makeStore();
+	const belowFloor = `${"B".repeat(48)}\n`.repeat(200);
+	const atFloor = `${"A".repeat(49)}\n`.repeat(200);
+	assert.equal(Buffer.byteLength(belowFloor, "utf8"), 9_800);
+	assert.equal(Buffer.byteLength(atFloor, "utf8"), 10_000);
+
+	const belowFloorResult = await virtualizeToolResult(
+		{
+			toolName: "synthetic_low_byte_lines",
+			toolCallId: "below_line_byte_floor",
+			content: [{ type: "text", text: belowFloor }],
+		},
+		store,
+		{ cwd: dir },
+	);
+	assert.equal(belowFloorResult, undefined);
+
+	const atFloorResult = await virtualizeToolResult(
+		{
+			toolName: "synthetic_line_threshold",
+			toolCallId: "at_line_byte_floor",
+			content: [{ type: "text", text: atFloor }],
+		},
+		store,
+		{ cwd: dir },
+	);
+	assert.ok(atFloorResult);
+	assert.match(
+		atFloorResult.content[0]?.text ?? "",
+		/Large synthetic_line_threshold result stored locally/,
+	);
+	assert.equal((await store.listSources()).length, 1);
 });
 
 test("single-line outputs at the researched byte threshold are virtualized", async () => {
@@ -256,13 +328,80 @@ test("single-line outputs at the researched byte threshold are virtualized", asy
 	assert.equal((await store.listSources()).length, 1);
 });
 
-test("store failures suppress large raw output while preserving small pass-through", async () => {
+test("store failures preserve bounded visible output and suppress large output", async () => {
 	const dir = await mkdtemp(join(tmpdir(), "pi-trv-store-failure-"));
 	const badRoot = join(dir, "root-is-file");
 	await writeFile(badRoot, "not a directory", "utf8");
 	const store = new ToolResultStore(badRoot);
-	const large = markerLines("STORE_FAILURE_SHOULD_NOT_LEAK", 300);
+	const bounded = `${"B".repeat(49)}\n`.repeat(300);
+	const boundedContentInput = [
+		{ type: "text", text: "BEFORE_IMAGE" },
+		{ type: "image", data: "base64-image-data" },
+		{ type: "text", text: bounded },
+	];
 
+	const boundedResult = await virtualizeToolResult(
+		{
+			toolName: "synthetic_bounded_text",
+			toolCallId: "store_failure_bounded",
+			content: boundedContentInput,
+		},
+		store,
+		{ cwd: dir },
+	);
+
+	assert.ok(boundedResult);
+	const boundedContent = boundedResult.content as Array<
+		Record<string, unknown>
+	>;
+	assert.deepEqual(
+		boundedContent.slice(0, boundedContentInput.length),
+		boundedContentInput,
+	);
+	assert.equal(boundedContent.length, boundedContentInput.length + 1);
+	assert.match(
+		String(boundedContent.at(-1)?.text ?? ""),
+		/original model-visible synthetic_bounded_text output preserved/i,
+	);
+	const boundedFailure = boundedResult.details
+		.toolResultVirtualizerFailure as Record<string, unknown>;
+	assert.equal(boundedFailure.visibleContentPreserved, true);
+	assert.equal(boundedFailure.contentWithheld, false);
+	assert.equal(boundedFailure.receiptBytes, undefined);
+
+	const fullOutputPath = join(dir, "larger-captured-output.log");
+	await writeFile(
+		fullOutputPath,
+		markerLines("CAPTURED_OUTPUT_NOT_VISIBLE", 300),
+		"utf8",
+	);
+	const truncatedResult = await virtualizeToolResult(
+		{
+			toolName: "bash",
+			toolCallId: "store_failure_truncated",
+			content: [{ type: "text", text: "VISIBLE_TRUNCATED_OUTPUT" }],
+			details: { fullOutputPath, truncation: { truncated: true } },
+		},
+		store,
+		{ cwd: dir },
+	);
+
+	assert.ok(truncatedResult);
+	assert.equal(
+		truncatedResult.content[0]?.text,
+		"VISIBLE_TRUNCATED_OUTPUT",
+	);
+	const truncatedWarning = truncatedResult.content[1]?.text ?? "";
+	assert.match(truncatedWarning, /different captured source was not stored/i);
+	assert.doesNotMatch(truncatedWarning, /CAPTURED_OUTPUT_NOT_VISIBLE/);
+	const truncatedFailure = truncatedResult.details
+		.toolResultVirtualizerFailure as Record<string, unknown>;
+	assert.equal(truncatedFailure.visibleContentPreserved, true);
+	assert.equal(truncatedFailure.contentWithheld, true);
+
+	const largeMarker = "STORE_FAILURE_SHOULD_NOT_LEAK";
+	const large = `${largeMarker}${"L".repeat(50_000 - largeMarker.length)}`;
+	assert.equal(Buffer.byteLength(large, "utf8"), 50_000);
 	const largeResult = await virtualizeToolResult(
 		{
 			toolName: "synthetic_large_text",
@@ -275,14 +414,17 @@ test("store failures suppress large raw output while preserving small pass-throu
 	);
 
 	assert.ok(largeResult);
-	const text = largeResult.content[0]?.text ?? "";
-	assert.match(text, /failed before local storage completed/i);
-	assert.match(text, /content withheld/i);
-	assert.doesNotMatch(text, /STORE_FAILURE_SHOULD_NOT_LEAK/);
+	const largeText = largeResult.content[0]?.text ?? "";
+	assert.match(largeText, /failed before local storage completed/i);
+	assert.match(largeText, /content withheld/i);
+	assert.doesNotMatch(largeText, /STORE_FAILURE_SHOULD_NOT_LEAK/);
 	const truncation = largeResult.details.truncation as Record<string, unknown>;
 	assert.equal(truncation.content, undefined);
 	assert.equal(truncation.contentStoredInToolResultVirtualizer, false);
-	assert.ok(largeResult.details.toolResultVirtualizerFailure);
+	const largeFailure = largeResult.details
+		.toolResultVirtualizerFailure as Record<string, unknown>;
+	assert.equal(largeFailure.contentWithheld, true);
+	assert.equal(largeFailure.visibleContentPreserved, undefined);
 
 	const smallResult = await virtualizeToolResult(
 		{
@@ -294,6 +436,41 @@ test("store failures suppress large raw output while preserving small pass-throu
 		{ cwd: dir },
 	);
 	assert.equal(smallResult, undefined);
+});
+
+test("details-only store failures preserve visible content and report it accurately", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "pi-trv-details-store-failure-"));
+	const badRoot = join(dir, "root-is-file");
+	await writeFile(badRoot, "not a directory", "utf8");
+	const store = new ToolResultStore(badRoot);
+	const originalContent = [
+		{ type: "text", text: "BEFORE_DETAILS" },
+		{ type: "image", data: "base64-image-data" },
+		{ type: "text", text: "AFTER_DETAILS" },
+	];
+
+	const result = await virtualizeToolResult(
+		{
+			toolName: "synthetic_details_only",
+			toolCallId: "details_store_failure",
+			content: originalContent,
+			details: { diagnostic: "D".repeat(3_000) },
+		},
+		store,
+		{ cwd: dir },
+	);
+
+	assert.ok(result);
+	assert.deepEqual(result.content, originalContent);
+	const failure = result.details
+		.toolResultVirtualizerFailure as Record<string, unknown>;
+	assert.equal(failure.visibleContentPreserved, true);
+	assert.equal(failure.contentWithheld, false);
+	assert.equal(failure.receiptBytes, undefined);
+	assert.equal(
+		failure.visibleContentBytes,
+		Buffer.byteLength("BEFORE_DETAILS\nAFTER_DETAILS", "utf8"),
+	);
 });
 
 test("all SKILL.md reads pass through without becoming retrieval receipts", async () => {
@@ -341,7 +518,7 @@ test("SKILL.md reads bypass details-only virtualization", async () => {
 
 test("non-read tools do not receive the SKILL.md bypass", async () => {
 	const { store, dir } = await makeStore();
-	const raw = markerLines("NON_READ_SKILL_INPUT", 300);
+	const raw = markerLines(`NON_READ_SKILL_INPUT_${"X".repeat(40)}`, 300);
 
 	const result = await virtualizeToolResult(
 		{
@@ -432,7 +609,10 @@ test("degraded fallback captures are not described as exact full raw output", as
 
 test("large normal outputs are virtualized even when they contain the receipt marker text", async () => {
 	const { store, dir } = await makeStore();
-	const raw = `[tool-result-virtualizer] literal user output\n${markerLines("MARKER_COLLISION", 300)}`;
+	const raw = `[tool-result-virtualizer] literal user output\n${markerLines(
+		`MARKER_COLLISION_${"X".repeat(40)}`,
+		300,
+	)}`;
 
 	const result = await virtualizeToolResult(
 		{
@@ -447,8 +627,8 @@ test("large normal outputs are virtualized even when they contain the receipt ma
 	assert.ok(result);
 	const receipt = result.content[0]?.text ?? "";
 	assert.match(receipt, /Large synthetic_large_text result stored locally/);
-	assert.match(receipt, /MARKER_COLLISION line 0000/);
-	assert.doesNotMatch(receipt, /MARKER_COLLISION line 0100/);
+	assert.match(receipt, /MARKER_COLLISION_.* line 0000/);
+	assert.doesNotMatch(receipt, /MARKER_COLLISION_.* line 0100/);
 	const metadata = result.details.toolResultVirtualizer as {
 		sourceId: string;
 		captureStatus: string;
@@ -494,7 +674,10 @@ test("untrusted toolResultVirtualizer-shaped metadata does not bypass large-resu
 			content: [
 				{
 					type: "text",
-					text: markerLines("UNTRUSTED_METADATA_SHOULD_STORE", 300),
+					text: markerLines(
+						`UNTRUSTED_METADATA_SHOULD_STORE_${"X".repeat(40)}`,
+						300,
+					),
 				},
 			],
 			details: { toolResultVirtualizer: { sourceId: "tr_collision" } },
@@ -550,7 +733,7 @@ test("non-text-only tool results with large details are not stored or replaced",
 
 test("mixed tool results preserve non-text blocks while storing only text content", async () => {
 	const { store, dir } = await makeStore();
-	const text = markerLines("MIXED_TEXT_ONLY", 220);
+	const text = markerLines(`MIXED_TEXT_ONLY_${"X".repeat(40)}`, 220);
 	const result = await virtualizeToolResult(
 		{
 			toolName: "mixed_content_tool",

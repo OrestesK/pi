@@ -9,7 +9,9 @@ import {
 } from "node:fs/promises";
 import { join } from "node:path";
 
-const SOURCE_ID_PATTERN = /^tr_[a-z0-9]+_(?:[a-f0-9]{8}|[a-f0-9]{32})$/;
+import type { CaptureOccurrence } from "./occurrences.ts";
+
+const SOURCE_ID_PATTERN = /^tr_(?:[a-z0-9]+_(?:[a-f0-9]{8}|[a-f0-9]{32})|[a-f0-9]{64})$/;
 
 export type JournalTransaction = {
 	sourceId: string;
@@ -33,10 +35,11 @@ export type JournalInspection = {
 };
 
 type JournalRecord = {
-	version: 1;
+	version: 1 | 2;
 	sourceId: string;
 	hasDetails: boolean;
 	ownerPid: number;
+	occurrence?: CaptureOccurrence;
 };
 
 function isMissing(error: unknown): boolean {
@@ -85,7 +88,7 @@ function parseJournalRecord(text: string): JournalRecord | undefined {
 		return undefined;
 	const record = value as Record<string, unknown>;
 	if (
-		record.version !== 1 ||
+		(record.version !== 1 && record.version !== 2) ||
 		typeof record.sourceId !== "string" ||
 		!SOURCE_ID_PATTERN.test(record.sourceId) ||
 		typeof record.hasDetails !== "boolean" ||
@@ -95,11 +98,16 @@ function parseJournalRecord(text: string): JournalRecord | undefined {
 	) {
 		return undefined;
 	}
+	if (record.version === 2 && (!record.occurrence || typeof record.occurrence !== "object"))
+		return undefined;
 	return {
-		version: 1,
+		version: record.version,
 		sourceId: record.sourceId,
 		hasDetails: record.hasDetails,
 		ownerPid: record.ownerPid,
+		...(record.version === 2
+			? { occurrence: record.occurrence as CaptureOccurrence }
+			: {}),
 	};
 }
 
@@ -170,6 +178,22 @@ export class StoreJournal {
 		return transaction;
 	}
 
+	async setOccurrence(
+		transaction: JournalTransaction,
+		occurrence: CaptureOccurrence,
+	): Promise<void> {
+		const record: JournalRecord = {
+			version: 2,
+			sourceId: transaction.sourceId,
+			hasDetails: transaction.hasDetails,
+			ownerPid: process.pid,
+			occurrence,
+		};
+		await writeFile(transaction.journalPath, `${JSON.stringify(record)}\n`, {
+			mode: 0o600,
+		});
+	}
+
 	async commit(transaction: JournalTransaction): Promise<void> {
 		await unlinkIfPresent(transaction.stagedSourcePath);
 		if (transaction.hasDetails)
@@ -207,6 +231,7 @@ export class StoreJournal {
 
 	async recover(
 		committedSourceIds: ReadonlySet<string>,
+		recoverOccurrence?: (occurrence: CaptureOccurrence) => Promise<void>,
 	): Promise<JournalRecoveryReport> {
 		let entries: string[];
 		try {
@@ -250,6 +275,8 @@ export class StoreJournal {
 				report.unresolvedTransactionCount += 1;
 				continue;
 			}
+			if (record.occurrence && recoverOccurrence)
+				await recoverOccurrence(record.occurrence);
 			await this.commit(transaction);
 			report.committedTransactionCount += 1;
 		}

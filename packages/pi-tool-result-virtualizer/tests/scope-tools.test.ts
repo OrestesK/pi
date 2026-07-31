@@ -4,7 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
-	markerLines,
+	largeMarkerLines,
 	schemaProperties,
 	withRegisteredExtension,
 } from "./test-helpers.ts";
@@ -50,7 +50,9 @@ test("model-facing discovery is scoped while parent exact and global access stay
 			const patch = (await runToolResult({
 				toolName: "bash",
 				toolCallId: "scoped_source",
-				content: [{ type: "text", text: markerLines("PROJECT_A_ONLY", 300) }],
+				content: [
+					{ type: "text", text: largeMarkerLines("PROJECT_A_ONLY", 300) },
+				],
 			})) as { details: { toolResultVirtualizer: { sourceId: string } } };
 			const sourceId = patch.details.toolResultVirtualizer.sourceId;
 
@@ -88,7 +90,9 @@ test("model-facing discovery is scoped while parent exact and global access stay
 			await runToolResult({
 				toolName: "bash",
 				toolCallId: "scoped_source_b",
-				content: [{ type: "text", text: markerLines("PROJECT_B_ONLY", 420) }],
+				content: [
+					{ type: "text", text: largeMarkerLines("PROJECT_B_ONLY", 420) },
+				],
 			});
 			activeCwd = projectA;
 			const diagnosticsAfter = await runTool("tool_result_diagnostics", {

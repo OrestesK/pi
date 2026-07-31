@@ -10,6 +10,7 @@ import {
 import { dirname, join } from "node:path";
 import test from "node:test";
 
+import { SearchIndex } from "../src/search-index.ts";
 import { ToolResultStore } from "../src/store.ts";
 import { makeStore, supportsFts5Trigram } from "./test-helpers.ts";
 
@@ -158,9 +159,8 @@ test("store searches recent sources first when sourceId is omitted", async () =>
 	);
 });
 
-test("broad store search builds an FTS candidate index without changing newest-first matches", async () => {
-	if (!(await supportsFts5Trigram())) return;
-	const { store, dir } = await makeStore();
+test("broad store search uses the linear fallback when FTS is absent", async () => {
+	const { store } = await makeStore();
 	const oldSource = await store.storeSource({
 		toolName: "bash",
 		toolCallId: "old_fts_search_call",
@@ -183,14 +183,13 @@ test("broad store search builds an FTS candidate index without changing newest-f
 			{ sourceId: oldSource.sourceId, line: "needle from old source" },
 		],
 	);
-	assert.equal(
-		(await stat(join(dir, "search-index.sqlite"))).mode & 0o777,
-		0o600,
-	);
+	await assert.rejects(() => stat(join(store.root, "search-index.sqlite")), {
+		code: "ENOENT",
+	});
 });
 
-test("short broad store searches keep the linear fallback without creating an FTS index", async () => {
-	const { store, dir } = await makeStore();
+test("short broad store searches keep the linear fallback when FTS is absent", async () => {
+	const { store } = await makeStore();
 	const stored = await store.storeSource({
 		toolName: "bash",
 		toolCallId: "short_query_search_call",
@@ -204,13 +203,10 @@ test("short broad store searches keep the linear fallback without creating an FT
 		matches.map((match) => ({ sourceId: match.sourceId, line: match.line })),
 		[{ sourceId: stored.sourceId, line: "xy from short query" }],
 	);
-	await assert.rejects(() => stat(join(dir, "search-index.sqlite")), {
-		code: "ENOENT",
-	});
 });
 
-test("non-ASCII broad store searches keep the linear fallback without creating an FTS index", async () => {
-	const { store, dir } = await makeStore();
+test("non-ASCII broad store searches keep the linear fallback when FTS is absent", async () => {
+	const { store } = await makeStore();
 	const stored = await store.storeSource({
 		toolName: "bash",
 		toolCallId: "unicode_query_search_call",
@@ -224,9 +220,6 @@ test("non-ASCII broad store searches keep the linear fallback without creating a
 		matches.map((match) => ({ sourceId: match.sourceId, line: match.line })),
 		[{ sourceId: stored.sourceId, line: "İstanbul token" }],
 	);
-	await assert.rejects(() => stat(join(dir, "search-index.sqlite")), {
-		code: "ENOENT",
-	});
 });
 
 test("broad store searches fall back to linear scan when SQLite indexing is unavailable", async () => {
@@ -262,6 +255,7 @@ test("broad FTS candidate search escapes query syntax before exact line scanning
 		text: 'alpha "beta" gamma\n',
 		captureStatus: "event.content",
 	});
+	await SearchIndex.rebuildOffline(dir, [stored]);
 
 	const matches = await store.search('alpha "beta"', {
 		limit: 1,
@@ -283,7 +277,7 @@ test("broad FTS candidate search escapes query syntax before exact line scanning
 			.prepare("PRAGMA table_info(indexed_sources)")
 			.all()
 			.map((row) => row.name);
-		assert.equal(version, 2);
+		assert.equal(version, 3);
 		assert.deepEqual(columns, ["id", "source_id", "sha256"]);
 	} finally {
 		db.close();
@@ -305,6 +299,7 @@ test("broad FTS candidate search preserves exact line context and first-hit colu
 		text: "before\nneedle then needle again\nafter\n",
 		captureStatus: "event.content",
 	});
+	await SearchIndex.rebuildOffline(store.root, [stored]);
 
 	const matches = await store.search("needle", { limit: 3, contextLines: 1 });
 
@@ -330,6 +325,102 @@ test("broad FTS candidate search preserves exact line context and first-hit colu
 				context: "before\nneedle then needle again\nafter\n",
 			},
 		],
+	);
+});
+
+test("project-scoped duplicate content has a stable opaque source ID and preserves every occurrence", async () => {
+	const { store, dir } = await makeStore();
+	const projectId = "a".repeat(64);
+	const first = await store.storeSource({
+		toolName: "bash",
+		toolCallId: "first-call",
+		text: "same reusable evidence\n",
+		captureStatus: "event.content",
+		originalDetailsText: '{"capture":1}',
+		provenance: {
+			scope: "project",
+			projectId,
+			classification: "unclassified-local",
+			sessionId: "session-one",
+		},
+	});
+	const second = await store.storeSource({
+		toolName: "bash",
+		toolCallId: "second-call",
+		text: "same reusable evidence\n",
+		captureStatus: "event.content",
+		originalDetailsText: '{"capture":2}',
+		provenance: {
+			scope: "project",
+			projectId,
+			classification: "unclassified-local",
+			sessionId: "session-two",
+		},
+	});
+	assert.equal(second.sourceId, first.sourceId);
+	assert.equal((await store.getStats()).sourceCount, 1);
+	const occurrences = await Promise.all(
+		(await readdir(join(dir, "occurrences", "records"))).map(async (name) =>
+			JSON.parse(
+				await readFile(join(dir, "occurrences", "records", name), "utf8"),
+			) as Record<string, unknown>,
+		),
+	);
+	assert.equal(occurrences.length, 2);
+	assert.deepEqual(
+		occurrences.map((occurrence) => occurrence.sessionId),
+		["session-one", "session-two"],
+	);
+	assert.deepEqual(
+		occurrences.map((occurrence) => occurrence.toolCallId),
+		["first-call", "second-call"],
+	);
+	for (const occurrence of occurrences) {
+		const detailsPath = occurrence.originalDetailsPath;
+		if (typeof detailsPath !== "string")
+			throw new TypeError("expected occurrence details path");
+		assert.match(await readFile(detailsPath, "utf8"), /capture/);
+	}
+	const key = await stat(join(dir, "receipt-identity.key"));
+	assert.equal(key.mode & 0o777, 0o600);
+
+	const other = await store.storeSource({
+		toolName: "bash",
+		text: "same reusable evidence\n",
+		captureStatus: "event.content",
+		provenance: {
+			scope: "project",
+			projectId: "b".repeat(64),
+			classification: "unclassified-local",
+		},
+	});
+	assert.notEqual(other.sourceId, first.sourceId);
+});
+
+test("fresh-process capture leaves FTS stale and broad search uses the linear fallback", async () => {
+	if (!(await supportsFts5Trigram())) return;
+	const { store, dir } = await makeStore();
+	await store.storeSource({
+		toolName: "bash",
+		text: "first indexed evidence\n",
+		captureStatus: "event.content",
+	});
+	await store.rebuildSearchIndexOffline();
+	const nextProcessStore = new ToolResultStore(dir);
+	const second = await nextProcessStore.storeSource({
+		toolName: "bash",
+		text: "second indexed evidence\n",
+		captureStatus: "event.content",
+	});
+	const report = await nextProcessStore.diagnoseConsistency();
+	assert.equal(report.ftsStatus, "mismatch");
+	assert.equal(report.ftsMismatchCount, 1);
+	assert.equal(
+		(await nextProcessStore.search("second indexed", {
+			limit: 1,
+			contextLines: 0,
+		}))[0]?.sourceId,
+		second.sourceId,
 	);
 });
 
@@ -479,7 +570,9 @@ test("store previews retention candidates without deleting stored sources", asyn
 	);
 	assert.equal(
 		stats.totalStoredBytes,
-		stats.totalBytes + stats.totalOriginalDetailsBytes,
+		stats.totalBytes +
+			stats.totalOriginalDetailsBytes +
+			stats.totalOccurrenceBytes,
 	);
 
 	const preview = await store.previewRetention({ maxSources: 1 });
@@ -492,12 +585,20 @@ test("store previews retention candidates without deleting stored sources", asyn
 	);
 	assert.equal(
 		preview.candidateStoredBytes,
-		preview.candidateBytes + preview.candidateDetailsBytes,
+		preview.candidateBytes +
+			preview.candidateDetailsBytes +
+			preview.candidateOccurrenceBytes,
+	);
+	assert.equal(preview.candidateOccurrenceBytes > 0, true);
+	assert.equal(
+		preview.candidateOccurrenceBytes < stats.totalOccurrenceBytes,
+		true,
 	);
 	assert.deepEqual(
 		preview.candidates.map((candidate) => candidate.sourceId),
 		[oldSource.sourceId],
 	);
+	assert.deepEqual(preview.candidates[0]?.reasons, ["maxSources"]);
 	assert.equal(preview.keptSourceIds.includes(recentSource.sourceId), true);
 	assert.equal(
 		(await store.readSource(oldSource.sourceId)).text,
@@ -505,7 +606,7 @@ test("store previews retention candidates without deleting stored sources", asyn
 	);
 });
 
-test("broad search rebuilds FTS sidecar when FTS rows are missing", async () => {
+test("broad search falls back to linear scan when FTS rows are missing", async () => {
 	if (!(await supportsFts5Trigram())) return;
 	const { store, dir } = await makeStore();
 	const stored = await store.storeSource({
@@ -514,6 +615,7 @@ test("broad search rebuilds FTS sidecar when FTS rows are missing", async () => 
 		text: "needle survives missing fts row\n",
 		captureStatus: "event.content",
 	});
+	await SearchIndex.rebuildOffline(dir, [stored]);
 	assert.equal(
 		(await store.search("needle", { limit: 1, contextLines: 0 })).length,
 		1,
@@ -530,10 +632,20 @@ test("broad search rebuilds FTS sidecar when FTS rows are missing", async () => 
 		db.close();
 	}
 
+	const later = await store.storeSource({
+		toolName: "bash",
+		text: "later capture survives missing FTS rows\n",
+		captureStatus: "event.content",
+	});
 	const matches = await store.search("needle", { limit: 1, contextLines: 0 });
 	assert.deepEqual(
 		matches.map((match) => ({ sourceId: match.sourceId, line: match.line })),
 		[{ sourceId: stored.sourceId, line: "needle survives missing fts row" }],
+	);
+	assert.equal(
+		(await store.search("later capture", { limit: 1, contextLines: 0 }))[0]
+			?.sourceId,
+		later.sourceId,
 	);
 });
 

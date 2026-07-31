@@ -2,7 +2,14 @@ import { createHash, randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { canonicalSourceId } from "./canonical-id.ts";
 import type { StoreLimits } from "./config.ts";
+import {
+	OccurrenceJournal,
+	occurrenceFromMetadata,
+	type CaptureOccurrence,
+	type OccurrenceMetadata,
+} from "./occurrences.ts";
 import { inspectStoreConsistency } from "./diagnostics.ts";
 import { StoreJournal, type JournalTransaction } from "./journal.ts";
 import type {
@@ -124,6 +131,7 @@ export type StoreStats = {
 	sourceCount: number;
 	totalBytes: number;
 	totalOriginalDetailsBytes: number;
+	totalOccurrenceBytes: number;
 	totalStoredBytes: number;
 	totalLines: number;
 	indexLineCount: number;
@@ -156,6 +164,7 @@ export type StoreFootprint = {
 	scope: "store" | "visible";
 	sourceBytes: number;
 	detailsBytes: number;
+	occurrenceBytes: number;
 	indexBytes: number;
 	ftsBytes: number;
 	totalBytes: number;
@@ -212,6 +221,7 @@ export type RetentionPreview = {
 	candidateCount: number;
 	candidateBytes: number;
 	candidateDetailsBytes: number;
+	candidateOccurrenceBytes: number;
 	candidateStoredBytes: number;
 	candidateLines: number;
 	selectors: { maxSources?: number; maxAgeHours?: number };
@@ -236,9 +246,9 @@ export type StoreFailurePoint =
 	| "afterDetailsPromotion"
 	| "afterSourcePromotion"
 	| "beforeMetadataAppend"
-	| "afterMetadataAppend"
-	| "beforeFtsAppend"
-	| "afterFtsAppend";
+	| "beforeOccurrenceAppend"
+	| "afterOccurrenceAppend"
+	| "afterMetadataAppend";
 
 export type StoreFailureInjector = (
 	point: StoreFailurePoint,
@@ -277,6 +287,10 @@ function makeSourceId(): string {
 	return `tr_${Date.now().toString(36)}_${randomBytes(16).toString("hex")}`;
 }
 
+function makeOccurrenceId(): string {
+	return `oc_${Date.now().toString(36)}_${randomBytes(16).toString("hex")}`;
+}
+
 function hashText(text: string): string {
 	return createHash("sha256").update(text).digest("hex");
 }
@@ -307,6 +321,7 @@ export class ToolResultStore {
 	private readonly limits: StoreLimits;
 	private readonly failureInjector: StoreFailureInjector | undefined;
 	private readonly catalog: StoreCatalog;
+	private readonly occurrences: OccurrenceJournal;
 	private readonly searchCoordinator: SearchCoordinator;
 	private recoveryPromise: Promise<void> | undefined;
 	private writeQueue: Promise<void> = Promise.resolve();
@@ -319,7 +334,8 @@ export class ToolResultStore {
 		this.writeLock = new StoreWriteLock(root);
 		this.limits = options.limits ?? {};
 		this.failureInjector = options.failureInjector;
-		const searchIndexFactory = options.searchIndexFactory ?? SearchIndex.create;
+		const searchIndexFactory = options.searchIndexFactory ?? SearchIndex.open;
+		this.occurrences = new OccurrenceJournal(root);
 		this.catalog = new StoreCatalog({
 			root: this.root,
 			sourcesDir: this.sourcesDir,
@@ -361,13 +377,55 @@ export class ToolResultStore {
 		input: StoreSourceInput,
 	): Promise<StoredSource> {
 		const sourceBytes = Buffer.byteLength(input.text, "utf8");
+		const sourceSha256 = hashText(input.text);
 		const detailsBytes =
 			input.originalDetailsText === undefined
 				? 0
 				: Buffer.byteLength(input.originalDetailsText, "utf8");
-		await this.assertAdmission(sourceBytes + detailsBytes);
+		const existingEntries = (await this.readIndexReport()).entries;
+		const sourceId =
+			input.provenance?.scope === "project" && input.provenance.projectId
+				? await canonicalSourceId(this.root, {
+					projectId: input.provenance.projectId,
+					toolName: input.toolName,
+					captureStatus: input.captureStatus,
+					sha256: sourceSha256,
+				})
+				: makeSourceId();
+		const existing = existingEntries.find((entry) => entry.sourceId === sourceId);
+		if (existing !== undefined) {
+			if (
+				existing.scope !== "project" ||
+				existing.projectId !== input.provenance?.projectId ||
+				existing.toolName !== input.toolName ||
+				existing.captureStatus !== input.captureStatus ||
+				existing.sha256 !== sourceSha256
+			) {
+				throw new Error("tool-result canonical source identity collision");
+			}
+			const occurrence = this.buildOccurrence(sourceId, input, detailsBytes);
+			await this.assertAdmission(
+				Buffer.byteLength(JSON.stringify(occurrence), "utf8") + detailsBytes,
+				false,
+			);
+			const transaction = await this.journal.begin(sourceId, false);
+			try {
+				await this.prepareOccurrence(occurrence, input.originalDetailsText);
+				await this.journal.setOccurrence(transaction, occurrence);
+				await this.publishOccurrence(occurrence);
+				await this.journal.commit(transaction);
+				return existing;
+			} catch (error) {
+				throw error;
+			}
+		}
+		const occurrence = this.buildOccurrence(sourceId, input, detailsBytes);
+		await this.assertAdmission(
+			sourceBytes +
+				detailsBytes * 2 +
+				Buffer.byteLength(JSON.stringify(occurrence), "utf8"),
+		);
 		await this.injectFailure("afterAdmission");
-		const sourceId = makeSourceId();
 		const transaction = await this.journal.begin(
 			sourceId,
 			input.originalDetailsText !== undefined,
@@ -378,6 +436,9 @@ export class ToolResultStore {
 			sourceBytes,
 			detailsBytes,
 		);
+		await this.prepareOccurrence(occurrence, input.originalDetailsText);
+		await this.journal.setOccurrence(transaction, occurrence);
+		let occurrenceAppended = false;
 		try {
 			await this.injectFailure("afterJournal");
 			if (input.originalDetailsText !== undefined) {
@@ -408,10 +469,11 @@ export class ToolResultStore {
 				flag: "a",
 				mode: 0o600,
 			});
+			await this.injectFailure("beforeOccurrenceAppend");
+			await this.publishOccurrence(occurrence);
+			occurrenceAppended = true;
+			await this.injectFailure("afterOccurrenceAppend");
 			await this.injectFailure("afterMetadataAppend");
-			await this.injectFailure("beforeFtsAppend");
-			await this.searchCoordinator.append(metadata, input.text);
-			await this.injectFailure("afterFtsAppend");
 			await this.journal.commit(transaction).catch(() => undefined);
 			return metadata;
 		} catch (error) {
@@ -424,12 +486,61 @@ export class ToolResultStore {
 				// The original write error remains authoritative when the index cannot be inspected.
 			}
 			if (committed) {
+				if (!occurrenceAppended) await this.publishOccurrence(occurrence);
 				await this.journal.commit(transaction).catch(() => undefined);
 				return metadata;
 			}
 			await this.journal.rollback(transaction).catch(() => undefined);
 			throw error;
 		}
+	}
+
+	private buildOccurrence(
+		sourceId: string,
+		input: StoreSourceInput,
+		detailsBytes: number,
+	): CaptureOccurrence {
+		const occurrenceId = makeOccurrenceId();
+		const originalDetailsPath =
+			input.originalDetailsText === undefined
+				? undefined
+				: this.occurrences.detailsPath(occurrenceId);
+		const occurrenceMetadata: OccurrenceMetadata = {
+			sourceId,
+			createdAt: Date.now(),
+		};
+		if (input.provenance?.sessionId !== undefined)
+			occurrenceMetadata.sessionId = input.provenance.sessionId;
+		if (input.provenance?.subagentRunId !== undefined)
+			occurrenceMetadata.subagentRunId = input.provenance.subagentRunId;
+		if (input.provenance?.agentName !== undefined)
+			occurrenceMetadata.agentName = input.provenance.agentName;
+		if (input.toolCallId !== undefined)
+			occurrenceMetadata.toolCallId = input.toolCallId;
+		if (input.inputSummary !== undefined)
+			occurrenceMetadata.inputSummary = input.inputSummary;
+		if (input.originalPath !== undefined)
+			occurrenceMetadata.originalPath = input.originalPath;
+		if (input.originalFullOutputPath !== undefined)
+			occurrenceMetadata.originalFullOutputPath = input.originalFullOutputPath;
+		if (originalDetailsPath !== undefined)
+			occurrenceMetadata.originalDetailsPath = originalDetailsPath;
+		if (input.originalDetailsText !== undefined) {
+			occurrenceMetadata.originalDetailsByteCount = detailsBytes;
+			occurrenceMetadata.originalDetailsSha256 = hashText(input.originalDetailsText);
+		}
+		return occurrenceFromMetadata(occurrenceId, occurrenceMetadata);
+	}
+
+	private prepareOccurrence(
+		occurrence: CaptureOccurrence,
+		detailsText: string | undefined,
+	): Promise<void> {
+		return this.occurrences.prepare(occurrence, detailsText);
+	}
+
+	private publishOccurrence(occurrence: CaptureOccurrence): Promise<void> {
+		return this.occurrences.publish(occurrence);
 	}
 
 	private metadataForInput(
@@ -477,7 +588,10 @@ export class ToolResultStore {
 		return metadata;
 	}
 
-	private async assertAdmission(attemptedBytes: number): Promise<void> {
+	private async assertAdmission(
+		attemptedBytes: number,
+		addsSource = true,
+	): Promise<void> {
 		if (
 			this.limits.maxSources === undefined &&
 			this.limits.maxStoredBytes === undefined
@@ -486,7 +600,7 @@ export class ToolResultStore {
 		const entries = (await this.readIndexReport()).entries;
 		if (
 			this.limits.maxSources !== undefined &&
-			entries.length + 1 > this.limits.maxSources
+			addsSource && entries.length + 1 > this.limits.maxSources
 		) {
 			throw new StoreQuotaError(
 				"maxSources",
@@ -496,10 +610,11 @@ export class ToolResultStore {
 			);
 		}
 		if (this.limits.maxStoredBytes !== undefined) {
-			const currentBytes = entries.reduce(
-				(total, entry) => total + entry.byteCount + detailsByteCount(entry),
-				0,
-			);
+			const currentBytes =
+				entries.reduce(
+					(total, entry) => total + entry.byteCount + detailsByteCount(entry),
+					0,
+				) + (await this.occurrences.byteCount());
 			if (currentBytes + attemptedBytes > this.limits.maxStoredBytes) {
 				throw new StoreQuotaError(
 					"maxStoredBytes",
@@ -529,7 +644,10 @@ export class ToolResultStore {
 		const committedSourceIds = new Set(
 			(await this.readIndexReport()).entries.map((entry) => entry.sourceId),
 		);
-		await this.journal.recover(committedSourceIds);
+		await this.journal.recover(committedSourceIds, (occurrence) =>
+			this.publishOccurrence(occurrence),
+		);
+		await this.occurrences.recover(committedSourceIds);
 	}
 
 	async listSources(
@@ -556,12 +674,15 @@ export class ToolResultStore {
 			(sum, entry) => sum + detailsByteCount(entry),
 			0,
 		);
+		const totalOccurrenceBytes = await this.occurrences.byteCount();
 		return {
 			root: this.root,
 			sourceCount: entries.length,
 			totalBytes,
 			totalOriginalDetailsBytes,
-			totalStoredBytes: totalBytes + totalOriginalDetailsBytes,
+			totalOccurrenceBytes,
+			totalStoredBytes:
+				totalBytes + totalOriginalDetailsBytes + totalOccurrenceBytes,
 			totalLines: entries.reduce((sum, entry) => sum + entry.lineCount, 0),
 			indexLineCount:
 				accessContext.actor === "system"
@@ -596,6 +717,12 @@ export class ToolResultStore {
 			recentLimit: limit,
 			includeGlobalState: accessContext.actor === "system",
 		});
+	}
+
+	/** Call only while no Pi process can write to this store. */
+	async rebuildSearchIndexOffline(): Promise<void> {
+		await this.ensureRecovered();
+		await SearchIndex.rebuildOffline(this.root, await this.readIndex());
 	}
 
 	async previewRetention(
@@ -648,6 +775,9 @@ export class ToolResultStore {
 			(sum, candidate) => sum + detailsByteCount(candidate),
 			0,
 		);
+		const candidateOccurrenceBytes = await this.occurrences.byteCountBySource(
+			candidateIds,
+		);
 		return {
 			root: this.root,
 			sourceCount: entries.length,
@@ -655,7 +785,9 @@ export class ToolResultStore {
 			candidateCount: candidateList.length,
 			candidateBytes,
 			candidateDetailsBytes,
-			candidateStoredBytes: candidateBytes + candidateDetailsBytes,
+			candidateOccurrenceBytes,
+			candidateStoredBytes:
+				candidateBytes + candidateDetailsBytes + candidateOccurrenceBytes,
 			candidateLines: candidateList.reduce(
 				(sum, candidate) => sum + candidate.lineCount,
 				0,
@@ -761,13 +893,12 @@ export class ToolResultStore {
 				lineLimit,
 			);
 		}
-		const entries = this.catalog.discoveryEntries(
-			await this.readIndex(),
-			accessContext,
-		);
+		const allEntries = await this.readIndex();
+		const entries = this.catalog.discoveryEntries(allEntries, accessContext);
 		const indexedCandidates = await this.searchCoordinator.candidateSources(
 			query,
 			entries,
+			allEntries,
 		);
 		return searchSources(
 			query,

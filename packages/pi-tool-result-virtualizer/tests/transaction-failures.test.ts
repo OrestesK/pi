@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { StoreJournal } from "../src/journal.ts";
 import { type StoreFailurePoint, ToolResultStore } from "../src/store.ts";
 
 async function files(path: string): Promise<string[]> {
@@ -117,9 +118,9 @@ for (const scenario of PRE_COMMIT_FAILURES) {
 }
 
 for (const failurePoint of [
+	"beforeOccurrenceAppend",
+	"afterOccurrenceAppend",
 	"afterMetadataAppend",
-	"beforeFtsAppend",
-	"afterFtsAppend",
 ] as const) {
 	test(`post-commit failure at ${failurePoint} leaves the committed source retrievable after restart`, async () => {
 		const root = await mkdtemp(
@@ -149,3 +150,70 @@ for (const failurePoint of [
 		);
 	});
 }
+
+test("v1 journal transactions remain recoverable", async () => {
+	const root = await mkdtemp(join(tmpdir(), "pi-trv-v1-journal-"));
+	const journal = new StoreJournal(root);
+	const transaction = await journal.begin("tr_" + "a".repeat(64), false);
+	await writeFile(transaction.stagedSourcePath, "staged\n", { mode: 0o600 });
+	const v1 = JSON.parse(await readFile(transaction.journalPath, "utf8")) as Record<string, unknown>;
+	v1.ownerPid = 999_999;
+	await writeFile(transaction.journalPath, JSON.stringify(v1), { mode: 0o600 });
+	const restarted = new ToolResultStore(root);
+	assert.deepEqual(await restarted.listSources(), []);
+	await assert.rejects(() => stat(transaction.journalPath), { code: "ENOENT" });
+});
+
+test("committed v2 occurrence replays exactly once after restart", async () => {
+	const root = await mkdtemp(join(tmpdir(), "pi-trv-v2-occurrence-"));
+	const store = new ToolResultStore(root);
+	const stored = await store.storeSource({
+		toolName: "read", text: "committed\n", captureStatus: "event.content",
+	});
+	const journal = new StoreJournal(root);
+	const transaction = await journal.begin(stored.sourceId, false);
+	const occurrence = { occurrenceId: "oc_replay", sourceId: stored.sourceId, createdAt: 1 };
+	await journal.setOccurrence(transaction, occurrence);
+	const v2 = JSON.parse(await readFile(transaction.journalPath, "utf8")) as Record<string, unknown>;
+	v2.ownerPid = 999_999;
+	await writeFile(transaction.journalPath, JSON.stringify(v2), { mode: 0o600 });
+	const restarted = new ToolResultStore(root);
+	await restarted.listSources();
+	const recordPath = join(root, "occurrences", "records", "oc_replay.json");
+	assert.deepEqual(JSON.parse(await readFile(recordPath, "utf8")), occurrence);
+	await restarted.listSources();
+	assert.equal((await readdir(join(root, "occurrences", "records"))).filter((name) => name === "oc_replay.json").length, 1);
+});
+
+test("duplicate occurrence details are admitted against maxStoredBytes", async () => {
+	const root = await mkdtemp(join(tmpdir(), "pi-trv-occurrence-quota-"));
+	const projectId = "a".repeat(64);
+	const initial = new ToolResultStore(root);
+	await initial.storeSource({
+		toolName: "read", text: "same\n", captureStatus: "event.content",
+		provenance: { scope: "project", projectId, classification: "unclassified-local" },
+	});
+	const limit = (await initial.getStats()).totalStoredBytes + 100;
+	const limited = new ToolResultStore(root, { limits: { maxStoredBytes: limit } });
+	await assert.rejects(
+		limited.storeSource({
+			toolName: "read", text: "same\n", captureStatus: "event.content",
+			originalDetailsText: "x".repeat(101),
+			provenance: { scope: "project", projectId, classification: "unclassified-local" },
+		}),
+		/error.*maxStoredBytes|maxStoredBytes/i,
+	);
+});
+
+test("legacy occurrence bytes are included in store totals", async () => {
+	const root = await mkdtemp(join(tmpdir(), "pi-trv-legacy-occurrence-"));
+	const store = new ToolResultStore(root);
+	const stored = await store.storeSource({ toolName: "read", text: "source\n", captureStatus: "event.content" });
+	const before = (await store.getStats()).totalOccurrenceBytes;
+	const detailsPath = join(root, "occurrences", "legacy.details.json");
+	await writeFile(detailsPath, "legacy details\n", { mode: 0o600 });
+	const legacy = { occurrenceId: "oc_legacy", sourceId: stored.sourceId, createdAt: 1, originalDetailsPath: detailsPath };
+	await writeFile(join(root, "occurrences.jsonl"), `${JSON.stringify(legacy)}\n`, { mode: 0o600 });
+	const stats = await store.getStats();
+	assert.equal(stats.totalOccurrenceBytes - before, Buffer.byteLength(`${JSON.stringify(legacy)}\n`) + Buffer.byteLength("legacy details\n"));
+});

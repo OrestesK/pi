@@ -21,6 +21,7 @@ import {
 	subagentRpcReplyEvent,
 } from "../src/subagent-rpc-client.ts";
 import {
+	largeMarkerLines,
 	markerLines,
 	schemaProperties,
 	withRegisteredExtension,
@@ -31,7 +32,7 @@ function largeReadEvent(path: string, marker: string): Record<string, unknown> {
 		toolName: "read",
 		toolCallId: marker,
 		input: { path },
-		content: [{ type: "text", text: markerLines(marker, 300) }],
+		content: [{ type: "text", text: largeMarkerLines(marker, 300) }],
 	};
 }
 
@@ -218,7 +219,9 @@ test("extension tool_result hook failures with large output return compact failu
 		});
 		assert.ok(toolResultHandler);
 		assert.ok(contextHandler);
-		const large = markerLines("HOOK_FALLBACK_SHOULD_NOT_LEAK", 300);
+		const largeMarker = "HOOK_FALLBACK_SHOULD_NOT_LEAK";
+		const large = `${largeMarker}${"X".repeat(50_000 - largeMarker.length)}`;
+		assert.equal(Buffer.byteLength(large, "utf8"), 50_000);
 		const failurePatch = (await toolResultHandler(
 			{
 				toolName: "synthetic_large_text",
@@ -352,7 +355,9 @@ test("delegate tool starts one bounded run and receipts advertise it only when r
 			const patch = (await runToolResult({
 				toolName: "synthetic_large_text",
 				toolCallId: "delegate_source",
-				content: [{ type: "text", text: markerLines("DELEGATE_TARGET", 300) }],
+				content: [
+					{ type: "text", text: largeMarkerLines("DELEGATE_TARGET", 300) },
+				],
 			})) as {
 				content: Array<{ text?: string }>;
 				details: {
@@ -424,7 +429,10 @@ test("delegate tool starts one bounded run and receipts advertise it only when r
 						toolName: "synthetic_large_text",
 						toolCallId: `delegate_child_${name}`,
 						content: [
-							{ type: "text", text: markerLines("CHILD_RECEIPT", 300) },
+							{
+								type: "text",
+								text: largeMarkerLines("CHILD_RECEIPT", 300),
+							},
 						],
 					})) as {
 						content: Array<{ text?: string }>;
@@ -481,7 +489,10 @@ test("delegate tool starts one bounded run and receipts advertise it only when r
 				toolName: "synthetic_large_text",
 				toolCallId: "delegate_unavailable_source",
 				content: [
-					{ type: "text", text: markerLines("NO_DELEGATE_ACTION", 300) },
+					{
+						type: "text",
+						text: largeMarkerLines("NO_DELEGATE_ACTION", 300),
+					},
 				],
 			})) as {
 				content: Array<{ text?: string }>;
@@ -529,7 +540,9 @@ test("protected tools expose and persist optional compact reasons", async () => 
 		const patch = (await runToolResult({
 			toolName: "synthetic_large_text",
 			toolCallId: "reason_source",
-			content: [{ type: "text", text: markerLines("REASON_TARGET", 300) }],
+			content: [
+				{ type: "text", text: largeMarkerLines("REASON_TARGET", 300) },
+			],
 		})) as { details: { toolResultVirtualizer: { sourceId: string } } };
 		const sourceId = patch.details.toolResultVirtualizer.sourceId;
 
@@ -628,7 +641,7 @@ test("extension searches bounded ranges across explicit source ids", async () =>
 				const lineNumber = index + 1;
 				if (lineNumber === matchLine) return `${label} bounded needle`;
 				if (lineNumber === outsideLine) return `${label} outside needle`;
-				return `${label} filler ${lineNumber}`;
+				return `${label} filler ${lineNumber} ${"X".repeat(40)}`;
 			}).join("\n")}\n`;
 		const first = (await runToolResult({
 			toolName: "synthetic_large_text",
@@ -751,7 +764,7 @@ test("extension rejects blank search queries without returning arbitrary stored 
 			content: [
 				{
 					type: "text",
-					text: `${markerLines("BLANK_QUERY_SHOULD_NOT_LEAK", 220)}`,
+					text: largeMarkerLines("BLANK_QUERY_SHOULD_NOT_LEAK", 220),
 				},
 			],
 		})) as { details: { toolResultVirtualizer: { sourceId: string } } };
@@ -783,7 +796,10 @@ test("extension guides broad no-match search toward sourceId-restricted search",
 			toolName: "synthetic_large_text",
 			toolCallId: "broad_no_match_source",
 			content: [
-				{ type: "text", text: `${markerLines("BROAD_NO_MATCH_PRIVATE", 220)}` },
+				{
+					type: "text",
+					text: largeMarkerLines("BROAD_NO_MATCH_PRIVATE", 220),
+				},
 			],
 		});
 
@@ -851,12 +867,16 @@ test("extension previews retention candidates without returning raw source conte
 		await runToolResult({
 			toolName: "bash",
 			toolCallId: "retention_old",
-			content: [{ type: "text", text: markerLines("RETENTION_OLD", 300) }],
+			content: [
+				{ type: "text", text: largeMarkerLines("RETENTION_OLD", 300) },
+			],
 		});
 		await runToolResult({
 			toolName: "bash",
 			toolCallId: "retention_recent",
-			content: [{ type: "text", text: markerLines("RETENTION_RECENT", 300) }],
+			content: [
+				{ type: "text", text: largeMarkerLines("RETENTION_RECENT", 300) },
+			],
 		});
 
 		const result = await runTool("tool_result_retention_preview", {
@@ -878,7 +898,10 @@ test("extension caps retention preview candidate lists while preserving full cou
 				toolName: "bash",
 				toolCallId: `retention_many_${index}`,
 				content: [
-					{ type: "text", text: markerLines(`RETENTION_MANY_${index}`, 220) },
+					{
+						type: "text",
+						text: largeMarkerLines(`RETENTION_MANY_${index}`, 220),
+					},
 				],
 			});
 		}
@@ -902,7 +925,10 @@ test("extension caps retention preview kept source lists while preserving full c
 				toolName: "bash",
 				toolCallId: `retention_kept_${index}`,
 				content: [
-					{ type: "text", text: markerLines(`RETENTION_KEPT_${index}`, 220) },
+					{
+						type: "text",
+						text: largeMarkerLines(`RETENTION_KEPT_${index}`, 220),
+					},
 				],
 			});
 		}
@@ -922,7 +948,10 @@ test("extension caps metadata protected tool outputs by bytes", async () => {
 				toolName: `metadata_cap_with_long_tool_name_${index}`,
 				toolCallId: `metadata_cap_${index}`,
 				content: [
-					{ type: "text", text: markerLines(`METADATA_CAP_${index}`, 220) },
+					{
+						type: "text",
+						text: largeMarkerLines(`METADATA_CAP_${index}`, 220),
+					},
 				],
 			});
 		}
@@ -965,7 +994,9 @@ test("extension exposes bounded read-only consistency diagnostics without raw co
 		const patch = (await runToolResult({
 			toolName: "bash",
 			toolCallId: "diag_source",
-			content: [{ type: "text", text: markerLines("DIAG_SECRET", 250) }],
+			content: [
+				{ type: "text", text: largeMarkerLines("DIAG_SECRET", 250) },
+			],
 			details: { truncation: { truncated: false } },
 		})) as { details: { toolResultVirtualizer: { sourceId: string } } };
 		const sourcePath = join(

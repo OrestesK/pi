@@ -22,7 +22,7 @@ pi install "$PWD"
 ## How it works
 
 - Intercepts text from `tool_result` events.
-- Virtualizes results at 50,000 bytes or 200 lines.
+- Virtualizes results at 50,000 bytes, or at 200 lines when the visible text is also at least 10,000 bytes.
 - Stores captured text under `${PI_TOOL_RESULT_VIRTUALIZER_DIR:-~/.pi/tool-result-virtualizer}`.
 - Assigns new captures to a keyed project scope derived from the canonical working directory without storing that raw path in provenance metadata.
 - Replaces model-visible content with a compact receipt containing source metadata, a cropped preview, textual known-fact search guidance, and a typed decision card with executable retrieval actions.
@@ -94,7 +94,7 @@ Events contain allowlisted sizes, counts, decisions, operation/outcome names, an
 - Reads whose requested filename is exactly `SKILL.md` bypass virtualization. Normalized path spellings do not widen this filename rule through symlinks.
 - `sourceId` must match `tr_[a-z0-9_]+` and stay at most 128 bytes.
 - Invalid input returns a compact error without echoing raw input.
-- If local storage fails for a large result, raw output is suppressed and a compact failure receipt is returned instead.
+- If local storage fails, model-visible output below 50,000 bytes is preserved with a warning; output at or above 50,000 bytes is suppressed and replaced with a compact failure receipt.
 
 ## Persistence and search
 

@@ -13,16 +13,18 @@ import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 
 import { StoreJournal } from "../src/journal.ts";
+import { SearchIndex } from "../src/search-index.ts";
 import { ToolResultStore } from "../src/store.ts";
 
 test("consistency diagnostics report a clean committed store", async () => {
 	const root = await mkdtemp(join(tmpdir(), "pi-trv-consistency-clean-"));
 	const store = new ToolResultStore(root);
-	await store.storeSource({
+	const stored = await store.storeSource({
 		toolName: "read",
 		text: "evidence\n",
 		captureStatus: "event.content",
 	});
+	await SearchIndex.rebuildOffline(root, [stored]);
 
 	const report = await store.diagnoseConsistency();
 	assert.equal(report.healthy, true);
@@ -30,11 +32,60 @@ test("consistency diagnostics report a clean committed store", async () => {
 	assert.equal(report.hashMismatchCount, 0);
 	assert.equal(report.detailsHashMismatchCount, 0);
 	assert.equal(report.scopeKeyUnavailable, false);
-	assert.equal(report.ftsStatus, "missing");
+	assert.equal(report.ftsStatus, "healthy");
 	assert.equal(report.footprint.sourceBytes, Buffer.byteLength("evidence\n"));
 	assert.equal(report.quota.maxSources, undefined);
 	assert.equal(report.quota.maxStoredBytes, undefined);
 	assert.deepEqual(report.issues, []);
+});
+
+test("visible consistency diagnostics exclude inaccessible occurrence bytes", async () => {
+	const root = await mkdtemp(join(tmpdir(), "pi-trv-visible-occurrences-"));
+	const store = new ToolResultStore(root, {
+		limits: { maxStoredBytes: 100_000 },
+	});
+	const projectOne = "a".repeat(64);
+	const projectTwo = "b".repeat(64);
+	await store.storeSource({
+		toolName: "read",
+		text: "project one evidence\n",
+		captureStatus: "event.content",
+		originalDetailsText: "project one occurrence details\n",
+		provenance: {
+			scope: "project",
+			projectId: projectOne,
+			classification: "unclassified-local",
+		},
+	});
+	await store.storeSource({
+		toolName: "read",
+		text: "project two evidence\n",
+		captureStatus: "event.content",
+		originalDetailsText: "project two occurrence details\n",
+		provenance: {
+			scope: "project",
+			projectId: projectTwo,
+			classification: "unclassified-local",
+		},
+	});
+
+	const visible = await store.diagnoseConsistency(5, {
+		actor: "parent",
+		projectId: projectOne,
+	});
+	const global = await store.diagnoseConsistency();
+
+	assert.equal(visible.scope, "visible");
+	assert.equal(visible.validSourceCount, 1);
+	assert.equal(visible.footprint.occurrenceBytes > 0, true);
+	assert.equal(
+		visible.footprint.occurrenceBytes < global.footprint.occurrenceBytes,
+		true,
+	);
+	assert.equal(
+		visible.quota.currentStoredBytes < global.quota.currentStoredBytes,
+		true,
+	);
 });
 
 test("consistency diagnostics expose corruption without mutating it", async () => {
@@ -132,7 +183,7 @@ test("consistency diagnostics report hash, scope-key, FTS, footprint, and quota 
 			classification: "unclassified-local",
 		},
 	});
-	await store.search("searchable");
+	await SearchIndex.rebuildOffline(root, [stored]);
 	assert.ok(stored.originalDetailsPath);
 	await writeFile(stored.textPath, "tampered source\n");
 	await writeFile(stored.originalDetailsPath, '{"tampered":true}\n');

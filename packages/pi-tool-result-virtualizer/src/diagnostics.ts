@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { access, readdir, stat } from "node:fs/promises";
+import { access, readFile, readdir, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
 import type { StoreLimits } from "./config.ts";
@@ -94,6 +94,28 @@ function sampleSourceIds(sourceIds: string[], limit = 5): string[] {
 		.slice(0, limit);
 }
 
+async function occurrenceBytesBySource(root: string): Promise<Map<string, number>> {
+	const totals = new Map<string, number>();
+	const add = async (occurrence: Record<string, unknown>, recordBytes: number) => {
+		if (typeof occurrence.sourceId !== "string") return;
+		let bytes = recordBytes;
+		if (typeof occurrence.originalDetailsPath === "string")
+			bytes += await fileByteCount(occurrence.originalDetailsPath);
+		totals.set(occurrence.sourceId, (totals.get(occurrence.sourceId) ?? 0) + bytes);
+	};
+	try {
+		const legacy = await readFile(join(root, "occurrences.jsonl"), "utf8");
+		for (const line of legacy.split("\n")) {
+			if (!line) continue;
+			try { await add(JSON.parse(line) as Record<string, unknown>, Buffer.byteLength(`${line}\n`)); } catch { /* legacy malformed entries are not billable */ }
+		}
+	} catch (error) { if (!isMissing(error)) throw error; }
+	for (const path of await directoryFiles(join(root, "occurrences", "records"))) {
+		try { const text = await readFile(path, "utf8"); await add(JSON.parse(text) as Record<string, unknown>, Buffer.byteLength(text)); } catch { /* invalid records are ignored */ }
+	}
+	return totals;
+}
+
 function detailsByteCount(source: StoredSourceMetadata): number {
 	return source.originalDetailsByteCount ?? 0;
 }
@@ -185,6 +207,16 @@ export async function inspectStoreConsistency(
 	}
 	let sourceBytes: number;
 	let detailsBytes: number;
+	const occurrenceBySource = await occurrenceBytesBySource(input.root);
+	const occurrenceIds = new Set(
+		(input.includeGlobalState ? input.allEntries : input.visibleEntries).map(
+			(entry) => entry.sourceId,
+		),
+	);
+	const occurrenceBytes = [...occurrenceIds].reduce(
+		(total, sourceId) => total + (occurrenceBySource.get(sourceId) ?? 0),
+		0,
+	);
 	let indexBytes: number;
 	let ftsBytes: number;
 	if (input.includeGlobalState) {
@@ -219,13 +251,16 @@ export async function inspectStoreConsistency(
 		detailsBytes,
 		indexBytes,
 		ftsBytes,
-		totalBytes: sourceBytes + detailsBytes + indexBytes + ftsBytes,
+		occurrenceBytes,
+		totalBytes: sourceBytes + detailsBytes + occurrenceBytes + indexBytes + ftsBytes,
 	};
 	const quotaEntries = input.includeGlobalState
 		? input.allEntries
 		: input.visibleEntries;
 	const currentStoredBytes = quotaEntries.reduce(
-		(total, entry) => total + entry.byteCount + detailsByteCount(entry),
+		(total, entry) =>
+			total + entry.byteCount + detailsByteCount(entry) +
+			(occurrenceBySource.get(entry.sourceId) ?? 0),
 		0,
 	);
 	const quota: StoreQuotaState = {

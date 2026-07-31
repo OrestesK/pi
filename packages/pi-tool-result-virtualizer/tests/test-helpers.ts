@@ -29,6 +29,10 @@ export function markerLines(marker: string, count: number): string {
 	);
 }
 
+export function largeMarkerLines(marker: string, count: number): string {
+	return markerLines(`${marker}_${"X".repeat(40)}`, count);
+}
+
 export async function supportsFts5Trigram(): Promise<boolean> {
 	try {
 		const sqlite = await import("node:sqlite");

@@ -90,3 +90,14 @@ export function resultRefFromMetadata(metadata: ResultRefMetadata): ResultRef {
 		sha256: metadata.sha256,
 	};
 }
+
+export function receiptResultRefFromMetadata(
+	metadata: ResultRefMetadata,
+): ResultRef {
+	const result = resultRefFromMetadata(metadata);
+	if (result.scope.kind !== "project") return result;
+	return {
+		...result,
+		scope: { kind: "project", projectId: result.scope.projectId },
+	};
+}

@@ -11,7 +11,7 @@ import {
 	type ReceiptDecisionCard,
 } from "./receipt.ts";
 import { retrievalDescription, retrievalLabel } from "./recovery.ts";
-import { resultRefFromMetadata } from "./result-ref.ts";
+import { receiptResultRefFromMetadata } from "./result-ref.ts";
 import type { CaptureStatus, StoredSource, ToolResultStore } from "./store.ts";
 import {
 	recordTelemetry,
@@ -43,6 +43,7 @@ export type ToolResultPatch = {
 
 const CONTENT_BYTE_THRESHOLD = 50_000;
 const CONTENT_LINE_THRESHOLD = 200;
+const CONTENT_LINE_BYTE_FLOOR = 10_000;
 const DETAILS_BYTE_THRESHOLD = 2 * 1024;
 const DETAILS_SCALAR_BYTE_LIMIT = 256;
 const CONTEXT_MODE_MCP_TOOL_PREFIX = "context_mode_ctx_";
@@ -339,9 +340,11 @@ function shouldVirtualize(
 	eventText: string,
 ): boolean {
 	if (isProtectedToolResult(event, toolName)) return false;
+	const eventBytes = byteLength(eventText);
 	const exceedsThreshold =
-		byteLength(eventText) >= CONTENT_BYTE_THRESHOLD ||
-		lineCount(eventText) >= CONTENT_LINE_THRESHOLD ||
+		eventBytes >= CONTENT_BYTE_THRESHOLD ||
+		(eventBytes >= CONTENT_LINE_BYTE_FLOOR &&
+			lineCount(eventText) >= CONTENT_LINE_THRESHOLD) ||
 		truncationContentBytes(event.details) >= CONTENT_BYTE_THRESHOLD;
 	if (!exceedsThreshold) {
 		if (!isTruncated(event.details)) return false;
@@ -424,25 +427,43 @@ function formatBytes(bytes: number): string {
 function buildFailureReceipt(toolName: string, eventText: string): string {
 	return [
 		`[tool-result-virtualizer] Large ${toolName} result failed before local storage completed`,
-		`Original content withheld: ${formatBytes(byteLength(eventText))}, ${lineCount(eventText)} lines`,
+		`Captured content withheld: ${formatBytes(byteLength(eventText))}, ${lineCount(eventText)} lines`,
 		"No source id was created. Retry the original tool call after fixing the local tool-result virtualizer store.",
 	].join("\n");
+}
+
+function buildFailureWarning(
+	toolName: string,
+	capturedContentWithheld: boolean,
+): string {
+	const captureWarning = capturedContentWithheld
+		? " A different captured source was not stored."
+		: "";
+	return `[tool-result-virtualizer] Local storage failed; original model-visible ${toolName} output preserved.${captureWarning} No source id was created.`;
 }
 
 function buildFailureDetails(
 	originalDetails: unknown,
 	toolName: string,
-	eventText: string,
+	captureText: string,
 	visibleContentBytes: number,
+	contentWithheld: boolean,
+	visibleContentPreserved: boolean,
 ): Record<string, unknown> {
 	const details = compactVisibleDetails(originalDetails, false, true);
-	details.toolResultVirtualizerFailure = {
+	const failure: Record<string, unknown> = {
 		toolName,
-		byteCount: byteLength(eventText),
-		lineCount: lineCount(eventText),
-		contentWithheld: true,
-		receiptBytes: visibleContentBytes,
+		byteCount: byteLength(captureText),
+		lineCount: lineCount(captureText),
+		contentWithheld,
 	};
+	if (visibleContentPreserved) {
+		failure.visibleContentPreserved = true;
+		failure.visibleContentBytes = visibleContentBytes;
+	} else {
+		failure.receiptBytes = visibleContentBytes;
+	}
+	details.toolResultVirtualizerFailure = failure;
 	return details;
 }
 
@@ -586,7 +607,7 @@ export async function virtualizeToolResult(
 	try {
 		const stored = await store.storeSource(sourceInput);
 		const decisionCard = createReceiptDecisionCard(
-			resultRefFromMetadata(stored),
+			receiptResultRefFromMetadata(stored),
 			options.delegationAvailable === true,
 		);
 		const receipt = buildReceipt(stored, capture.text, decisionCard);
@@ -608,18 +629,39 @@ export async function virtualizeToolResult(
 			),
 		};
 	} catch {
-		if (!shouldReplaceContent && !shouldStoreOriginalDetails) return undefined;
-		const visibleText = shouldReplaceContent
-			? buildFailureReceipt(toolName, capture.text)
-			: eventText;
+		const preserveVisibleContent =
+			shouldReplaceContent && visibleBytesBefore < CONTENT_BYTE_THRESHOLD;
+		const capturedContentWithheld = capture.text !== eventText;
+		let visibleText = eventText;
+		let content = visibleContent(event.content, eventText, false);
+		if (preserveVisibleContent) {
+			content = [
+				...content,
+				{
+					type: "text",
+					text: buildFailureWarning(toolName, capturedContentWithheld),
+				},
+			];
+			visibleText = textFromContent(content);
+		} else if (shouldReplaceContent) {
+			visibleText = buildFailureReceipt(toolName, capture.text);
+			content = visibleContent(event.content, visibleText, true);
+		}
+		const visibleContentPreserved =
+			!shouldReplaceContent || preserveVisibleContent;
+		const contentWithheld =
+			shouldReplaceContent &&
+			(!preserveVisibleContent || capturedContentWithheld);
 		await finish("failed", "storage_failure", byteLength(visibleText));
 		return {
-			content: visibleContent(event.content, visibleText, shouldReplaceContent),
+			content,
 			details: buildFailureDetails(
 				event.details,
 				toolName,
 				capture.text,
 				byteLength(visibleText),
+				contentWithheld,
+				visibleContentPreserved,
 			),
 		};
 	}

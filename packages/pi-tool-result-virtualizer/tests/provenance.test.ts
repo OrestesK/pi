@@ -13,7 +13,10 @@ import test from "node:test";
 
 import { ProvenanceResolver } from "../src/provenance.ts";
 import { ToolResultStore } from "../src/store.ts";
-import { markerLines, withRegisteredExtension } from "./test-helpers.ts";
+import {
+	largeMarkerLines,
+	withRegisteredExtension,
+} from "./test-helpers.ts";
 
 test("project provenance is stable across resolver instances and canonical paths", async () => {
 	const root = await mkdtemp(join(tmpdir(), "pi-trv-provenance-root-"));
@@ -113,7 +116,7 @@ test("extension passes host session provenance into stored captures", async () =
 			await runToolResult({
 				toolName: "read",
 				content: [
-					{ type: "text", text: markerLines("SESSION_PROVENANCE", 250) },
+					{ type: "text", text: largeMarkerLines("SESSION_PROVENANCE", 250) },
 				],
 				details: {},
 			});
