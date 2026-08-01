@@ -11,10 +11,10 @@ Use semantic code tools when code structure, behavior, types, relationships, or 
 
 When a situational Pi Lens tool is unavailable, call `pi_lens_activate_tools` with the needed tool names. Use the activated tools on the next model turn.
 
-- **Ownership and shape:** `symbol_search`, then `module_report`; read exact bodies with `read_symbol` or `read_enclosing`.
-- **Types and relationships:** `lsp_navigation` for definitions, references, implementations, hover, symbols, rename previews, and call hierarchy.
-- **Structural patterns:** `ast_grep_search`; use `ast_grep_replace` for structural rewrites and dry-run before applying. Use `ast_grep_outline` for syntax-only structure and `ast_grep_dump` when the AST shape is unclear.
-- **Diagnostics:** `lsp_diagnostics` for focused language-server checks and `lens_diagnostics` for aggregate edited-file or project findings.
+- **Ownership and shape:** `symbol_search`, then `module_report`; read exact bodies with `read_symbol` or `read_enclosing`
+- **Types and relationships:** `lsp_navigation` for definitions, references, implementations, hover, symbols, rename previews, and call hierarchy
+- **Structural patterns:** `ast_grep_search`; use `ast_grep_replace` for structural rewrites and dry-run before applying. Use `ast_grep_outline` for syntax-only structure and `ast_grep_dump` when the AST shape is unclear
+- **Diagnostics:** `lsp_diagnostics` for focused language-server checks and `lens_diagnostics` for aggregate edited-file or project findings
 
 Use every evidence group that answers a material question, but do not call groups mechanically. Gather the minimum evidence that can settle ownership, implementation, or correctness.
 
@@ -32,7 +32,7 @@ Dry-run structural replacements before applying them.
 
 Use the tool's registered `path` and `paths` fields. Start from a real file in the project when workspace symbol or project resolution needs context. Query references from the definition when usage-site results can be partial.
 
-Run targeted LSP diagnostics after each coherent code edit group and again after the final relevant edit. State the concrete reason when diagnostics are unavailable or do not apply.
+Run targeted LSP diagnostics after each coherent code edit group and again after the final relevant edit. State the concrete reason when a required semantic or diagnostic surface is unavailable or does not apply.
 
 ## Trust the result boundary
 

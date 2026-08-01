@@ -33,7 +33,7 @@ For a readiness claim or review that depends on current PR content:
 
 This is an observational freshness check, not an atomic lock on the PR. It applies only when a conclusion depends on PR content; metadata-only inspection and non-PR reviews do not gain this gate.
 
-Mutating operations require the user to explicitly ask for that exact action. One requested GitHub mutation does not authorize another. This skill documents command categories; it does not permit any mutation blocked by AGENTS.md or project rules:
+Mutating operations require the user to explicitly ask for that exact action. One requested GitHub mutation does not authorize another. This skill documents command categories; it does not permit any mutation blocked by the active instructions already in context, specifically the authorization and external-action policies, or by applicable project rules:
 
 - creating a PR with `gh pr create --title "..." --body-file /tmp/pr_body.md`
 - editing a PR description/body

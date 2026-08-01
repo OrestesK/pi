@@ -66,7 +66,7 @@ When crafting or supervising goals, keep the normal-session resource posture and
 Build the goal from evidence in this order:
 
 1. Latest explicit user instruction in the current session.
-2. Current system/developer/project instructions, especially `AGENTS.md`.
+2. Current system, developer, and project instructions already in context.
 3. Current repo state and relevant files/docs named by the task.
 4. Active TODOs/task trackers.
 5. Current `.scratch/` artifacts, run outputs, plans, reviews, and handoffs.
@@ -286,7 +286,7 @@ Scope:
 Constraints:
 - <preserve invariants>
 - <protected actions unavailable unless already authorized>
-- <follow AGENTS.md/project workflow/tool rules>
+- <follow the active instructions already in context, specifically the applicable project, workflow, and tool rules>
 - Use the normal session config without asking the user questions while the goal runs.
 - Follow the normal parent-write, subagent, proof, review, progress, and verification contract; do not add a second goal-only orchestration layer.
 - For every in-scope material decision that would normally ask, force substantial review by at least three distinct relevant advisors, gather more evidence as needed, choose the best supported answer, and record the decision, evidence, assumptions, uncertainty, and rejected alternatives. Never return `INCONCLUSIVE` or block on decision ambiguity.

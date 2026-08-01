@@ -44,7 +44,7 @@ Before asking questions, inspect what can be answered from tools:
 - relevant README/docs/instruction files
 - nearby code and tests
 - existing patterns and similar implementations
-- current constraints from `AGENTS.md`
+- current constraints from the active instructions already in context, specifically applicable project rules and global workflow and safety boundaries
 
 Use `scout` if the area is broad. Keep raw research in `.scratch/research/`.
 
