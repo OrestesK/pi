@@ -76,12 +76,13 @@ Load the named skill when its trigger is materially relevant. Mechanical work ma
 - Standalone nontrivial plan/code/feedback review → `review`. Implementation-stage review remains a `manager-workflow` stage using `review`
 - Explicit deep simplification/structure review → `code-quality-review`; concrete useful quality review may also run opportunistically as a read-only nonblocking lane during ordinary work
 - Done/fixed/passing/ready claim → `verification-before-completion` as specified under Verification
-- Nontrivial subagents and waiting reflection → `delegation`
+- Nontrivial work → `delegation` unless unavailable or prohibited; use its waiting procedure when child work is pending or reflection is useful
 - Code ownership, structure, types, relationships, or diagnostics → `code-intelligence`
 - First work in an unfamiliar repository → `learn-codebase`
 - Large output/log/test/build/data processing → `context-mode`
 - Session JSONL analysis → `session-reader`
 - GitHub/PR/CI → `github`; `iterate-pr` for iterative fixes
+- Entity-level Git change, changed-function, or change blast-radius analysis → `semantic-git`
 - Material React/TypeScript UI → `frontend`
 
 ### Orchestration boundary

@@ -1,6 +1,6 @@
 ---
 name: code-quality-review
-description: Deep code-quality and simplification review for explicit review requests or concrete useful background quality checks. Reviews simplicity, structure, maintainability, behavior-preserving cleanup, over-engineering, and AI slop; stays read-only unless fixes are explicitly authorized.
+description: Deep code-quality and simplification review for explicit deep structural/simplification review requests or concrete useful background quality checks. Reviews simplicity, structure, maintainability, behavior-preserving cleanup, over-engineering, and AI slop; stays read-only unless fixes are explicitly authorized.
 ---
 
 # Full Code Quality Review

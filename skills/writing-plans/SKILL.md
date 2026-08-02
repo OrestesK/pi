@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Use after requirements or design are approved when the user explicitly requests a durable plan or it is materially useful. Produces precise .scratch implementation tasks, behavioral-proof strategy, verification commands, and review checkpoints.
+description: Use after the requirements or design are approved when the user explicitly requests a durable plan or it is materially useful. Produces precise implementation tasks that may be saved under `.scratch/`, plus a behavioral-proof strategy, verification commands, and review checkpoints.
 ---
 
 # Writing Plans
@@ -29,7 +29,7 @@ Not allowed:
 
 Verify you have:
 
-- approved design or sufficiently clear requirements,
+- approved design or approved, sufficiently clear requirements,
 - known constraints from project instructions,
 - likely files/symbols affected,
 - project test/lint/typecheck commands when discoverable,
@@ -46,7 +46,7 @@ Avoid tables in generated plan Markdown. Every implementation plan should includ
 
 **Recommendation and outcome:** <chosen approach and observable result>
 **Previous behavior and delta:** <verified current state and proposed change>
-**Approved design:** <compact summary; a path is supporting evidence only>
+**Approved design or requirements:** <compact summary; a path is supporting evidence only>
 **Changed behavior:** <material changes>
 **Unchanged behavior / non-goals:** <preserved boundaries>
 **Constraints:** <protected actions, no mutating git, project conventions>

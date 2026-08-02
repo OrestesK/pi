@@ -167,7 +167,7 @@ If any issue appears: **stop, fix it, re-screenshot, then continue.** The comple
 
 1. Complete the diagram contract, reference-style contract, semantic cut, and overview/detail decision from `references/quality-gates.md`.
 2. Plan the coordinate grid, panels, primary route, and endpoint before writing JSON.
-3. Optional fresh start: `npx -y mcp-excalidraw-server clear --yes`.
+3. Only after the user approves discarding the current scene, or after a named snapshot under an approved replacement workflow, run `npx -y mcp-excalidraw-server clear --yes`.
 4. Create only title/boundaries and primary nodes first. Use descriptive IDs. Screenshot and correct hierarchy/whitespace before arrows:
    ```bash
    npx -y mcp-excalidraw-server add - <<'EOF'
@@ -287,7 +287,7 @@ This is how diagrams live in a repo: commit the `.excalidraw` file, and re-`impo
 - **Exit code 4 (browser required)?** Open `http://127.0.0.1:3000` in a browser, then retry — screenshots, image export, viewport, and mermaid conversion render in the frontend.
 - **Elements not appearing?** Check `describe` — they may be off-screen. In MCP mode, `set_viewport` with `scrollToContent: true`; in a browser, press the zoom-to-fit button.
 - **Arrow not connecting?** Verify element IDs with `get <id>`. Make sure `startElementId`/`endElementId` match existing element IDs.
-- **Canvas in a bad state?** `snapshot save` first, then `clear --yes` and rebuild. Or `snapshot restore` to go back.
+- **Canvas in a bad state?** Prefer `snapshot restore` when a suitable snapshot exists. Otherwise, save a named snapshot and obtain approval to discard the current scene before `clear --yes` and rebuild.
 - **Element won't update?** It may be locked — `arrange unlock --ids <id>` first.
 - **Duplicate text elements / element count doubling?** The frontend auto-sync timer periodically writes the full Excalidraw scene back to the server. Excalidraw internally generates a bound text element for every shape with a label; clearing and re-sending elements can re-inject cached bound texts. Clean up: `query --type text` to find elements with a `containerId`, `delete` the unwanted ones, wait a few seconds for auto-sync to settle. The safest prevention: **never put labels on background zone rectangles** — use free-standing text elements.
 

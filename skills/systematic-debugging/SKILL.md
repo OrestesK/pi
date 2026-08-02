@@ -72,7 +72,7 @@ No “while here” refactors unless the fix requires them.
 
 Continue only while each attempted fix tests a supported root-cause hypothesis and produces material new evidence or progress. Stop when failures repeat, progress stalls, each change only reveals unrelated symptoms, evidence invalidates the architecture or plan, or a material/protected boundary is reached.
 
-Summarize the attempts and evidence, question the architecture or original plan, and route the next decision through the active decision mode above. Do not use an arbitrary attempt count.
+Summarize the attempts and evidence, question the architecture or original plan, and route the next decision through the active workflow. Do not use an arbitrary attempt count.
 
 ## Red Flags
 

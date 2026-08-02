@@ -18,7 +18,7 @@ Use the inspected task context to produce the architecture body of the decision-
 
 ### User-requested spec only
 
-When the user asks only for a tech spec, return the spec and stop. Do not implement, offer implementation by default, or create a tracked file. Return it inline unless the user requests a file. Under `manager-workflow`, a useful `.scratch/` artifact may preserve detail but never replaces the complete chat proposal.
+When the user asks only for a tech spec, return the spec and stop. Do not implement, offer implementation by default, or create a tracked file. Return the complete spec inline. A user-requested or workflow-useful `.scratch/` artifact may preserve detail but never replaces the complete inline spec.
 
 ## Establish sufficient context
 

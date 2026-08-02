@@ -14,4 +14,4 @@ Use the `sem` CLI for structural code change analysis:
 - `sem log` — entity-level git log
 - `sem entities` — list all code entities in a file
 
-Use instead of raw `git diff` when you need to understand structural changes rather than line-level diffs.
+Use `sem` alongside raw `git diff` when entity-level structural analysis is needed; retain raw diffs for line-level and total-effective-diff review.

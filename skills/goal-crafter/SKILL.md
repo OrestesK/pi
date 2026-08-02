@@ -9,7 +9,7 @@ Craft one high-quality `/goal` command for Pi's local `pi-goal-supervisor`.
 
 This skill writes a goal contract. It does not start the goal, implement the work, or run an autonomous loop.
 
-When the user explicitly asks for goal crafting, goal-skill iteration, broad session-history research, or goal-design research, do not ask permission for read-only research, subagent research/review, or creating or updating the requested local skill artifact. Put temporary notes under `.scratch/`; a strict no-file or no-artifact instruction forbids them. Keep working until the evidence is sufficient or a real safety or permission blocker stops the task.
+When the user explicitly asks for goal crafting, goal-skill iteration, broad session-history research, or goal-design research, do not ask permission for read-only research, subagent research/review, or creating or updating the requested local skill artifact. Put temporary notes under `.scratch/`; a strict no-file or no-artifact instruction forbids all artifact creation and subagent runs. Keep working until the evidence is sufficient or a real safety or permission blocker stops the task.
 
 ## Trigger
 
@@ -92,8 +92,8 @@ Rules:
 
 ### 1. Confirm mode and scope
 
-- Goal: produce exactly one fenced `text` block containing one `/goal ...` command.
-- The final response must have no intro, outro, caveat paragraph, or second code block. The first non-fence text inside the block must start with `/goal `.
+- Default output: produce exactly one fenced `text` block containing one `/goal ...` command.
+- Unless the exception under **Output** applies, the final response has no intro, outro, caveat paragraph, or second code block. The first non-fence text inside the block must start with `/goal `.
 - Do not implement the underlying task.
 - Do not start the goal for the user unless the user explicitly asks after seeing it.
 - Do not make material product/API/scope/workflow decisions silently.
@@ -141,7 +141,7 @@ Context discovery:
 Scope:
 - In scope: <bounded objective area, source-of-truth discovery, verification surfaces, and safe quality ratchet work>.
 - Out of scope: <explicit non-goals, approval-required actions, unsafe/private/destructive routes>.
-- Scope may shift only when fresh evidence shows a better in-scope target; record the reason before continuing.
+- Keep the approved scope fixed. Within it, shift priority only when fresh evidence identifies a better target, and record the reason before continuing.
 
 Constraints:
 - <project/user/tool safety rules that must remain true>
@@ -178,7 +178,7 @@ Blocked only if:
 - For another allowed class, emit GOAL_BLOCKED with the specific blocker and evidence that no safe non-asking next step exists.
 ```
 
-Keep the command paste-ready as exactly one fenced `text` block and no surrounding prose. Include only details the goal runner needs. Do not paste evidence inventories, old paths, old findings, or todos as hardcoded requirements. Include exact paths/names only when they are the current target, an authoritative current source of truth, or necessary for locating the work; otherwise encode discovery terms, source-of-truth search, and re-verification policy.
+Keep the command paste-ready. Use one fenced `text` block with no surrounding prose by default; the exception under **Output** may add short bullets after the block. Include only details the goal runner needs. Do not paste evidence inventories, old paths, old findings, or todos as hardcoded requirements. Include exact paths/names only when they are the current target, an authoritative current source of truth, or necessary for locating the work; otherwise encode discovery terms, source-of-truth search, and re-verification policy.
 
 Before rendering, apply these internal shape-fit checks. Do not emit framework names or extra sections by default; expose the underlying detail only when it materially helps the runner:
 
@@ -281,7 +281,7 @@ Context discovery:
 Scope:
 - In scope: <bounded areas plus safe source-of-truth discovery and quality ratchet work>
 - Out of scope: <non-goals and approval-required/unsafe/private/destructive routes>
-- Scope may shift only when fresh evidence proves a better in-scope target; record the reason before continuing.
+- Keep the approved scope fixed. Within it, shift priority only when fresh evidence identifies a better target, and record the reason before continuing.
 
 Constraints:
 - <preserve invariants>
@@ -409,10 +409,10 @@ Reject or revise goals with these anti-patterns:
 
 Default output:
 
-1. One fenced code block containing the paste-ready `/goal` command.
-2. No long rationale.
+1. One fenced `text` block containing the paste-ready `/goal` command
+2. No surrounding prose
 
-When the user asked to review/refine or when assumptions matter, add at most five short bullets after the block:
+Exception: when the user asks to review/refine the goal or material assumptions must be surfaced, append at most five short bullets after the block:
 
 - evidence used,
 - assumptions,

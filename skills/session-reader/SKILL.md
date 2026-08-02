@@ -9,13 +9,22 @@ Parse Pi session JSONL files into readable output. `PI_CODING_AGENT_SESSION_DIR`
 
 ## Step 1: Find the Session
 
+Resolve `scripts/read_session.py` relative to this skill directory and set `script_path` to that absolute path. Then list sessions and set `session_path` to the selected JSONL file's absolute path:
+
 ```bash
+script_path="/absolute/path/resolved-from-this-skill/scripts/read_session.py"
+
 if [[ -n "${PI_CODING_AGENT_SESSION_DIR:-}" ]]; then
-    ls -t "$PI_CODING_AGENT_SESSION_DIR"/*.jsonl | head -10
+    session_dir="$PI_CODING_AGENT_SESSION_DIR"
+    ls -t "$session_dir"/*.jsonl | head -10
 else
     session_root="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/sessions"
-    ls -t "$session_root"/*<project>*/*.jsonl | head -10
+    find "$session_root" -mindepth 1 -maxdepth 1 -type d -printf '%p\n' | sort
+    project_dir="/absolute/path/to/one-listed-project-directory"
+    ls -t "$project_dir"/*.jsonl | head -10
 fi
+
+session_path="/absolute/path/to/selected-session.jsonl"
 ```
 
 ## Step 2: Start with Table of Contents
@@ -23,7 +32,7 @@ fi
 Always start with `toc` to get a numbered map of the session:
 
 ```bash
-uv run {baseDir}/scripts/read_session.py <path> --mode toc
+uv run "$script_path" "$session_path" --mode toc
 ```
 
 This prints a compact numbered list of every user exchange with timestamps and tools used.
@@ -34,13 +43,13 @@ Default mode — shows only user messages and assistant text responses. Tool cal
 
 ```bash
 # Full conversation (default mode)
-uv run {baseDir}/scripts/read_session.py <path>
+uv run "$script_path" "$session_path"
 
 # Specific range
-uv run {baseDir}/scripts/read_session.py <path> --offset 5 --limit 3
+uv run "$script_path" "$session_path" --offset 5 --limit 3
 
 # Search for specific topic
-uv run {baseDir}/scripts/read_session.py <path> --search "error"
+uv run "$script_path" "$session_path" --search "error"
 ```
 
 ## Step 4: Drill Into a Turn
@@ -48,7 +57,7 @@ uv run {baseDir}/scripts/read_session.py <path> --search "error"
 See everything about a specific exchange — thinking, tool calls, tool results, costs:
 
 ```bash
-uv run {baseDir}/scripts/read_session.py <path> --mode turn --turn 7
+uv run "$script_path" "$session_path" --mode turn --turn 7
 ```
 
 ## Mode Reference
@@ -87,8 +96,9 @@ uv run {baseDir}/scripts/read_session.py <path> --mode turn --turn 7
 Subagent session files can be read with the same script:
 
 ```bash
-# From --mode subagents output, grab the JSONL path
-uv run {baseDir}/scripts/read_session.py <subagent-jsonl-path> --mode toc
+# Set this to the JSONL path returned by --mode subagents
+subagent_session_path="/absolute/path/to/subagent-session.jsonl"
+uv run "$script_path" "$subagent_session_path" --mode toc
 ```
 
 ## Session Format Reference

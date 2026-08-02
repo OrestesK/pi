@@ -23,7 +23,7 @@ Use `systematic-debugging` to establish root cause. Capture the narrow failing r
 
 ### Existing coverage plus before/after evidence
 
-Use existing tests when they already prove the changed claim. Add or change a test only when the existing contract would not catch the intended regression.
+When existing tests already prove the changed claim, run them after the change. Add or change a test only when the existing contract would not catch the intended regression.
 
 ### Integration, live, or manual proof
 
@@ -58,7 +58,7 @@ Good tests:
 Bad tests:
 
 - mirror implementation details,
-- only assert that a mock was called,
+- only assert that an incidental mock was called,
 - pass before the feature exists,
 - require changing production code solely for tests,
 - cover field existence or trivial mapping without behavior.

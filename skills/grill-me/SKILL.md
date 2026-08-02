@@ -11,10 +11,10 @@ Use the active conversation to identify the plan, decision, or idea to interview
 - Walk the decision tree one dependency at a time.
 - Ask exactly one question, then wait for the user's answer before continuing.
 - Give a recommended answer with each question.
-- Find facts from the codebase, tools, or documentation yourself. Ask the user only to make decisions.
+- Find facts from the codebase, tools, or documentation yourself. Except for one opening question needed to establish the subject, ask the user only to make decisions.
 - Surface important assumptions and trade-offs; do not leave material decisions implicit.
 - Do not create files, make changes, or start implementation during the interview.
-- Stop when the important decisions are settled and confirm the shared understanding.
+- When the important decisions are settled, end the interview phase and confirm the shared understanding. Then offer the optional planning output.
 
 ## Optional planning output
 

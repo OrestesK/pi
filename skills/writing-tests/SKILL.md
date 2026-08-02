@@ -39,7 +39,7 @@ Avoid tests that:
 
 Do not add tests whose only purpose is to re-prove guarantees already enforced by the language, type system, declarative schema, validation library, or framework. Add tests when repo-owned code composes, configures, narrows, or depends on those guarantees at a boundary.
 
-Never test hardcoded implementation/config values. Do not copy literals from production code into assertions just to mirror the code. Instead, test behavior, canonical source-of-truth wiring, or meaningful invariants. Exact expected values are appropriate only when the value is itself the user-visible behavior, external contract, canonical fixture, or invariant result.
+Do not test hardcoded implementation/config values merely by duplicating their literals in assertions. Do not copy literals from production code into assertions just to mirror the code. Instead, test behavior, canonical source-of-truth wiring, or meaningful invariants. Exact expected values are appropriate only when the value is itself the user-visible behavior, external contract, canonical fixture, or invariant result.
 
 For UI or visualization tests, prefer user-visible behavior, accessible semantics, data transformation correctness, calculation correctness, rendered outcomes, and interaction outcomes over brittle markup shape, raw HTML structure, or snapshot-heavy assertions. Assert structure only when the structure or semantics is part of the contract.
 
@@ -195,7 +195,7 @@ When reviewing tests, check:
 - Are skipped tests, relaxed assertions, or broad snapshots justified?
 - Are focused/skipped tests temporary, conditional, and tracked rather than silently disabling coverage?
 - Does the test contain real assertions instead of logs, prints, zero-assertion smoke, tautologies, or broad truthiness checks?
-- Is a test labeled as a boundary/system test mocking every boundary it claims to exercise?
+- Does a test labeled as a boundary/system test avoid mocking the boundary it claims to exercise?
 - Were snapshot, golden, or recorded-fixture updates reviewed as behavior changes rather than accepted blindly?
 - Does every global state, environment, registry, clock, filesystem, or process mutation get cleaned up?
 

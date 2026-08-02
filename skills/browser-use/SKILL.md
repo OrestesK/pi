@@ -27,7 +27,7 @@ Default to the managed browser-use browser. Do **not** start by trying to attach
 5. **Verify visually**: use `browser-use screenshot <path.png>` for UI evidence
 6. **Repeat**: browser stays open between commands
 
-If a command fails, run `browser-use close` first to clear any broken session, then retry the same managed-browser flow.
+Only for a task-owned managed browser started for this task, run `browser-use close` after a command failure and retry. Never use `browser-use close` as automatic recovery after `connect`, `cloud connect`, or a `--profile` session; it can close a user-connected/profile browser or stop a cloud browser. Before closing any of those sessions, state that effect and obtain the user's explicit approval.
 
 For local dev-server testing, the expected default is:
 
@@ -244,17 +244,23 @@ Config stored in `~/.browser-use/config.json`.
 2. **Use `--headed` for debugging** to see what the browser is doing
 3. **Sessions persist** — browser stays open between commands
 4. **CLI aliases**: `bu`, `browser`, and `browseruse` all work
-5. **If commands fail**, run `browser-use close` first, then retry
+5. **If commands fail**, only for a task-owned managed browser started for this task, run `browser-use close` and retry. Never use `browser-use close` as automatic recovery after `connect`, `cloud connect`, or a `--profile` session; it can close a user-connected/profile browser or stop a cloud browser. Before closing any of those sessions, state that effect and obtain the user's explicit approval
 
 ## Troubleshooting
 
-- **Browser won't start?** `browser-use close` then `browser-use --headed open <url>`
+- **Browser won't start?** Only for a task-owned managed browser started for this task, run `browser-use close` and retry with `browser-use --headed open <url>`. Never use `browser-use close` as automatic recovery after `connect`, `cloud connect`, or a `--profile` session; it can close a user-connected/profile browser or stop a cloud browser. Before closing any of those sessions, state that effect and obtain the user's explicit approval
 - **Element not found?** `browser-use scroll down` then `browser-use state`
 - **Run diagnostics:** `browser-use doctor`
 
 ## Cleanup
 
+Close only a task-owned managed browser without further approval. Before closing a connected, cloud, or `--profile` session, state the effect and obtain the user's explicit approval.
+
+Record `task_tunnel_port` only when this task creates that tunnel. Stop only that recorded task-owned tunnel:
+
 ```bash
-browser-use close                         # Close browser session
-browser-use tunnel stop --all             # Stop tunnels (if any)
+browser-use close
+browser-use tunnel stop "$task_tunnel_port"
 ```
+
+`browser-use tunnel stop --all` requires explicit authorization covering every affected tunnel.

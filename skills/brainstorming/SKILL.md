@@ -107,7 +107,7 @@ After reviewed design approval:
 
 - Use `writing-plans` only when the user explicitly requested a durable plan or it is materially useful for continuity or execution.
 - Otherwise return to `manager-workflow` execution.
-- For unresolved material design choices, ask one clear question at a time and recommend an option when useful.
+- If a later material design choice becomes unresolved, return to clarification, ask one clear question at a time, and recommend an option when useful.
 
 ## Quality Bar
 

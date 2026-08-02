@@ -18,7 +18,7 @@ Every reviewer receives the approved behavior, non-goals, relevant decisions, ac
 After a coherent review-fix group, choose the follow-up by effective risk:
 
 - **Tiny mechanical fix:** no behavior, contract, reachability, or proof meaning changed. The parent inspects the final diff and runs the narrowest check; no child reviewer is required
-- **Contained correction:** one localized behavior, correctness, or proof defect changed without a public contract, security/data boundary, shared abstraction, cross-owner behavior, or new reachable consumer. Use one fresh targeted reviewer or validator
+- **Contained correction:** one localized behavior, correctness, or proof defect is corrected without changing a public contract, security/data boundary, shared abstraction, cross-owner behavior, or new reachable consumer. Use one fresh targeted reviewer or validator
 - **Broad or high-risk correction:** architecture or ownership, public contracts, security/data boundaries, concurrency, compatibility, shared abstractions, several consumers, or a materially changed proof strategy. Run a new review with at least three fresh reviewers and distinct targets
 
 Use the broader tier when classification is unclear. Continue only while a new validated primary finding produces a material correction. Stop when review is clean, only incidental or rejected findings remain, evidence stalls, a blocker appears, or another approval is required.

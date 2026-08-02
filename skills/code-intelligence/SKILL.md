@@ -30,7 +30,7 @@ Dry-run structural replacements before applying them.
 
 ## LSP use
 
-Use the tool's registered `path` and `paths` fields. Start from a real file in the project when workspace symbol or project resolution needs context. Query references from the definition when usage-site results can be partial.
+Use each tool's registered `path` or `paths` field. Start from a real file in the project when workspace symbol or project resolution needs context. Query references from the definition when usage-site results can be partial.
 
 Run targeted LSP diagnostics after each coherent code edit group and again after the final relevant edit. State the concrete reason when a required semantic or diagnostic surface is unavailable or does not apply.
 
