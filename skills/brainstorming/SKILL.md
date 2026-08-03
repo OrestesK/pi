@@ -55,11 +55,11 @@ Ask only what tools cannot answer. If evidence does not settle user intent, defe
 Rules:
 
 - Ask one focused question per `ask_user` call
-- Ask only material user-owned choices after tools and evidence resolve factual or routine questions
+- During pre-approval nontrivial design, ask about every consequential user-owned assumption, preference, or tradeoff that could noticeably affect the solution, workflow, UX, tradeoff, or maintenance shape after tools and evidence resolve factual or routine questions. A material choice always qualifies
 - Briefly explain why the choice matters, recommend an option when useful, and ask in normal language
 - Proactively map and verify materially reachable workflows, roles, states, failure paths, and consequences. Ask about unresolved reachable behavior; do not invent impossible hypotheticals or ask questions tools can answer.
 - When cost, time, downtime, rollout, production load, or resource tolerance could materially change the design, show the consequence and ask whether it is acceptable instead of silently optimizing around it.
-- Do not proceed from clarification to planning or implementation while a material requirement, scope boundary, or design choice remains unresolved.
+- Do not proceed from clarification to planning while a consequential user-owned assumption, material requirement, scope boundary, or design choice remains unresolved.
 - Prefer structured options when there are clear choices.
 - Include a short context summary in `ask_user` so the user sees why the question matters.
 - Do not bundle unrelated questions.

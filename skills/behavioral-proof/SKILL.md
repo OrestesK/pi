@@ -27,7 +27,7 @@ When existing tests already prove the changed claim, run them after the change. 
 
 ### Integration, live, or manual proof
 
-Use the real integration or user flow when the claim crosses process, provider, browser, database, queue, deployment, rendering, performance, or other runtime boundaries that unit tests cannot establish. State any unavailable boundary explicitly.
+When a material changed claim crosses a process, provider, browser, database, queue, deployment, rendering, performance, or other runtime boundary, prioritize the reachable live or end-to-end flow, then the closest integration evidence. Focused unit tests support but do not substitute for that runtime claim. If live evidence is unavailable or protected, use the strongest authorized lower-fidelity evidence and state the remaining unverified boundary explicitly. For claims that do not cross a runtime boundary, keep the smallest claim-bound proof instead of forcing a live probe.
 
 ### Non-behavioral work
 

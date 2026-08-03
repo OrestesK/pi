@@ -15,9 +15,11 @@ Use this flow only to select delegation topology. Follow `manager-workflow` for 
 
 ```text
 Request
-├─ Direct answer or one simple bounded task you can complete
-│  └─ Handle it yourself; do not delegate.
-└─ Delegation can materially improve the result
+├─ Direct answer or trivial mechanically obvious edit
+│  └─ Parent handles it.
+├─ Approved nontrivial implementation
+│  └─ clone owns every implementation slice.
+└─ Delegated read-only or advisory work
    ├─ One atomic focused deliverable
    │  └─ Launch the matching specialist directly.
    └─ Any other bounded coherent task
@@ -56,7 +58,9 @@ Fanout output
    └─ Inspect the output only when it becomes relevant.
 ```
 
-Run independent top-level clones and direct specialists in parallel. Use clone by default for every bounded coherent task that is not one atomic specialist deliverable. A clone owns its task-level implementation area and may use every required file in the shared project. The parent and other active task owners must avoid that task area. The clone stops and asks its immediate parent before touching a file owned by another active task, making a decision, handling a contradiction, or changing scope. Never launch a nested clone.
+Route every approved nontrivial implementation slice to `clone`, including a lone slice. The parent may implement only trivial mechanically obvious edits or corrections. When two or more approved implementation slices are genuinely independent, dispatch them in the same parallel wave when their active write sets are disjoint and their dependencies permit it. Consolidate shared-file changes under one owner when practical; otherwise schedule the shared file in a later accepted wave.
+
+Before each write wave involving a clone, the parent creates one allocation map containing its own and every active clone’s write set as exact paths or unambiguous globs. Include the complete map in every clone packet. All participants may read shared files. A clone stops through `contact_supervisor` before writing outside its assigned set, including an apparently unowned file. Ownership never changes mid-wave. For a normal handoff, the parent accepts the current wave before starting the next map. If missing ownership blocks the slice, the parent instructs the clone to end the current wave and return partial evidence, inspects it, releases the allocation, and starts a fresh wave whose map includes the required files. Dependent work waits until the new wave’s prerequisite evidence is green. Never launch a nested clone.
 
 Use only distinct roles or evidence targets that can change the decision, implementation, risk, or proof. Size parallelism from concrete independent evidence gaps, risk surfaces, and useful roles. Stop when evidence is sufficient; pending work or cost alone does not justify another wave. Do not launch duplicate children only to satisfy a number.
 
@@ -64,13 +68,15 @@ Honor a feasible explicit number requested by the user when the work can be spli
 
 For code-capable child tasks, pass `skill: "code-intelligence"` when code structure, types, relationships, or diagnostics are material. Clone inherits the skill catalog; specialists receive only explicitly supplied skills.
 
-Use the smallest topology that preserves dependencies and synthesis.
+Use the smallest topology that preserves dependencies, exclusive active write ownership, and synthesis.
 
 ## Parent and child execution
 
-Follow the active global instructions already in context, specifically the parent-child authority and integration rules in the `Orchestration boundary` section. Assign each clone one bounded coherent task. Continue useful non-overlapping work while it runs; do not duplicate its implementation or poll it.
+Follow the active global instructions already in context, specifically the parent-child authority and integration rules in the `Orchestration boundary` section. Assign each clone one bounded coherent task and require the canonical event protocol in `agents/clone.md` without duplicating it here. Progress reports are non-blocking; use `need_decision` and wait only when parent input is required. The parent inspects or steers only for concrete drift, conflict, blockers, runtime control notices, or useful new evidence. Continue useful non-overlapping work while clones run; do not duplicate implementation or routinely poll.
 
-Clone runs the applicable verification and independent review policy before completion. It returns changed files, child evidence, verification and review results, open risks, and the next integration step. The parent makes the final decision and performs the proportionate integration check.
+Each clone runs complete but proportionate verification for its slice and returns actual changed files plus named commands and results. Dependent phases wait until the parent accepts prerequisite evidence as green; independent phases continue concurrently.
+
+At fan-in, the parent inspects every clone result and the complete effective diff for scope, unexpected files, ownership violations, and combined contracts. It verifies integration and key combined risks without routinely rerunning sufficient current slice checks, then follows `manager-workflow` and `review` for the integrated readiness review. The parent may repair a trivial mechanically obvious defect; substantive, uncertain, behavioral, or multi-file corrections return to a clone with exact failure evidence.
 
 ## Child task contract
 
@@ -79,8 +85,11 @@ Give each child:
 - the concrete outcome
 - approved behavior and non-goals when relevant
 - the exact evidence target and why it is distinct
-- required proof or available evidence
+- required proof or available evidence, including named slice checks
 - effect and mutation boundaries
+- for a writing clone, the complete per-wave allocation map and its assigned active write set
+- ownership-conflict and scope-expansion stop conditions
+- the canonical clone progress protocol when applicable
 - a bounded stop condition
 - the expected response shape
 - an output path only when an artifact is useful and allowed

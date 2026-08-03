@@ -224,7 +224,7 @@ When fixes are explicitly authorized:
    - optional improvements;
    - rejected/deferred feedback;
    - decisions requiring approval.
-3. The parent applies one coherent fix group at a time. Use write children only under the configured exclusive-file policy.
+3. Apply one coherent authorized fix group at a time under the active global and `delegation` ownership rules; this workflow does not choose or override the writer.
 4. For behavior-preserving refactors, capture focused baseline evidence first; do not invent new behavior tests for purely mechanical cleanup unless existing proof is insufficient.
 5. For behavior changes or bug fixes, use `behavioral-proof` to select proportionate evidence.
 6. After each meaningful fix group, run the narrowest proof that can detect drift, then relevant broader checks.

@@ -43,13 +43,13 @@ Pi's local `/goal` is session-scoped and continuation-oriented:
 
 ## Resource posture
 
-`/goal` uses the same normal configuration, tools, skills, subagents, parent-write ownership, proof, review, reflection, progress, safety boundaries, and completion behavior as an interactive session. It retains normal goal continuation semantics. Its only decision-authority override is that a material question that would normally go to the user goes through forced decision review instead.
+`/goal` uses the same normal configuration, tools, skills, subagent delegation, implementation ownership, proof, review, reflection, progress, safety boundaries, and completion behavior as an interactive session. It retains normal goal continuation semantics. Its only decision-authority override is that a material question that would normally go to the user goes through forced decision review instead.
 
 Default goal shape for this user is adaptive and long-horizon: the goal should keep choosing safe useful evidence-producing work until the user explicitly ends it or the goal runner can show that no safe useful in-scope options remain. Use a short bounded goal only when the user explicitly asks for one.
 
 When crafting or supervising goals, keep the normal-session resource posture and add only the question-review substitution:
 
-- Follow the normal subagent, parent-write, proof, review, progress, and verification rules. Goal mode does not add another general swarm or workflow layer merely because it is active.
+- Follow the normal delegation, implementation ownership, subagent use, proof, review, progress, and verification rules. Goal mode does not add another general swarm or workflow layer merely because it is active.
 - For every in-scope material choice that would normally ask the user, run a substantial review of that exact question with at least three distinct relevant advisors—reviewer, researcher, planner, adversarial, or another fitting role. Gather further evidence or review angles as needed, validate and synthesize the results, choose the best supported in-scope answer, and record the decision, evidence, assumptions, uncertainty, and rejected alternatives. The gate always chooses; it never returns `INCONCLUSIVE` or blocks on ambiguity.
 - Advisors cannot authorize destructive actions, external mutations, deployment, disclosure, export, persistence, or other protected actions. Read-only work follows the global rule. If a protected action is required and no safe alternative can complete the goal, emit only the supervisor-supported blocker.
 - For nontrivial, multi-owner, behavior/API/schema, PR-sized, migration, cross-file, or otherwise risk-bearing goals, create the same visible contract card, plan, and owner map required by the normal workflow before editing. Replace the normal user approval question with the forced decision-review gate.
@@ -58,7 +58,7 @@ When crafting or supervising goals, keep the normal-session resource posture and
 - Include web/code research when the objective needs current external facts or local evidence is insufficient.
 - Use the normal `manager-workflow` review stage for every nontrivial plan and final-readiness review. Give reviewers the full goal contract, non-goals, relevant decisions, target, proof/evidence, angle, and stop condition.
 - Judge design quality across the complete repeated lifecycle, including failure recovery, deployment, verification, cleanup, and final state. Prefer the best, cleanest, most cohesive complete design; minimize components only when doing so omits no required lifecycle behavior.
-- Automatically apply only validated, mechanically local, non-material fixes inside the goal behavior, then return control to `manager-workflow`.
+- Continue automatically only for validated, mechanically local, non-material fixes inside the goal behavior; select the writer through the active global and `delegation` ownership rules, then return control to `manager-workflow`.
 - Run all relevant read-only verification automatically. Mutating validation, disclosure, export, persistence, deployment, or destruction requires an already approved exact boundary; advisors cannot authorize it.
 
 ## Evidence priority
@@ -147,7 +147,7 @@ Constraints:
 - <project/user/tool safety rules that must remain true>
 - <forbidden or protected actions not already authorized>
 - Use the normal session config without asking the user questions while the goal runs.
-- Follow the normal parent-write, subagent, proof, review, progress, and verification contract; do not add a second goal-only orchestration layer.
+- Follow the normal delegation, implementation ownership, subagent use, proof, review, progress, and verification contract; do not add a second goal-only orchestration layer.
 - For every in-scope material decision that would normally ask, force substantial review by at least three distinct relevant advisors, gather more evidence as needed, choose the best supported answer, and record the decision, evidence, assumptions, uncertainty, and rejected alternatives. Never return `INCONCLUSIVE` or block on decision ambiguity.
 - For nontrivial work, use the normal visible contract card and owner map, then final independent review against them.
 
@@ -288,7 +288,7 @@ Constraints:
 - <protected actions unavailable unless already authorized>
 - <follow the active instructions already in context, specifically the applicable project, workflow, and tool rules>
 - Use the normal session config without asking the user questions while the goal runs.
-- Follow the normal parent-write, subagent, proof, review, progress, and verification contract; do not add a second goal-only orchestration layer.
+- Follow the normal delegation, implementation ownership, subagent use, proof, review, progress, and verification contract; do not add a second goal-only orchestration layer.
 - For every in-scope material decision that would normally ask, force substantial review by at least three distinct relevant advisors, gather more evidence as needed, choose the best supported answer, and record the decision, evidence, assumptions, uncertainty, and rejected alternatives. Never return `INCONCLUSIVE` or block on decision ambiguity.
 - For nontrivial work, use the normal visible contract card and owner map, then final independent review against them.
 

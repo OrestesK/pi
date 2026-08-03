@@ -25,7 +25,7 @@ Use the broader tier when classification is unclear. Continue only while a new v
 
 A final `PASS` requires every accepted primary in-scope `must-fix` and `should-fix` finding to be fixed or explicitly deferred by the user. Incidental optional cleanup and background quality exploration remain nonblocking.
 
-Only validated, mechanically local, non-material fixes inside the approved behavior may be automatic. Final claim-bound verification is still required.
+Only validated, mechanically local, non-material fixes inside the approved behavior may continue automatically. Automatic continuation does not select the writer; use the active global and `delegation` ownership rules. Final claim-bound verification is still required.
 
 ## Review Modes
 
@@ -106,7 +106,7 @@ For each item:
    - `needs-discussion`: unclear feedback or feedback that would change behavior, architecture, tests, security, or scope
 4. Push back with evidence when feedback is wrong or conflicts with approved scope
 5. Ask one focused question when feedback changes behavior, architecture, tests, security, or scope
-6. Do not apply fixes from a standalone review-only request. In an approved implementation review/fix stage, the parent may automatically apply validated, mechanically local, non-material fixes inside the approved behavior, then return control to `manager-workflow`. Other fixes route through a reviewed behavioral amendment
+6. Do not apply fixes from a standalone review-only request. In an approved implementation review/fix stage, validated, mechanically local, non-material fixes inside the approved behavior may continue automatically under the active global and `delegation` ownership rules, then return control to `manager-workflow`. Other fixes route through a reviewed behavioral amendment
 
 Structural feedback is not automatically correct. Verify that the proposed simplification is concrete, behavior-preserving, and compatible with approved scope. If it changes architecture, behavior, schema, config, security, data mutation, or public contracts, ask before implementing.
 
@@ -123,6 +123,18 @@ Review output always keeps these partitions distinct:
 An explicit cleanup/code-quality request makes the requested cleanup or simplification surface primary. Ordinary review does not dispatch dedicated cleanup/polish hunters.
 
 Within each populated partition, use `must-fix`, `should-fix`, `nit`, `note`, or `needs-discussion` as appropriate. Omit empty incidental partitions rather than manufacturing findings.
+
+## Fix explicit Git targets before review
+
+When the user explicitly names a branch, tag, commit, or range:
+
+1. Resolve each named ref once to an immutable commit ID with read-only Git commands
+2. Resolve the merge base when that matches the requested comparison semantics
+3. Record the fixed base and head IDs plus the included commit list
+4. Give every reviewer the same fixed target and effective diff
+5. Stop when a ref does not resolve or the comparison is unexpectedly empty
+
+Do not fetch or mutate Git to resolve a target. Ordinary working-tree review is unchanged. `github` owns remote pull-request identity and metadata; `semantic-git` owns structural Git analysis.
 
 ## How to Review
 

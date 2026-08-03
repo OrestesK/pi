@@ -119,8 +119,12 @@
     "defaultModel": "openai-codex/gpt-5.6-terra",
     "disableBuiltins": false,
     "agentOverrides": {
-      "delegate": { "disabled": true },
-      "worker": { "disabled": true }
+      "delegate": {
+        "disabled": true
+      },
+      "worker": {
+        "disabled": true
+      }
     }
   },
   "autocompleteMaxVisible": 10,
