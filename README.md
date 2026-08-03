@@ -12,14 +12,14 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 | Path | Kind | Purpose |
 | --- | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | Executable policy | Always-loaded agent rules and workflow routing |
-| [`APPEND_SYSTEM.md`](APPEND_SYSTEM.md) | Executable policy | Host, toolchain, and language overlay |
+| [`APPEND_SYSTEM.md`](APPEND_SYSTEM.md) | Executable policy | Coding toolchain, core clipboard, and selected local CLI overlay |
 | [`settings.json`](settings.json) | Runtime config | Models, packages, UI, and compaction |
 | [`models.json`](models.json) | Runtime config | Custom model definitions |
 | [`mcp.json`](mcp.json) | Runtime config | MCP server registry |
 | [`permissions.json`](permissions.json) | Inactive artifact | Not consumed by Pi 0.80.6 or the loaded extensions |
 | [`keybindings.json`](keybindings.json) | Runtime config | Terminal keybindings |
 | [`agents/`](agents/) | Executable prompts | Local subagent roles; same-name files override packaged builtins |
-| [`skills/`](skills/) | Executable workflows | Instructions loaded on demand |
+| [`skills/`](skills/) | Executable workflows | On-demand workflows and domain guidance |
 | [`extensions/`](extensions/) | Runtime code/config | Commands, UI helpers, todos, and guardrails |
 | [`mcp-servers/`](mcp-servers/) | Runtime code | Local MCP implementations |
 | [`themes/`](themes/) | Runtime config | TUI themes |
