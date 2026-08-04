@@ -68,11 +68,15 @@ type RenderFn = (width: number) => string[];
 type WorkingState = "inactive" | "working" | "streaming";
 type WorkingStateSnapshot = { state: WorkingState; elapsedSeconds: number };
 type GetWorkingState = () => WorkingStateSnapshot;
-type SessionCostCacheEntry = {
+type SessionUsageCacheEntry = {
 	length: number;
 	lastEntry: SessionEntry | undefined;
-	total: number;
+	totalCost: number;
 	hasCost: boolean;
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
 };
 
 type PatchableUserMessagePrototype = {
@@ -146,7 +150,6 @@ const CLIPBOARD_IMAGE_LIST_TIMEOUT_MS = 1000;
 const CLIPBOARD_IMAGE_READ_TIMEOUT_MS = 3000;
 const CLIPBOARD_IMAGE_MAX_BYTES = 50 * 1024 * 1024;
 const execFileAsync = promisify(execFile);
-
 const CLIPBOARD_IMAGE_EXTENSIONS: Record<string, string> = {
 	"image/gif": "gif",
 	"image/jpeg": "jpg",
@@ -283,49 +286,91 @@ function formatTokenCount(value: number | null | undefined): string {
 	return String(value);
 }
 
-const sessionCostCache = new WeakMap<ExtensionContext, SessionCostCacheEntry>();
+const sessionUsageCache = new WeakMap<ExtensionContext, SessionUsageCacheEntry>();
 
-function getSessionCost(ctx: ExtensionContext): {
-	total: number;
-	hasCost: boolean;
+function getSessionUsage(ctx: ExtensionContext): SessionUsageCacheEntry & {
 	usingSubscription: boolean;
 } {
 	const entries = ctx.sessionManager.getEntries();
 	const lastEntry = entries.at(-1);
-	let cache = sessionCostCache.get(ctx);
+	let cache = sessionUsageCache.get(ctx);
 	if (
 		!cache ||
 		cache.length !== entries.length ||
 		cache.lastEntry !== lastEntry
 	) {
-		let total = 0;
+		let totalCost = 0;
 		let hasCost = false;
+		let inputTokens = 0;
+		let outputTokens = 0;
+		let cacheReadTokens = 0;
+		let cacheWriteTokens = 0;
 
 		for (const entry of entries) {
 			if (entry.type !== "message" || entry.message.role !== "assistant") {
 				continue;
 			}
-			const cost = entry.message.usage?.cost?.total;
+			const usage = entry.message.usage;
+			if (!usage) continue;
+			const cost = usage.cost?.total;
 			if (typeof cost === "number" && Number.isFinite(cost)) {
 				if (cost > 0) hasCost = true;
-				total += cost;
+				totalCost += cost;
 			}
+			inputTokens += usage.input;
+			outputTokens += usage.output;
+			cacheReadTokens += usage.cacheRead;
+			cacheWriteTokens += usage.cacheWrite;
 		}
 
-		cache = { length: entries.length, lastEntry, total, hasCost };
-		sessionCostCache.set(ctx, cache);
+		cache = {
+			length: entries.length,
+			lastEntry,
+			totalCost,
+			hasCost,
+			inputTokens,
+			outputTokens,
+			cacheReadTokens,
+			cacheWriteTokens,
+		};
+		sessionUsageCache.set(ctx, cache);
 	}
 
 	const usingSubscription = ctx.model
 		? ctx.modelRegistry.isUsingOAuth(ctx.model)
 		: false;
-	return { total: cache.total, hasCost: cache.hasCost, usingSubscription };
+	return { ...cache, usingSubscription };
 }
 
 function formatSessionCost(ctx: ExtensionContext): string | undefined {
-	const cost = getSessionCost(ctx);
-	if (cost.usingSubscription) return `${formatCost(cost.total)} sub`;
-	return cost.hasCost ? formatCost(cost.total) : undefined;
+	const usage = getSessionUsage(ctx);
+	if (usage.usingSubscription) return `${formatCost(usage.totalCost)} sub`;
+	return usage.hasCost ? formatCost(usage.totalCost) : undefined;
+}
+
+function formatSessionCacheHit(ctx: ExtensionContext): string | undefined {
+	const usage = getSessionUsage(ctx);
+	const promptTokens =
+		usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
+	if (usage.cacheReadTokens <= 0 || promptTokens <= 0) return undefined;
+	return `cache ${Math.round((usage.cacheReadTokens / promptTokens) * 100)}%`;
+}
+
+function formatSessionTokenUsage(ctx: ExtensionContext): string | undefined {
+	const usage = getSessionUsage(ctx);
+	const totalTokens =
+		usage.inputTokens +
+		usage.outputTokens +
+		usage.cacheReadTokens +
+		usage.cacheWriteTokens;
+	if (totalTokens <= 0) return undefined;
+	const categories = [
+		`in ${formatTokenCount(usage.inputTokens)}`,
+		`out ${formatTokenCount(usage.outputTokens)}`,
+		`read ${formatTokenCount(usage.cacheReadTokens)}`,
+		`write ${formatTokenCount(usage.cacheWriteTokens)}`,
+	].join("/");
+	return `tokens ${formatTokenCount(totalTokens)} (${categories})`;
 }
 
 function formatContextUsage(ctx: ExtensionContext): string {
@@ -784,28 +829,56 @@ function compactPath(cwd: string): string {
 	return cwd;
 }
 
+function normalizeFooterStatus(value: string | undefined): string | undefined {
+	if (!value) return undefined;
+	const normalized = stripAnsi(
+		value.replace(
+			/(?:\x1b\]|\x9d)(?:(?!\x07|\x1b\\|\x9c)[\s\S])*(?:\x07|\x1b\\|\x9c)/g,
+			"",
+		),
+	)
+		.replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+	return normalized || undefined;
+}
+
+function footerMetricsLine(
+	ctx: ExtensionContext,
+	theme: Theme,
+): string | undefined {
+	const parts = [
+		formatSessionCost(ctx),
+		formatSessionCacheHit(ctx),
+		formatSessionTokenUsage(ctx),
+	]
+		.filter((part): part is string => Boolean(part))
+		.map((part) => theme.fg("muted", part));
+	if (parts.length === 0) return undefined;
+	return `  ${parts.join(theme.fg("dim", " · "))}`;
+}
+
 function footerLine(
 	ctx: ExtensionContext,
 	width: number,
 	branch: string | undefined,
 	theme: Theme,
 	thinkingLevel: string | undefined,
+	slipstreamStatus: string | undefined,
 ): string | undefined {
 	const model = theme.fg("text", ctx.model?.id ?? "model");
 	const context = theme.fg(contextUsageColor(ctx), formatContextUsage(ctx));
-	const cost = formatSessionCost(ctx);
 	const thinking =
 		thinkingLevel && thinkingLevel !== "off"
 			? theme.fg("accent", `● ${thinkingLevel}`)
 			: undefined;
-	const parts = [
-		model,
-		thinking,
-		context,
-		cost ? theme.fg("muted", cost) : undefined,
-		theme.fg("dim", "/ commands"),
-	].filter((part): part is string => Boolean(part));
-	const left = `  ${parts.join(theme.fg("dim", " · "))}`;
+	const parts = slipstreamStatus
+		? [model, thinking, context, theme.fg("accent", slipstreamStatus)]
+		: [model, thinking, context, theme.fg("dim", "/ commands")];
+	const visibleParts = parts.filter(
+		(part): part is string => Boolean(part),
+	);
+	const left = `  ${visibleParts.join(theme.fg("dim", " · "))}`;
 	const right = theme.fg(
 		"muted",
 		`${compactPath(ctx.cwd)}${branch ? ` (${branch})` : ""}`,
@@ -5399,12 +5472,14 @@ function suppressSubagentWidget(ctx: ExtensionContext): void {
 	const originalSetWidget = ui.setWidget;
 	ui.__claudeUiOriginalSetWidget = originalSetWidget;
 	ui.setWidget = (key, value, options) => {
-		if (key === "agents" && value !== undefined) return;
+		if ((key === "agents" || key === "slipstream") && value !== undefined)
+			return;
 		originalSetWidget.call(ui, key, value, options);
 	};
 	ui.__claudeUiWidgetPatch = true;
 	patchedWidgetUis.add(ui);
 	originalSetWidget.call(ui, "agents", undefined);
+	originalSetWidget.call(ui, "slipstream", undefined);
 }
 
 function restoreSubagentWidgetPatches(): void {
@@ -5875,6 +5950,10 @@ function renderSubagentControlNotice(
 export const __claudeUiTestInternals = {
 	allowlistedToolNames: [...EXTENSION_TOOL_WRAPPER_ALLOWLIST],
 	agentToolCallBody,
+	footerLine,
+	footerMetricsLine,
+	formatSessionCacheHit,
+	formatSessionTokenUsage,
 	formatBashCall,
 	formatEditCall,
 	formatFindCall,
@@ -6034,6 +6113,8 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", (_event, ctx) => {
 		try {
+			for (const dispose of [...footerDisposers]) dispose();
+			footerDisposers.clear();
 			bumpFooterRenderRevision();
 			writeSnapshots.clear();
 			inlineImageCache.clear();
@@ -6075,6 +6156,7 @@ export default function (pi: ExtensionAPI) {
 							width: number;
 							branch: string | undefined;
 							thinkingLevel: string;
+							slipstreamStatus: string | undefined;
 							lines: string[];
 					  }
 					| undefined;
@@ -6098,32 +6180,49 @@ export default function (pi: ExtensionAPI) {
 						const currentCtx = activeCtx ?? ctx;
 						const branch = footerData.getGitBranch() ?? undefined;
 						const thinkingLevel = pi.getThinkingLevel();
+						const slipstreamStatus = normalizeFooterStatus(
+							footerData.getExtensionStatuses().get("slipstream"),
+						);
 						if (
 							footerCache &&
 							footerCache.revision === footerRenderRevision &&
 							footerCache.ctx === currentCtx &&
 							footerCache.width === width &&
 							footerCache.branch === branch &&
-							footerCache.thinkingLevel === thinkingLevel
+							footerCache.thinkingLevel === thinkingLevel &&
+							footerCache.slipstreamStatus === slipstreamStatus
 						) {
 							return footerCache.lines;
 						}
 
 						let raw: string | undefined;
+						let metrics: string | undefined;
 						try {
-							raw = footerLine(currentCtx, width, branch, theme, thinkingLevel);
+							raw = footerLine(
+								currentCtx,
+								width,
+								branch,
+								theme,
+								thinkingLevel,
+								slipstreamStatus,
+							);
+							metrics = footerMetricsLine(currentCtx, theme);
 						} catch (error) {
 							if (!isStaleContextError(error)) throw error;
 							clearStaleContext(currentCtx);
 							raw = undefined;
+							metrics = undefined;
 						}
-						const lines = raw ? [fitLine(raw, width), fitLine("", width)] : [];
+						const lines = raw
+							? [fitLine(raw, width), fitLine(metrics ?? "", width)]
+							: [];
 						footerCache = {
 							revision: footerRenderRevision,
 							ctx: currentCtx,
 							width,
 							branch,
 							thinkingLevel,
+							slipstreamStatus,
 							lines,
 						};
 						return lines;
@@ -6207,7 +6306,7 @@ export default function (pi: ExtensionAPI) {
 		if (!safeHasUI(ctx)) return;
 		activeCtx = ctx;
 		bumpFooterRenderRevision();
-		sessionCostCache.delete(ctx);
+		sessionUsageCache.delete(ctx);
 		setWorkingState("inactive", ctx);
 	});
 

@@ -10,7 +10,8 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { loadTs } from "../../../packages/pi-subagents/test/support/load-ts.mjs";
 
 const corePath = fileURLToPath(new URL("../core.ts", import.meta.url));
-const { __claudeUiTestInternals: ui } = await loadTs(corePath);
+const { default: registerClaudeUi, __claudeUiTestInternals: ui } =
+	await loadTs(corePath);
 
 const theme = {
 	fg: (_name, text) => text,
@@ -23,6 +24,25 @@ const theme = {
 const renderLines = (component, width = 160) => component.render(width);
 const render = (component, width = 160) =>
 	renderLines(component, width).join("\n");
+const assistantUsageEntry = ({
+	input = 0,
+	output = 0,
+	cacheRead = 0,
+	cacheWrite = 0,
+}) => ({
+	type: "message",
+	message: {
+		role: "assistant",
+		usage: {
+			input,
+			output,
+			cacheRead,
+			cacheWrite,
+			totalTokens: input + output + cacheRead + cacheWrite,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+		},
+	},
+});
 const textResult = (text, details = undefined) => ({
 	content: [{ type: "text", text }],
 	...(details === undefined ? {} : { details }),
@@ -2488,4 +2508,291 @@ test("subagent control notice renderer hides stale straggler notices after run c
 			},
 		},
 	]);
+});
+
+test("Claude footer separates session metrics from the primary row", () => {
+	const footerContext = (entries, usingSubscription = false) => ({
+		cwd: "/workspace/project",
+		getContextUsage: () => ({
+			contextWindow: 200_000,
+			percent: 42,
+			tokens: 84_000,
+		}),
+		model: { contextWindow: 200_000, id: "claude-test" },
+		modelRegistry: { isUsingOAuth: () => usingSubscription },
+		sessionManager: { getEntries: () => entries },
+	});
+
+	assert.equal(
+		ui.formatSessionCacheHit(
+			footerContext([assistantUsageEntry({ input: 1, cacheRead: 2 })]),
+		),
+		"cache 67%",
+	);
+	assert.equal(
+		ui.formatSessionCacheHit(
+			footerContext([
+				assistantUsageEntry({ input: 1, cacheRead: 1, cacheWrite: 2 }),
+			]),
+		),
+		"cache 25%",
+	);
+	assert.equal(
+		ui.formatSessionCacheHit(
+			footerContext([assistantUsageEntry({ cacheWrite: 2 })]),
+		),
+		undefined,
+	);
+
+	const entries = [
+		assistantUsageEntry({
+			input: 50_000,
+			output: 10_000,
+			cacheRead: 700_000,
+			cacheWrite: 40_000,
+		}),
+		{
+			type: "compaction",
+			id: "compact1",
+			parentId: "assistant1",
+			timestamp: "2026-08-04T00:00:00.000Z",
+			summary: "Earlier session work",
+			firstKeptEntryId: "assistant2",
+			tokensBefore: 800_000,
+		},
+		assistantUsageEntry({
+			input: 40_000,
+			output: 15_000,
+			cacheRead: 500_000,
+			cacheWrite: 45_000,
+		}),
+	];
+	const ctx = footerContext(entries, true);
+	const tokenUsage = "tokens 1.4M (in 90k/out 25k/read 1.2M/write 85k)";
+	assert.equal(ui.formatSessionTokenUsage(ctx), tokenUsage);
+	assert.equal(ui.formatSessionCacheHit(ctx), "cache 87%");
+	assert.equal(ui.formatSessionTokenUsage(footerContext([])), undefined);
+	assert.equal(ui.footerMetricsLine(footerContext([]), theme), undefined);
+
+	const primary = ui.footerLine(ctx, 160, "main", theme, "off", undefined);
+	const metrics = ui.footerMetricsLine(ctx, theme);
+	assert.match(primary, /\/ commands.*\/workspace\/project \(main\)/);
+	assert.doesNotMatch(primary, /\$0\.0000 sub|cache 87%|tokens 1\.4M/);
+	assert.equal(
+		metrics,
+		`  $0.0000 sub · cache 87% · ${tokenUsage}`,
+	);
+	assert.doesNotMatch(metrics, /\/ commands|\/workspace\/project/);
+});
+
+test("Claude footer renders Slipstream status inline and suppresses its duplicate widget", async () => {
+	const handlers = new Map();
+	const pi = {
+		events: { emit() {} },
+		getThinkingLevel: () => "off",
+		on(event, handler) {
+			const eventHandlers = handlers.get(event) ?? [];
+			eventHandlers.push(handler);
+			handlers.set(event, eventHandlers);
+		},
+		registerCommand() {},
+		registerMessageRenderer() {},
+		registerTool() {},
+	};
+	registerClaudeUi(pi);
+
+	const widgetCalls = [];
+	let footerFactory;
+	const entries = [assistantUsageEntry({ input: 1, output: 1, cacheRead: 2 })];
+	const ctx = {
+		cwd: "/workspace/project",
+		getContextUsage: () => ({
+			contextWindow: 200_000,
+			percent: 42,
+			tokens: 84_000,
+		}),
+		hasUI: true,
+		isIdle: () => true,
+		model: { contextWindow: 200_000, id: "claude-test" },
+		modelRegistry: { isUsingOAuth: () => true },
+		sessionManager: {
+			getBranch: () => [],
+			getEntries: () => entries,
+		},
+		shutdown() {},
+		ui: {
+			addAutocompleteProvider() {},
+			setEditorComponent() {},
+			setFooter(factory) {
+				footerFactory = factory;
+			},
+			setWidget(...args) {
+				widgetCalls.push(args);
+			},
+			setWorkingVisible() {},
+			theme,
+		},
+	};
+	const sessionStart = handlers.get("session_start")?.[0];
+	assert.equal(typeof sessionStart, "function");
+	await sessionStart({}, ctx);
+	assert.equal(typeof footerFactory, "function");
+
+	const statuses = new Map();
+	const tui = { requestRender() {} };
+	const footer = footerFactory(tui, theme, {
+		getExtensionStatuses: () => statuses,
+		getGitBranch: () => "detached",
+		onBranchChange: () => () => {},
+	});
+	const footerRows = (width = 160) =>
+		footer.render(width).map((line) => line.trimEnd());
+	const footerLine = (width = 160) => footerRows(width)[0];
+	const footerMetrics = (width = 160) => footerRows(width)[1];
+
+	try {
+		const initialRows = footerRows();
+		assert.equal(initialRows.length, 2);
+		assert.match(initialRows[0], /\/ commands.*\/workspace\/project \(detached\)/);
+		assert.doesNotMatch(initialRows[0], /\$0\.0000 sub|cache|tokens/);
+		assert.match(
+			initialRows[1],
+			/^\s*\$0\.0000 sub · cache 67% · tokens 4 \(in 1\/out 1\/read 2\/write 0\)$/,
+		);
+		assert.doesNotMatch(initialRows[1], /\/ commands|\/workspace\/project/);
+
+		statuses.set(
+			"slipstream",
+			"\u001b[31mslipstream:\u001b[39m auto summary\n—\t \u001b]8;;https://example.com\u0007generating\u001b]8;;\u0007\u0000 continuation",
+		);
+		const active = footerLine(360);
+		assert.match(
+			active,
+			/slipstream: auto summary — generating continuation/,
+		);
+		assert.doesNotMatch(active, /\/ commands|\u001b|\n|\t/);
+
+		statuses.set(
+			"slipstream",
+			"\u001b]8;;https://example.com\u009cslipstream: checking summary\u001b]8;;\u009c",
+		);
+		const c1TerminatedOsc = footerLine(360);
+		assert.match(c1TerminatedOsc, /slipstream: checking summary/);
+		assert.doesNotMatch(
+			c1TerminatedOsc,
+			/generating continuation|\]8;;|example\.com|\u001b|\u009c/,
+		);
+
+		statuses.set(
+			"slipstream",
+			"\u001b]8;;https://bel.example\u0007first\u001b]8;;\u0007 / \u001b]8;;https://esc.example\u001b\\second\u001b]8;;\u001b\\ / \u001b]8;;https://c1.example\u009cthird\u001b]8;;\u009c / \u009d8;;https://c1-intro.example\u009cfourth\u009d8;;\u009c",
+		);
+		const mixedOscTerminators = footerLine(360);
+		assert.match(
+			mixedOscTerminators,
+			/first \/ second \/ third \/ fourth/,
+		);
+		assert.doesNotMatch(
+			mixedOscTerminators,
+			/\]8;;|(?:bel|esc|c1|c1-intro)\.example|\u001b|\u0007|\u009c|\u009d/,
+		);
+
+		statuses.delete("slipstream");
+		assert.match(footerLine(), /\/ commands/);
+
+		entries.push(assistantUsageEntry({ input: 2, output: 3 }));
+		for (const agentEnd of handlers.get("agent_end") ?? []) {
+			await agentEnd({}, ctx);
+		}
+		assert.doesNotMatch(footerLine(), /cache|tokens/);
+		assert.match(footerMetrics(), /cache 40%/);
+		assert.match(
+			footerMetrics(),
+			/tokens 9 \(in 3\/out 4\/read 2\/write 0\)/,
+		);
+
+		entries.splice(
+			0,
+			entries.length,
+			assistantUsageEntry({
+				input: 50_000,
+				output: 10_000,
+				cacheRead: 700_000,
+				cacheWrite: 40_000,
+			}),
+			{
+				type: "compaction",
+				id: "compact-footer",
+				parentId: "assistant-before",
+				timestamp: "2026-08-04T00:00:00.000Z",
+				summary: "Earlier session work",
+				firstKeptEntryId: "assistant-after",
+				tokensBefore: 800_000,
+			},
+			assistantUsageEntry({
+				input: 40_000,
+				output: 15_000,
+				cacheRead: 500_000,
+				cacheWrite: 45_000,
+			}),
+		);
+		for (const agentEnd of handlers.get("agent_end") ?? []) {
+			await agentEnd({}, ctx);
+		}
+		statuses.delete("slipstream");
+		const wideRows = footerRows(160);
+		assert.equal(wideRows.length, 2);
+		assert.match(wideRows[0], /\/ commands.*\/workspace\/project \(detached\)/);
+		assert.doesNotMatch(wideRows[0], /\$0\.0000 sub|cache|tokens/);
+		assert.equal(
+			wideRows[1].trimStart(),
+			"$0.0000 sub · cache 87% · tokens 1.4M (in 90k/out 25k/read 1.2M/write 85k)",
+		);
+		assert.doesNotMatch(wideRows[1], /…|\/ commands|\/workspace\/project/);
+
+		for (const status of [
+			undefined,
+			"slipstream: repairing summary after a detailed judge diagnosis",
+		]) {
+			if (status) statuses.set("slipstream", status);
+			else statuses.delete("slipstream");
+			for (const width of [40, 80, 160]) {
+				const rows = footer.render(width);
+				assert.equal(rows.length, 2);
+				for (const line of rows) {
+					assert.ok(
+						visibleWidth(line) <= width,
+						`footer line exceeds width ${width}: ${line}`,
+					);
+				}
+			}
+		}
+
+		entries.splice(0);
+		ctx.modelRegistry.isUsingOAuth = () => false;
+		for (const agentEnd of handlers.get("agent_end") ?? []) {
+			await agentEnd({}, ctx);
+		}
+		const noMetricsRows = footerRows();
+		assert.equal(noMetricsRows.length, 2);
+		assert.equal(noMetricsRows[1], "");
+
+		assert.deepEqual(widgetCalls.slice(0, 2), [
+			["agents", undefined],
+			["slipstream", undefined],
+		]);
+		const callsAfterInstall = widgetCalls.length;
+		ctx.ui.setWidget("slipstream", ["duplicate"]);
+		assert.equal(widgetCalls.length, callsAfterInstall);
+		ctx.ui.setWidget("slipstream", undefined);
+		ctx.ui.setWidget("other", ["keep"]);
+		assert.deepEqual(widgetCalls.slice(callsAfterInstall), [
+			["slipstream", undefined, undefined],
+			["other", ["keep"], undefined],
+		]);
+	} finally {
+		for (const shutdown of handlers.get("session_shutdown") ?? []) {
+			await shutdown({}, ctx);
+		}
+	}
 });
