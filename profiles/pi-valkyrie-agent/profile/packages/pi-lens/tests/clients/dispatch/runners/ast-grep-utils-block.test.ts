@@ -1,0 +1,168 @@
+import * as path from "node:path";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import astGrepNapiRunner from "../../../../clients/dispatch/runners/ast-grep-napi.js";
+import type { Diagnostic } from "../../../../clients/dispatch/types.js";
+import {
+	linesFor,
+	makeRealRunnerEnv,
+	napiFallbackHasTool,
+	type RealRunnerEnv,
+} from "../../../support/real-runner-ctx.js";
+
+const { logLatency } = vi.hoisted(() => ({ logLatency: vi.fn() }));
+vi.mock("../../../../clients/latency-logger.js", () => ({
+	logLatency: (entry: unknown) => logLatency(entry),
+}));
+vi.mock("../../../../clients/lsp/wait-policy/index.js", () => ({
+	resolveAstGrepNativeExe: () => undefined,
+}));
+
+const RULES_DIR = path.join(process.cwd(), "rules", "ast-grep-rules", "rules");
+
+let env: RealRunnerEnv;
+beforeAll(() => {
+	env = makeRealRunnerEnv({ hasTool: napiFallbackHasTool });
+});
+afterAll(() => env.cleanup());
+
+async function diagnosticsOn(
+	code: string,
+	sampleFile = "sample.ts",
+	log: (message: string) => void = () => {},
+): Promise<Diagnostic[]> {
+	const { ctx } = env.addFile(sampleFile, code, { log });
+	return (await astGrepNapiRunner.run(ctx)).diagnostics;
+}
+
+describe("ast-grep NAPI utils: block passthrough (#663)", () => {
+	it("passes utils through the TypeScript no-dupe-keys rule", async () => {
+		const diagnostics = await diagnosticsOn(
+			[
+				"const duplicate = { a: 1, a: 2 };",
+				"const distinct = { a: 1, b: 2 };",
+				"const keyAndMethod = { a: 1, a() {} };",
+				"",
+			].join("\n"),
+		);
+
+		expect(linesFor(diagnostics, "no-dupe-keys")).toEqual([1, 3]);
+	});
+
+	it("runs TSX-tagged utils rules on TSX files", async () => {
+		const diagnostics = await diagnosticsOn(
+			[
+				"function usePlain() { return 42; }",
+				"function useRealHook() { useEffect(() => {}); }",
+				"const [value, setValue] = useState<number>(0);",
+				"",
+			].join("\n"),
+			"sample.tsx",
+		);
+		expect(linesFor(diagnostics, "unnecessary-react-hook")).toEqual([1]);
+		expect(linesFor(diagnostics, "redundant-usestate-type")).toEqual([3]);
+	});
+
+	it("does not cross-fire TSX-tagged rules on TypeScript files", async () => {
+		const diagnostics = await diagnosticsOn(
+			"function usePlain() { return 42; }\nconst [value, setValue] = useState<number>(0);\n",
+			"sample.ts",
+		);
+		expect(linesFor(diagnostics, "unnecessary-react-hook")).toEqual([]);
+		expect(linesFor(diagnostics, "redundant-usestate-type")).toEqual([]);
+	});
+
+	it("aggregates unsupported-language skips into latency telemetry", async () => {
+		logLatency.mockClear();
+		const logs: string[] = [];
+		await diagnosticsOn("const value = 1;\n", "sample.ts", (message) =>
+			logs.push(message),
+		);
+
+		expect(
+			logs.filter((message) => message.includes("unsupported language")),
+		).toEqual([]);
+		const entries = logLatency.mock.calls
+			.map(
+				([entry]) =>
+					entry as { phase?: string; metadata?: Record<string, unknown> },
+			)
+			.filter(
+				(entry) => entry.phase === "astgrep_napi_unsupported_rules_skipped",
+			);
+		expect(entries).toHaveLength(1);
+		const python = (
+			entries[0].metadata?.skippedByLanguage as Record<
+				string,
+				{ count: number; ruleIds: string[] }
+			>
+		).python;
+		expect(python.ruleIds).toContain("no-compile-call");
+		expect(python.count).toBe(python.ruleIds.length);
+	});
+
+	it("logs each unsupported rule once for a shared dedup set", async () => {
+		const { filePath } = env.addFile("sample.py", "value = 1\n");
+		const { evaluateAstGrepRules } = await import(
+			"../../../../clients/dispatch/runners/ast-grep-napi.js"
+		);
+		logLatency.mockClear();
+		const logs: string[] = [];
+		const options = {
+			log: (message: string) => logs.push(message),
+			unsupportedLanguageLog: new Set<string>(),
+		};
+		const root = { findAll: () => [] };
+		evaluateAstGrepRules(filePath, root, env.cwd, "python", options);
+		evaluateAstGrepRules(filePath, root, env.cwd, "python", options);
+
+		expect(
+			logs.filter((message) => message.includes("unsupported language")),
+		).toEqual([]);
+		const entries = logLatency.mock.calls
+			.map(
+				([entry]) =>
+					entry as { phase?: string; metadata?: Record<string, unknown> },
+			)
+			.filter(
+				(entry) => entry.phase === "astgrep_napi_unsupported_rules_skipped",
+			);
+		expect(entries).toHaveLength(1);
+		const languages = entries[0].metadata?.skippedByLanguage as Record<
+			string,
+			{ ruleIds: string[] }
+		>;
+		expect(languages.python.ruleIds).toContain("no-compile-call");
+	});
+
+	it("passes utils through the JavaScript no-dupe-keys twin", async () => {
+		const diagnostics = await diagnosticsOn(
+			"const duplicate = { a: 1, a: 2 };\nconst distinct = { a: 1, b: 2 };\n",
+			"sample.js",
+		);
+		expect(linesFor(diagnostics, "no-dupe-keys-js")).toEqual([1]);
+	});
+
+	it("keeps no-dupe-class-members scoped to actual duplicates", async () => {
+		const diagnostics = await diagnosticsOn(
+			[
+				"class DuplicateMethod { foo() {} foo() {} }",
+				"class DuplicateField { foo = 1; foo = 2; }",
+				"class Distinct { foo() {} bar() {} }",
+				"class AccessorPair { get value() {} set value(next) {} }",
+				"",
+			].join("\n"),
+		);
+		expect(linesFor(diagnostics, "no-dupe-class-members")).toEqual([1, 2]);
+	});
+
+	it("preserves utils when parsing the Rust rule covered by the CLI suite", async () => {
+		const { loadYamlRulesUncached } = await import(
+			"../../../../clients/dispatch/runners/yaml-rule-parser.js"
+		);
+		const rule = loadYamlRulesUncached(RULES_DIR).find(
+			(candidate) => candidate.id === "rust-2024-let-chain-candidate",
+		);
+		expect(rule, "rust-2024-let-chain-candidate rule not found").toBeTruthy();
+		expect(rule?.utils && Object.keys(rule.utils).length > 0).toBe(true);
+	});
+});

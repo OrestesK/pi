@@ -1,0 +1,8 @@
+.pi/todos/
+.pi-subagents/
+.scratch/
+.DS_Store
+AGENTS.md
+node_modules/
+.fallow/
+tmp/

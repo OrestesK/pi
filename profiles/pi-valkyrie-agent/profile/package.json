@@ -1,0 +1,38 @@
+{
+  "name": "ok-pi-agent-profile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "26.4.0"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:slipstream": "npm --prefix packages/pi-slipstream-compact-valkyrie test",
+    "typecheck:attestation": "tsc --noEmit --strict --skipLibCheck --module NodeNext --moduleResolution NodeNext --target ES2022 --types node extensions/tool-attestation.ts",
+    "typecheck:slipstream": "npm --prefix packages/pi-slipstream-compact-valkyrie run typecheck",
+    "check": "npm test && npm run test:slipstream && npm run typecheck:attestation && npm run typecheck:slipstream"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.80.6",
+    "context-mode": "file:packages/context-mode",
+    "pi-fff": "file:packages/pi-fff",
+    "pi-lens": "file:packages/pi-lens",
+    "pi-intercom": "file:packages/pi-intercom",
+    "pi-mcp-adapter": "file:packages/pi-mcp-adapter",
+    "pi-slipstream-compact": "file:packages/pi-slipstream-compact-valkyrie",
+    "pi-subagents": "file:packages/pi-subagents",
+    "pi-tool-result-virtualizer": "file:packages/pi-tool-result-virtualizer"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "@earendil-works/pi-agent-core": "0.80.6",
+    "@earendil-works/pi-ai": "0.80.6",
+    "@earendil-works/pi-tui": "0.80.6",
+    "protobufjs": "7.6.5",
+    "ws": "8.21.1"
+  }
+}

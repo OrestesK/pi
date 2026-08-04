@@ -1,0 +1,139 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { getProjectDataDir } from "./file-utils.js";
+import { readJsonCache } from "./json-cache-read.js";
+import { normalizeMapKey } from "./path-utils.js";
+import { detectProjectConventions, } from "./project-conventions.js";
+import { deserializeWordIndex, serializeWordIndex, } from "./word-index.js";
+// v2: added `wordIndex` (identifier inverted index + BM25, #162). Bumping the
+// version invalidates pre-v2 snapshots so they rebuild with the new field.
+export const PROJECT_SNAPSHOT_VERSION = 2;
+export function getProjectSnapshotPath(cwd) {
+    return path.join(getProjectDataDir(cwd), "cache", "project-snapshot.json");
+}
+export function getProjectSnapshotMetaPath(cwd) {
+    return path.join(getProjectDataDir(cwd), "cache", "project-snapshot.meta.json");
+}
+export function isProjectSnapshotFresh(snapshot, currentProjectSeq) {
+    return (!!snapshot &&
+        snapshot.version === PROJECT_SNAPSHOT_VERSION &&
+        snapshot.seq === currentProjectSeq);
+}
+function parseSnapshot(value) {
+    if (!value || typeof value !== "object")
+        return null;
+    const snapshot = value;
+    if (snapshot.version !== PROJECT_SNAPSHOT_VERSION)
+        return null;
+    if (typeof snapshot.projectRoot !== "string")
+        return null;
+    if (typeof snapshot.generatedAt !== "string")
+        return null;
+    if (typeof snapshot.seq !== "number")
+        return null;
+    if (!Array.isArray(snapshot.cachedExports))
+        return null;
+    return {
+        version: PROJECT_SNAPSHOT_VERSION,
+        projectRoot: snapshot.projectRoot,
+        generatedAt: snapshot.generatedAt,
+        seq: snapshot.seq,
+        files: snapshot.files ?? {},
+        symbols: snapshot.symbols ?? {},
+        reverseDeps: snapshot.reverseDeps ?? {},
+        cachedExports: snapshot.cachedExports.filter((entry) => Array.isArray(entry) &&
+            typeof entry[0] === "string" &&
+            typeof entry[1] === "string"),
+        wordIndex: snapshot.wordIndex,
+        projectRulesScan: snapshot.projectRulesScan,
+        startupScan: snapshot.startupScan,
+        languageProfile: snapshot.languageProfile,
+        conventions: snapshot.conventions,
+    };
+}
+export function loadProjectSnapshot(cwd) {
+    const snapshot = readJsonCache(getProjectSnapshotPath(cwd), (parsed) => parseSnapshot(parsed) ?? undefined);
+    return snapshot ?? null;
+}
+export function saveProjectSnapshot(cwd, snapshot) {
+    const snapshotPath = getProjectSnapshotPath(cwd);
+    fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+    fs.writeFileSync(snapshotPath, JSON.stringify(snapshot, null, 2));
+    fs.writeFileSync(getProjectSnapshotMetaPath(cwd), JSON.stringify({
+        timestamp: snapshot.generatedAt,
+        version: snapshot.version,
+        seq: snapshot.seq,
+    }, null, 2));
+}
+export function buildProjectSnapshotFromRuntime(args) {
+    return {
+        version: PROJECT_SNAPSHOT_VERSION,
+        projectRoot: normalizeMapKey(path.resolve(args.cwd)),
+        generatedAt: new Date().toISOString(),
+        seq: args.runtime.projectSeq,
+        files: {},
+        symbols: {},
+        reverseDeps: {},
+        cachedExports: [...args.runtime.cachedExports.entries()].sort((a, b) => a[0].localeCompare(b[0])),
+        wordIndex: args.runtime.wordIndex
+            ? serializeWordIndex(args.runtime.wordIndex)
+            : undefined,
+        projectRulesScan: args.runtime.projectRulesScan,
+        startupScan: args.startupScan,
+        languageProfile: args.languageProfile,
+        conventions: args.conventions,
+    };
+}
+export function hydrateRuntimeFromProjectSnapshot(runtime, snapshot) {
+    runtime.cachedExports.clear();
+    for (const [name, filePath] of snapshot.cachedExports) {
+        runtime.cachedExports.set(name, filePath);
+    }
+    if (snapshot.projectRulesScan) {
+        runtime.projectRulesScan = snapshot.projectRulesScan;
+    }
+    runtime.wordIndex = deserializeWordIndex(snapshot.wordIndex);
+}
+export function saveRuntimeProjectSnapshot(args) {
+    try {
+        if (typeof args.runtime.projectSeq !== "number")
+            return;
+        const existing = loadProjectSnapshot(args.cwd);
+        let conventions = args.conventions ?? existing?.conventions;
+        if (!conventions) {
+            try {
+                conventions = detectProjectConventions(args.cwd);
+            }
+            catch (err) {
+                args.dbg?.(`project_snapshot: convention detection failed: ${err}`);
+            }
+        }
+        const snapshot = buildProjectSnapshotFromRuntime({
+            ...args,
+            startupScan: args.startupScan ?? existing?.startupScan,
+            languageProfile: args.languageProfile ?? existing?.languageProfile,
+            conventions,
+        });
+        if (existing) {
+            snapshot.files = existing.files ?? {};
+            snapshot.symbols = existing.symbols ?? {};
+            snapshot.reverseDeps = existing.reverseDeps ?? {};
+            // The word index is built by its own session task, which may not have
+            // finished when another task triggers a save — keep the prior index
+            // rather than clobbering it with undefined. #348: only carry it forward
+            // when `existing` was built AT THIS SAME seq — otherwise a stale
+            // snapshot's leftover index (already correctly rejected as stale by
+            // isProjectSnapshotFresh on load, seq mismatch) would get silently
+            // re-stamped with the CURRENT seq by this save, "laundering" a stale
+            // index into looking fresh before the word-index task even runs.
+            if (!snapshot.wordIndex && existing.wordIndex && existing.seq === snapshot.seq) {
+                snapshot.wordIndex = existing.wordIndex;
+            }
+        }
+        saveProjectSnapshot(args.cwd, snapshot);
+        args.dbg?.(`project_snapshot: saved seq=${snapshot.seq} exports=${snapshot.cachedExports.length}`);
+    }
+    catch (err) {
+        args.dbg?.(`project_snapshot: save failed: ${err}`);
+    }
+}

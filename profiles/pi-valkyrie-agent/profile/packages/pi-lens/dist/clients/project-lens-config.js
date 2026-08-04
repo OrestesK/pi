@@ -1,0 +1,323 @@
+/**
+ * Project-level `.pi-lens.json` config loader.
+ *
+ * Reads an optional `.pi-lens.json` (or `pi-lens.json`) at the project root and
+ * surfaces the fields the rest of pi-lens honors:
+ *
+ *   - `ignore` — gitignore-style glob patterns added to every scan (LSP walk,
+ *     fact-rules, tree-sitter, jscpd, knip, review graph, source-filter). Wired
+ *     into `getProjectIgnoreMatcher` in `file-utils.ts` via the existing
+ *     `createProjectIgnoreMatcher(rootDir, extraPatterns)` extension point.
+ *
+ *   - `rules` — per-rule threshold overrides. Currently honored:
+ *       rules["high-complexity"].threshold — cyclomatic complexity (default 15)
+ *       rules["high-fan-out"].threshold   — distinct-function calls (default 20)
+ *
+ *   - `maxProjectFiles` — the base project-size scale knob (#776). Read by
+ *     `clients/project-scale.ts`'s `getProjectScaleBase`, which derives the
+ *     five subsystem size budgets (project-diagnostics scanner, review graph,
+ *     startup scan, jscpd, word index) as documented ratios of this value.
+ *
+ *   - `reviewGraph.maxFiles` — explicit review-graph file-budget override
+ *     (#775 R2), for monorepos that want a bigger graph than
+ *     `project-scale.ts`'s adaptive taper would derive from
+ *     `maxProjectFiles` alone. Tolerantly parsed (numeric strings coerce via
+ *     `toPositiveFinite`, same as `maxProjectFiles`) and clamped to
+ *     `[100, 20_000]` — a value outside that range is silently clamped
+ *     rather than rejected (still an explicit, deliberate opt-in; only a
+ *     non-numeric/non-positive value warns and is dropped). Read by
+ *     `getReviewGraphMaxFilesDerived`, where it takes precedence over the
+ *     taper (but the subsystem's own PRE-EXISTING
+ *     `PI_LENS_REVIEW_GRAPH_MAX_FILES` env override still wins outright over
+ *     both, unchanged).
+ *
+ *   - `format.enabled`, `autofix.enabled`, and
+ *     `actionableWarnings.autoFix.enabled` — project-owned mutation controls.
+ *     These can disable pi-lens writes while leaving diagnostics enabled.
+ *
+ * The file is loaded once per `(path, mtimeMs)` and cached — editing the file
+ * invalidates the cache so the next access sees the new values without
+ * restarting pi. Discovery is cached by starting directory and validated by the
+ * cached directory mtimes plus the config-file mtime, so hot paths do not repeat
+ * candidate-file probes on every dispatch.
+ *
+ * The loader walks up from the starting directory until it finds a config file
+ * (mirroring `lsp/config.ts`'s `loadLSPConfig` so project-monorepos with a
+ * `.pi-lens.json` at the repo root work without per-subdir configs).
+ *
+ * A malformed file is treated as "no config" and logged once — we never want a
+ * stray syntax error in user-edited JSON to break diagnostics.
+ *
+ * `findPiLensConfigInDir` / `loadPiLensConfigInDir` are the per-directory
+ * (no upward walk) counterparts used by `file-utils.ts`'s
+ * `getProjectIgnoreMatcher` to layer NESTED `.pi-lens.json` `ignore` fields
+ * the same way nested `.gitignore`s are already layered (#783): every
+ * ancestor directory between the git root and a scanned file is checked for
+ * its own config file, so a package-local `.pi-lens.json`'s `ignore`
+ * patterns apply to files inside that package, in addition to (and with
+ * higher precedence than) the root config's `ignore` patterns.
+ */
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { parseEnabledShape } from "./config-enabled-shape.js";
+import { toPositiveFinite } from "./env-utils.js";
+import { isAtOrAboveHomeDir, walkUpDirs } from "./path-utils.js";
+import { findPiLensConfigMarkerInDir } from "./workspace-topology.js";
+const PROJECT_CONFIG_BASENAMES = [".pi-lens.json", "pi-lens.json"];
+/** Clamp bounds for `reviewGraph.maxFiles` — see the field's doc comment above. */
+const REVIEW_GRAPH_MAX_FILES_MIN = 100;
+const REVIEW_GRAPH_MAX_FILES_MAX = 20_000;
+export const EMPTY_PROJECT_CONFIG = {
+    ignore: [],
+    rules: {},
+    maxProjectFiles: undefined,
+    reviewGraph: undefined,
+    raw: undefined,
+    configPath: undefined,
+};
+/** Cache by absolute config path; we read each candidate's mtime before reuse. */
+const configCache = new Map();
+const discoveryCache = new Map();
+const warnedInvalidConfigs = new Set();
+/**
+ * Walk up from `startDir` looking for a `.pi-lens.json` or `pi-lens.json`.
+ * Returns the parsed config, or an empty config if none was found.
+ */
+export function loadPiLensProjectConfig(startDir, preloadedInfo = findPiLensProjectConfig(startDir)) {
+    const configInfo = preloadedInfo;
+    if (!configInfo)
+        return EMPTY_PROJECT_CONFIG;
+    const cached = configCache.get(configInfo.path);
+    if (cached && cached.mtimeMs === configInfo.mtimeMs) {
+        return cached.config;
+    }
+    const config = parseConfigFile(configInfo.path);
+    configCache.set(configInfo.path, { mtimeMs: configInfo.mtimeMs, config });
+    return config;
+}
+/** For tests + callers that need to force a re-read (e.g. config-watcher hooks). */
+export function resetProjectLensConfigCache() {
+    configCache.clear();
+    discoveryCache.clear();
+    warnedInvalidConfigs.clear();
+}
+/**
+ * Look for a `.pi-lens.json`/`pi-lens.json` directly IN `dir` — no upward
+ * walk. Used to layer nested per-package configs (#783) the same way
+ * `file-utils.ts` layers nested `.gitignore`s: each ancestor directory
+ * between the git root and a target file is checked for its OWN config
+ * file, independent of whatever config `loadPiLensProjectConfig`'s upward
+ * walk would find starting from `dir`.
+ *
+ * Sourced from the shared workspace-topology marker index (#806) — one
+ * `readdir` pass per directory visit collects this marker alongside
+ * `tsconfig.json`/workspace-manifest markers other consumers need for the
+ * SAME directory, instead of each subsystem re-probing it independently.
+ */
+export function findPiLensConfigInDir(dir) {
+    const marker = findPiLensConfigMarkerInDir(dir);
+    if (!marker)
+        return undefined;
+    return { path: marker.path, dir: marker.dir, mtimeMs: marker.mtimeMs };
+}
+/**
+ * Find the closest config, between an edited file and the project root, that
+ * explicitly defines one mutation flag. The walk uses the shared primitive
+ * and refuses to inspect HOME or any ancestor of HOME.
+ */
+export function findNestedProjectMutationValue(name, editedFilePath, projectRoot, homeDir = os.homedir()) {
+    const root = path.resolve(projectRoot);
+    const start = path.dirname(path.resolve(editedFilePath));
+    for (const dir of walkUpDirs(start)) {
+        if (isAtOrAboveHomeDir(dir, homeDir))
+            break;
+        const rel = path.relative(root, dir);
+        if (rel.startsWith("..") || path.isAbsolute(rel))
+            break;
+        const config = loadPiLensConfigInDir(dir);
+        const enabled = name === "no-autoformat"
+            ? config.format?.enabled
+            : name === "no-autofix"
+                ? config.autofix?.enabled
+                : config.actionableWarnings?.autoFix?.enabled;
+        if (enabled !== undefined)
+            return { value: enabled, dir };
+        if (dir === root)
+            break;
+    }
+    return undefined;
+}
+/**
+ * Load the `.pi-lens.json`/`pi-lens.json` directly IN `dir` (no upward
+ * walk) — the per-directory counterpart to `loadPiLensProjectConfig`'s
+ * upward-walking discovery. Shares `configCache` (keyed by absolute config
+ * path + mtime), so a directory whose config was already loaded via the
+ * upward-walk path (e.g. the git root itself) is not re-read here.
+ */
+export function loadPiLensConfigInDir(dir) {
+    const info = findPiLensConfigInDir(dir);
+    if (!info)
+        return EMPTY_PROJECT_CONFIG;
+    const cached = configCache.get(info.path);
+    if (cached && cached.mtimeMs === info.mtimeMs) {
+        return cached.config;
+    }
+    const config = parseConfigFile(info.path);
+    configCache.set(info.path, { mtimeMs: info.mtimeMs, config });
+    return config;
+}
+export function findPiLensProjectConfig(startDir) {
+    const cacheKey = path.resolve(startDir);
+    const cached = discoveryCache.get(cacheKey);
+    if (cached && discoveryCacheStillFresh(cached)) {
+        if (!cached.info)
+            return undefined;
+        const stat = safeFileStat(cached.info.path);
+        if (stat?.isFile())
+            return { ...cached.info, mtimeMs: stat.mtimeMs };
+    }
+    const discovered = discoverPiLensProjectConfig(cacheKey);
+    discoveryCache.set(cacheKey, discovered);
+    return discovered.info;
+}
+function safeFileStat(filePath) {
+    try {
+        return fs.statSync(filePath);
+    }
+    catch {
+        return undefined;
+    }
+}
+function safeDirMtimeMs(dir) {
+    try {
+        return fs.statSync(dir).mtimeMs;
+    }
+    catch {
+        return -1;
+    }
+}
+function discoveryCacheStillFresh(entry) {
+    return entry.dirMtimes.every((cached) => safeDirMtimeMs(cached.dir) === cached.mtimeMs);
+}
+function discoverPiLensProjectConfig(startDir) {
+    const dirMtimes = [];
+    for (const dir of walkUpDirs(startDir)) {
+        dirMtimes.push({ dir, mtimeMs: safeDirMtimeMs(dir) });
+        for (const name of PROJECT_CONFIG_BASENAMES) {
+            const candidate = path.join(dir, name);
+            const stat = safeFileStat(candidate);
+            if (stat?.isFile()) {
+                return {
+                    info: { path: candidate, dir, mtimeMs: stat.mtimeMs },
+                    dirMtimes,
+                };
+            }
+        }
+    }
+    return { info: undefined, dirMtimes };
+}
+function warnInvalidConfigOnce(configPath, reason) {
+    const key = `${configPath}:${reason}`;
+    if (warnedInvalidConfigs.has(key))
+        return;
+    warnedInvalidConfigs.add(key);
+    console.error(`[pi-lens] ignoring invalid project config ${configPath}: ${reason}`);
+}
+function parseEnabledConfig(configPath, fieldPath, value) {
+    return parseEnabledShape(value, fieldPath, (reason) => warnInvalidConfigOnce(configPath, reason));
+}
+function parseConfigFile(configPath) {
+    let raw;
+    try {
+        const text = fs.readFileSync(configPath, "utf-8");
+        raw = JSON.parse(text);
+    }
+    catch (error) {
+        warnInvalidConfigOnce(configPath, error instanceof Error ? error.message : "failed to parse JSON");
+        return EMPTY_PROJECT_CONFIG;
+    }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        warnInvalidConfigOnce(configPath, "top-level value must be an object");
+        return EMPTY_PROJECT_CONFIG;
+    }
+    const obj = raw;
+    const ignore = Array.isArray(obj.ignore)
+        ? obj.ignore.filter((p) => typeof p === "string")
+        : [];
+    const format = parseEnabledConfig(configPath, "format", obj.format);
+    const autofix = parseEnabledConfig(configPath, "autofix", obj.autofix);
+    const actionableWarningsRaw = obj.actionableWarnings &&
+        typeof obj.actionableWarnings === "object" &&
+        !Array.isArray(obj.actionableWarnings)
+        ? obj.actionableWarnings
+        : undefined;
+    if (obj.actionableWarnings !== undefined && !actionableWarningsRaw) {
+        warnInvalidConfigOnce(configPath, "actionableWarnings must be an object");
+    }
+    const actionableWarningsAutoFix = parseEnabledConfig(configPath, "actionableWarnings.autoFix", actionableWarningsRaw?.autoFix);
+    const actionableWarnings = actionableWarningsRaw
+        ? { autoFix: actionableWarningsAutoFix }
+        : undefined;
+    const rules = {};
+    if (obj.rules && typeof obj.rules === "object" && !Array.isArray(obj.rules)) {
+        const rawRules = obj.rules;
+        for (const [ruleId, ruleCfg] of Object.entries(rawRules)) {
+            if (!ruleCfg || typeof ruleCfg !== "object" || Array.isArray(ruleCfg)) {
+                continue;
+            }
+            const r = ruleCfg;
+            if (typeof r.threshold === "number" &&
+                Number.isFinite(r.threshold) &&
+                r.threshold > 0) {
+                rules[ruleId] = { threshold: r.threshold };
+            }
+            else if ("threshold" in r) {
+                warnInvalidConfigOnce(configPath, `rules.${ruleId}.threshold must be a positive finite number`);
+            }
+        }
+    }
+    let maxProjectFiles;
+    if ("maxProjectFiles" in obj) {
+        if (typeof obj.maxProjectFiles === "number" &&
+            Number.isFinite(obj.maxProjectFiles) &&
+            obj.maxProjectFiles > 0) {
+            maxProjectFiles = obj.maxProjectFiles;
+        }
+        else {
+            warnInvalidConfigOnce(configPath, "maxProjectFiles must be a positive finite number");
+        }
+    }
+    let reviewGraph;
+    if (obj.reviewGraph !== undefined) {
+        if (!obj.reviewGraph ||
+            typeof obj.reviewGraph !== "object" ||
+            Array.isArray(obj.reviewGraph)) {
+            warnInvalidConfigOnce(configPath, "reviewGraph must be an object");
+        }
+        else {
+            const rg = obj.reviewGraph;
+            if ("maxFiles" in rg) {
+                const parsed = toPositiveFinite(rg.maxFiles);
+                if (parsed > 0) {
+                    const clamped = Math.min(REVIEW_GRAPH_MAX_FILES_MAX, Math.max(REVIEW_GRAPH_MAX_FILES_MIN, Math.floor(parsed)));
+                    reviewGraph = { maxFiles: clamped };
+                }
+                else {
+                    warnInvalidConfigOnce(configPath, "reviewGraph.maxFiles must be a positive finite number");
+                }
+            }
+        }
+    }
+    return {
+        ignore,
+        rules,
+        format,
+        autofix,
+        actionableWarnings,
+        maxProjectFiles,
+        reviewGraph,
+        raw,
+        configPath,
+    };
+}

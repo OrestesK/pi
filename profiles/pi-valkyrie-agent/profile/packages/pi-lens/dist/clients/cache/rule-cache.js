@@ -1,0 +1,120 @@
+/**
+ * Rule Cache for pi-lens
+ *
+ * Provides disk-based caching for parsed tree-sitter rules with
+ * automatic invalidation based on rule file modification times.
+ */
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { getProjectDataDir } from "../file-utils.js";
+import { readJsonCache } from "../json-cache-read.js";
+// v4: cache skip_test_files + fix_action — v3 entries silently dropped them,
+// and ruleHash (rule-file mtimes) never invalidates on a code-only fix.
+// v5 (#675): rule SELECTION changed in code — javascript no longer inherits the
+// typescript rule set and tsx now does. A v4 entry holds the old merge, and
+// queries now compile against the file's parse language, so replaying it would
+// fire typescript rules on javascript trees for real this time.
+// v6 (#878): the ruleHash FINGERPRINT now covers the full effective rule set —
+// inherited rule-source directories (tsx also runs typescript rules), not just
+// the language's own. A v5 tsx entry was hashed over tsx files only, so a
+// typescript-rule edit never invalidated it; v5 entries self-miss anyway (the
+// hash input set changed), the bump just makes the semantics break explicit.
+export const CACHE_VERSION = "v6";
+export class RuleCache {
+    cacheFile;
+    cacheDir;
+    language;
+    constructor(language, rootDir = process.cwd()) {
+        this.language = language;
+        this.cacheDir = path.join(getProjectDataDir(rootDir), "cache");
+        this.cacheFile = path.join(this.cacheDir, `${language}-rules-${CACHE_VERSION}.json`);
+    }
+    ensureCacheDir() {
+        if (!fs.existsSync(this.cacheDir)) {
+            fs.mkdirSync(this.cacheDir, { recursive: true });
+        }
+    }
+    computeRuleHash(ruleFiles) {
+        const hash = crypto.createHash("sha256");
+        for (const file of ruleFiles.sort((a, b) => a.localeCompare(b))) {
+            if (fs.existsSync(file)) {
+                const stat = fs.statSync(file);
+                hash.update(`${file}:${stat.mtimeMs}:${stat.size}`);
+            }
+        }
+        return hash.digest("hex").slice(0, 16);
+    }
+    get(ruleFiles) {
+        try {
+            this.ensureCacheDir();
+            if (!fs.existsSync(this.cacheFile))
+                return null;
+            const currentHash = this.computeRuleHash(ruleFiles);
+            const cached = readJsonCache(this.cacheFile, (parsed) => {
+                const entry = parsed;
+                if (entry.version !== CACHE_VERSION ||
+                    entry.ruleHash !== currentHash) {
+                    return undefined; // Cache invalid
+                }
+                return entry;
+            });
+            return cached ?? null;
+        }
+        catch {
+            return null;
+        }
+    }
+    set(ruleFiles, queries) {
+        try {
+            this.ensureCacheDir();
+            const entry = {
+                version: CACHE_VERSION,
+                timestamp: Date.now(),
+                ruleHash: this.computeRuleHash(ruleFiles),
+                queries,
+            };
+            fs.writeFileSync(this.cacheFile, JSON.stringify(entry, null, 2));
+            this.pruneStaleVersions();
+        }
+        catch {
+            // Cache write failure is non-fatal
+        }
+    }
+    // Orphaned `<language>-rules-v<N>.json` files from a prior CACHE_VERSION
+    // (e.g. v3 entries left behind by the #448 v3→v4 bump) never got cleaned up
+    // on their own — nothing ever read or removed them again once the version
+    // bumped. Delete every sibling for this language that isn't the current file.
+    pruneStaleVersions() {
+        const currentName = path.basename(this.cacheFile);
+        const pattern = new RegExp(`^${this.language}-rules-v\\d+\\.json$`);
+        let dirents;
+        try {
+            dirents = fs.readdirSync(this.cacheDir);
+        }
+        catch {
+            return;
+        }
+        for (const name of dirents) {
+            if (name === currentName || !pattern.test(name))
+                continue;
+            try {
+                fs.unlinkSync(path.join(this.cacheDir, name));
+            }
+            catch {
+                // Best-effort; ENOENT (already gone) or any other removal failure
+                // shouldn't undo the write that already succeeded above.
+            }
+        }
+    }
+    clear() {
+        try {
+            if (fs.existsSync(this.cacheFile)) {
+                fs.unlinkSync(this.cacheFile);
+            }
+        }
+        catch {
+            // Ignore
+        }
+    }
+}

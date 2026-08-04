@@ -1,0 +1,204 @@
+import * as fs from "node:fs";
+import * as net from "node:net";
+import * as path from "node:path";
+import { readInstanceRegistry, } from "./instance-registry.js";
+import { realIsPidAlive, STALE_HEARTBEAT_MS, } from "./instance-reaper.js";
+import { logLatency } from "./latency-logger.js";
+import { getLSPService } from "./lsp/index.js";
+import { contentHash, diagnosticsIpcPathForCwd, requestWarmCodeActions, requestWarmDiagnostics, WARM_CODE_ACTION_LOOKUP_LIMIT, WARM_DIAGNOSTICS_SCHEMA_VERSION, } from "./mcp/ipc.js";
+import { normalizeFilePath } from "./path-utils.js";
+const state = { local: true, servedDiagnosticHashes: new Map() };
+function record(event, cwd, reason, pid, source) {
+    logLatency({
+        type: "phase",
+        phase: "lsp_warm_attach",
+        filePath: cwd,
+        durationMs: 0,
+        metadata: { event, reason, incumbentPid: pid, source },
+    });
+}
+export function selectWarmAttachIncumbent(entries, cwd, now = Date.now(), isPidAlive = realIsPidAlive) {
+    const root = normalizeFilePath(cwd);
+    return entries
+        .filter((entry) => entry.pid !== process.pid &&
+        entry.projectRoot === root &&
+        isPidAlive(entry.pid) &&
+        Number.isFinite(Date.parse(entry.heartbeatAt)) &&
+        now - Date.parse(entry.heartbeatAt) <= STALE_HEARTBEAT_MS)
+        .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt))[0];
+}
+async function serveRequest(req) {
+    if (req.route === "code-actions") {
+        if (req.version !== WARM_DIAGNOSTICS_SCHEMA_VERSION ||
+            req.ranges.length > WARM_CODE_ACTION_LOOKUP_LIMIT ||
+            Date.now() > req.deadlineAt ||
+            state.servedDiagnosticHashes.get(normalizeFilePath(req.file)) !==
+                req.contentHash) {
+            return { error: "stale request" };
+        }
+        try {
+            const actions = await Promise.all(req.ranges.map(async (range) => {
+                if (Date.now() > req.deadlineAt) {
+                    throw new Error("deadline exceeded");
+                }
+                return getLSPService().codeAction(req.file, range.start.line, range.start.character, range.end.line, range.end.character);
+            }));
+            const servedAt = Date.now();
+            if (servedAt > req.deadlineAt)
+                return { error: "deadline exceeded" };
+            return {
+                result: {
+                    route: "code-actions",
+                    version: WARM_DIAGNOSTICS_SCHEMA_VERSION,
+                    contentHash: req.contentHash,
+                    servedAt,
+                    actions,
+                },
+            };
+        }
+        catch (error) {
+            return { error: String(error) };
+        }
+    }
+    if (req.route !== "diagnostics" ||
+        req.version !== WARM_DIAGNOSTICS_SCHEMA_VERSION) {
+        return { error: "schema mismatch" };
+    }
+    if (Date.now() > req.deadlineAt || contentHash(req.content) !== req.contentHash) {
+        return { error: "stale request" };
+    }
+    const touched = await getLSPService().touchFile(req.file, req.content, {
+        diagnostics: "document",
+        collectDiagnostics: true,
+        clientScope: "with-auxiliary",
+        maxClientWaitMs: Math.max(1, req.deadlineAt - Date.now()),
+        maxDiagnosticsWaitMs: Math.max(1, req.deadlineAt - Date.now()),
+        source: "warm-attach-incumbent",
+    });
+    const servedAt = Date.now();
+    if (servedAt <= req.deadlineAt && touched !== undefined && !touched.inconclusive) {
+        state.servedDiagnosticHashes.set(normalizeFilePath(req.file), req.contentHash);
+    }
+    return {
+        result: {
+            route: "diagnostics",
+            version: WARM_DIAGNOSTICS_SCHEMA_VERSION,
+            diagnostics: touched ?? [],
+            contentHash: req.contentHash,
+            servedAt,
+            fresh: servedAt <= req.deadlineAt && touched !== undefined,
+            inconclusive: touched?.inconclusive === true,
+        },
+    };
+}
+function startServer(cwd) {
+    state.server?.close();
+    const endpoint = diagnosticsIpcPathForCwd(cwd, process.pid);
+    if (process.platform !== "win32") {
+        try {
+            fs.unlinkSync(endpoint);
+        }
+        catch {
+            // No stale socket.
+        }
+    }
+    const server = net.createServer((socket) => {
+        socket.setEncoding("utf8");
+        let buffer = "";
+        socket.on("data", (chunk) => {
+            buffer += chunk;
+            const newline = buffer.indexOf("\n");
+            if (newline === -1)
+                return;
+            void (async () => {
+                try {
+                    const req = JSON.parse(buffer.slice(0, newline));
+                    socket.end(`${JSON.stringify(await serveRequest(req))}\n`);
+                }
+                catch (error) {
+                    socket.end(`${JSON.stringify({ error: String(error) })}\n`);
+                }
+            })();
+        });
+    });
+    server.on("error", (error) => {
+        record("listener-error", cwd, String(error));
+    });
+    server.listen(endpoint);
+    server.unref();
+    state.server = server;
+}
+export async function configureWarmAttach(cwd) {
+    state.cwd = path.resolve(cwd);
+    state.incumbentPid = undefined;
+    state.local = true;
+    if (process.env.PI_LENS_WARM_ATTACH !== "1") {
+        record("disabled", state.cwd, "opt-in-not-enabled");
+        return;
+    }
+    startServer(state.cwd);
+    const incumbent = selectWarmAttachIncumbent(await readInstanceRegistry(), state.cwd);
+    if (!incumbent) {
+        record("local", state.cwd, "no-live-incumbent");
+        return;
+    }
+    state.incumbentPid = incumbent.pid;
+    state.local = false;
+    record("attached", state.cwd, undefined, incumbent.pid);
+}
+export async function tryWarmAttachedDiagnostics(file, content, timeoutMs, source = "per-edit") {
+    if (state.local || !state.cwd || !state.incumbentPid)
+        return undefined;
+    const entries = await readInstanceRegistry();
+    const incumbent = selectWarmAttachIncumbent(entries, state.cwd);
+    if (incumbent?.pid !== state.incumbentPid) {
+        promoteToLocal("incumbent-stale-or-exited");
+        return undefined;
+    }
+    const result = await requestWarmDiagnostics(state.cwd, state.incumbentPid, file, content, timeoutMs);
+    if (!result.available) {
+        promoteToLocal(result.reason);
+    }
+    else {
+        record("diagnostics-served", file, undefined, state.incumbentPid, source);
+    }
+    return result;
+}
+export async function tryWarmAttachedCodeActions(file, expectedContentHash, ranges, timeoutMs) {
+    if (state.local || !state.cwd || !state.incumbentPid)
+        return undefined;
+    const result = await requestWarmCodeActions(state.cwd, state.incumbentPid, file, expectedContentHash, ranges, timeoutMs);
+    if (result.available) {
+        record("code-actions-served", file, undefined, state.incumbentPid);
+    }
+    else {
+        // Quickfixes are optional enrichment. Diagnostics already succeeded, so a
+        // code-action failure is deliberately softer and must not trigger takeover.
+        record("code-actions-skipped", file, result.reason, state.incumbentPid);
+    }
+    return result;
+}
+export function isWarmAttached() {
+    return !state.local && state.incumbentPid !== undefined;
+}
+function promoteToLocal(reason) {
+    if (state.local)
+        return;
+    const pid = state.incumbentPid;
+    state.local = true;
+    state.incumbentPid = undefined;
+    record("takeover", state.cwd ?? process.cwd(), reason, pid);
+}
+export function _resetWarmAttachForTests() {
+    state.server?.close();
+    state.server = undefined;
+    state.cwd = undefined;
+    state.incumbentPid = undefined;
+    state.local = true;
+    state.servedDiagnosticHashes.clear();
+}
+export function _setWarmAttachForTests(cwd, incumbentPid) {
+    state.cwd = path.resolve(cwd);
+    state.incumbentPid = incumbentPid;
+    state.local = false;
+}

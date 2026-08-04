@@ -1,0 +1,40 @@
+{
+  "name": "pi-tool-result-virtualizer",
+  "version": "0.1.0",
+  "description": "Pi extension that stores large tool results locally and replaces model-visible output/details with compact receipts",
+  "type": "module",
+  "author": "OrestesK",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "tool-results",
+    "context-window",
+    "sidecar"
+  ],
+  "files": [
+    "agents/",
+    "src/",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "node --experimental-strip-types --test tests/*.test.ts && tsc --noEmit"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "subagents": {
+      "agents": [
+        "./agents"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  }
+}
