@@ -104,6 +104,10 @@ class BridgeFailure(Exception):
         self.error_class = error_class
 
 
+class PrimaryStepLimitReached(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class BridgePaths:
     static_profile: Path = STATIC_PROFILE
@@ -175,8 +179,12 @@ class StreamLogs:
 @dataclass
 class EventState:
     final_marker: str
+    max_steps: int | None = None
     final_message: str = ""
     settled: bool = False
+    step_counting_started: bool = False
+    primary_tool_completions: int = 0
+    max_steps_reached: bool = False
 
 
 def utc_now() -> str:
@@ -260,7 +268,13 @@ def _validate_descriptor_path(descriptor: int, expected: Path, label: str) -> Pa
     return opened_path
 
 
-def read_trusted_mcp_config(path: Path, workspace: Path) -> JsonObject:
+def read_trusted_mcp_config(
+    path: Path,
+    workspace: Path,
+    *,
+    allow_workspace: bool = False,
+    bare_server_map: bool = False,
+) -> JsonObject:
     if not path.is_absolute():
         raise BridgeFailure(EXIT_STARTUP, "startup", "trusted MCP config path must be absolute")
     if not path.name or ".." in path.parts:
@@ -273,7 +287,7 @@ def read_trusted_mcp_config(path: Path, workspace: Path) -> JsonObject:
         workspace_descriptor, workspace_stat, workspace_path = workspace_chain[-1]
         _validate_descriptor_path(workspace_descriptor, workspace_path, "task workspace")
         workspace_identity = (workspace_stat.st_dev, workspace_stat.st_ino)
-        if any(
+        if not allow_workspace and any(
             (directory_stat.st_dev, directory_stat.st_ino) == workspace_identity
             for _, directory_stat, _ in config_chain
         ):
@@ -293,7 +307,7 @@ def read_trusted_mcp_config(path: Path, workspace: Path) -> JsonObject:
                 EXIT_STARTUP, "startup", "cannot open trusted MCP config"
             ) from error
         opened_path = _validate_descriptor_path(descriptor, path, "trusted MCP config")
-        if opened_path.is_relative_to(workspace_path):
+        if not allow_workspace and opened_path.is_relative_to(workspace_path):
             raise BridgeFailure(
                 EXIT_STARTUP,
                 "startup",
@@ -341,7 +355,11 @@ def read_trusted_mcp_config(path: Path, workspace: Path) -> JsonObject:
         ) from error
     if not isinstance(raw, dict):
         raise BridgeFailure(EXIT_STARTUP, "startup", "trusted MCP config must be an object")
-    document = cast(JsonObject, raw)
+    document: JsonObject
+    if bare_server_map:
+        document = {"mcpServers": cast(JsonObject, raw)}
+    else:
+        document = cast(JsonObject, raw)
     if set(document) != {"mcpServers"}:
         raise BridgeFailure(
             EXIT_STARTUP,
@@ -365,6 +383,7 @@ def read_trusted_mcp_config(path: Path, workspace: Path) -> JsonObject:
 def build_runtime_mcp_config(
     static_profile: Path,
     trusted_mcp_config: Path | None,
+    trusted_mcp_server_map: Path | None,
     workspace: Path,
 ) -> JsonObject:
     try:
@@ -380,9 +399,20 @@ def build_runtime_mcp_config(
     if frozenset(base_servers) != BASE_MCP_SERVER_NAMES:
         raise BridgeFailure(EXIT_STARTUP, "startup", "bundled MCP server inventory is invalid")
 
+    if trusted_mcp_config is not None and trusted_mcp_server_map is not None:
+        raise BridgeFailure(EXIT_STARTUP, "startup", "trusted MCP inputs are mutually exclusive")
+
     merged = dict(base_servers)
     if trusted_mcp_config is not None:
         trusted = read_trusted_mcp_config(trusted_mcp_config, workspace)
+        merged.update(cast(dict[str, object], trusted["mcpServers"]))
+    elif trusted_mcp_server_map is not None:
+        trusted = read_trusted_mcp_config(
+            trusted_mcp_server_map,
+            workspace,
+            allow_workspace=True,
+            bare_server_map=True,
+        )
         merged.update(cast(dict[str, object], trusted["mcpServers"]))
     return {"mcpServers": merged}
 
@@ -391,6 +421,7 @@ def prepare_runtime_profile(
     paths: BridgePaths,
     source_env: Mapping[str, str],
     trusted_mcp_config: Path | None,
+    trusted_mcp_server_map: Path | None,
     workspace: Path,
 ) -> RuntimeProfile:
     api_key = source_env.get("OPENAI_API_KEY", "")
@@ -413,7 +444,12 @@ def prepare_runtime_profile(
         mcp_config = root / "mcp.runtime.json"
         write_json_atomic(
             mcp_config,
-            build_runtime_mcp_config(paths.static_profile, trusted_mcp_config, workspace),
+            build_runtime_mcp_config(
+                paths.static_profile,
+                trusted_mcp_config,
+                trusted_mcp_server_map,
+                workspace,
+            ),
         )
         os.chmod(mcp_config, 0o600)
 
@@ -623,6 +659,15 @@ def process_event(
     capture_completion: bool = True,
 ) -> None:
     event_type = event.get("type")
+    if (
+        state.step_counting_started
+        and not state.max_steps_reached
+        and event_type == "tool_execution_end"
+    ):
+        state.primary_tool_completions += 1
+        if state.max_steps is not None and state.primary_tool_completions >= state.max_steps:
+            state.max_steps_reached = True
+
     if event_type == "extension_ui_request":
         method = event.get("method")
         request_id = event.get("id")
@@ -702,6 +747,8 @@ def await_response(
             state,
             capture_completion=capture_completion,
         )
+        if state.max_steps_reached:
+            raise PrimaryStepLimitReached
 
 
 def validate_state_response(response: JsonObject) -> JsonObject:
@@ -836,6 +883,8 @@ def run_bridge(
     paths: BridgePaths,
     source_env: Mapping[str, str],
     trusted_mcp_config: Path | None = None,
+    trusted_mcp_server_map: Path | None = None,
+    max_steps: int | None = None,
     stop_event: threading.Event | None = None,
 ) -> int:
     started_at = utc_now()
@@ -853,7 +902,7 @@ def run_bridge(
     stdout_thread: threading.Thread | None = None
     stderr_thread: threading.Thread | None = None
     final_marker = f"{FINAL_MARKER_PREFIX}{secrets.token_hex(16)}"
-    state = EventState(final_marker=final_marker)
+    state = EventState(final_marker=final_marker, max_steps=max_steps)
     tool_state: JsonObject | None = None
     initial_state: JsonObject | None = None
     final_state: JsonObject | None = None
@@ -873,6 +922,8 @@ def run_bridge(
             ) from error
         if timeout_seconds <= 0:
             raise BridgeFailure(EXIT_PROTOCOL, "protocol", "timeout must be positive")
+        if max_steps is not None and max_steps <= 0:
+            raise BridgeFailure(EXIT_PROTOCOL, "protocol", "max steps must be positive")
         task_id = source_env.get("TASK_ID", "")
         if not task_id:
             raise BridgeFailure(EXIT_PROTOCOL, "protocol", "TASK_ID is required")
@@ -881,6 +932,7 @@ def run_bridge(
             paths,
             source_env,
             trusted_mcp_config,
+            trusted_mcp_server_map,
             Path.cwd(),
         )
         redactor = runtime.redactor
@@ -954,52 +1006,52 @@ def run_bridge(
             "Use that line exactly once. Do not include it in progress updates or "
             "responses to background notifications."
         )
+        state.step_counting_started = True
         send_command(
             process,
             {"id": "task", "type": "prompt", "message": task_prompt},
         )
-        _ = await_response(
-            process,
-            events,
-            state,
-            "task",
-            deadline,
-            stop,
-            capture_completion=False,
-        )
-        state.final_message = ""
-        state.settled = False
-
-        while not state.settled:
-            event = next_event(process, events, deadline, stop)
-            process_event(process, event, state)
-
-        if not state.final_message:
-            raise BridgeFailure(EXIT_PROTOCOL, "protocol", "settled without marked final response")
-
-        send_command(process, {"id": "final-state", "type": "get_state"})
-        final_state = validate_state_response(
-            await_response(
+        try:
+            _ = await_response(
                 process,
                 events,
                 state,
-                "final-state",
+                "task",
                 deadline,
                 stop,
                 capture_completion=False,
             )
-        )
-        write_text(paths.log_dir / "final_message.txt", state.final_message, redactor)
-        write_json_atomic(
-            paths.log_dir / "metrics.json",
-            {
-                "initialState": initial_state,
-                "finalState": final_state,
-                "agentSettled": state.settled,
-                "finalMessageObserved": bool(state.final_message),
-                "durationSeconds": round(time.monotonic() - started_monotonic, 3),
-            },
-        )
+        except PrimaryStepLimitReached:
+            state.step_counting_started = False
+
+        if not state.max_steps_reached:
+            state.final_message = ""
+            state.settled = False
+            while not state.settled and not state.max_steps_reached:
+                event = next_event(process, events, deadline, stop)
+                process_event(process, event, state)
+
+        if not state.max_steps_reached:
+            state.step_counting_started = False
+            if not state.final_message:
+                raise BridgeFailure(
+                    EXIT_PROTOCOL, "protocol", "settled without marked final response"
+                )
+
+            send_command(process, {"id": "final-state", "type": "get_state"})
+            final_state = validate_state_response(
+                await_response(
+                    process,
+                    events,
+                    state,
+                    "final-state",
+                    deadline,
+                    stop,
+                    capture_completion=False,
+                )
+            )
+            write_text(paths.log_dir / "final_message.txt", state.final_message, redactor)
+
     except BridgeFailure as error:
         exit_code = error.exit_code
         error_class = error.error_class
@@ -1012,7 +1064,7 @@ def run_bridge(
         if process is not None:
             terminate_process_group(
                 process,
-                abort_rpc=exit_code != EXIT_OK,
+                abort_rpc=exit_code != EXIT_OK or state.max_steps_reached,
             )
         for thread in (stdout_thread, stderr_thread):
             if thread is not None:
@@ -1030,7 +1082,47 @@ def run_bridge(
         if runtime is not None:
             runtime.cleanup()
 
+        if process is not None:
+            if exit_code == EXIT_OK:
+                termination_reason = (
+                    "max_steps_reached" if state.max_steps_reached else "agent_settled"
+                )
+            else:
+                termination_reason = error_class or "failed"
+            metrics: dict[str, object] = {
+                "initialState": initial_state,
+                "finalState": final_state,
+                "agentSettled": state.settled,
+                "finalMessageObserved": bool(state.final_message),
+                "terminationReason": termination_reason,
+                "maxSteps": max_steps,
+                "primaryToolCompletions": state.primary_tool_completions,
+                "durationSeconds": round(time.monotonic() - started_monotonic, 3),
+            }
+            redacted_metrics_value = cast(object, json.loads(redactor.redact(json.dumps(metrics))))
+            redacted_metrics = (
+                cast(JsonObject, redacted_metrics_value)
+                if isinstance(redacted_metrics_value, dict)
+                else {
+                    "terminationReason": "internal",
+                    "maxSteps": max_steps,
+                    "primaryToolCompletions": state.primary_tool_completions,
+                }
+            )
+            try:
+                write_json_atomic(paths.log_dir / "metrics.json", redacted_metrics)
+            except OSError as error:
+                exit_code = EXIT_PROTOCOL
+                error_class = "metrics"
+                error_message = f"metrics write failed: {type(error).__name__}"
+
         task_id = source_env.get("TASK_ID", "")
+        if exit_code != EXIT_OK:
+            outcome = "failed"
+        elif state.max_steps_reached:
+            outcome = "max_steps_reached"
+        else:
+            outcome = "agent_settled"
         summary: dict[str, object] = {
             "version": 2,
             "taskId": task_id,
@@ -1042,9 +1134,12 @@ def run_bridge(
             "durationSeconds": round(time.monotonic() - started_monotonic, 3),
             "timeoutSeconds": timeout_seconds,
             "exitCode": exit_code,
-            "outcome": "agent_settled" if exit_code == EXIT_OK else "failed",
+            "outcome": outcome,
             "agentSettled": state.settled,
             "finalMessageObserved": bool(state.final_message),
+            "finalMessagePresent": bool(state.final_message),
+            "maxSteps": max_steps,
+            "primaryToolCompletions": state.primary_tool_completions,
             "errorClass": error_class,
             "error": error_message,
             "toolState": tool_state,
@@ -1065,13 +1160,26 @@ def run_bridge(
     return exit_code
 
 
+def positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be an integer") from error
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be positive")
+    return parsed
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run pinned Pi in unattended benchmark RPC mode")
     parser.add_argument("--problem-statement", type=Path, required=True)
     parser.add_argument("--task-id", required=True)
     parser.add_argument("--declared-model", choices=(VALS_MODEL_ID,), required=True)
     parser.add_argument("--prompt-profile", choices=PROMPT_PROFILES, required=True)
-    parser.add_argument("--trusted-mcp-config", type=Path)
+    mcp_input = parser.add_mutually_exclusive_group()
+    mcp_input.add_argument("--trusted-mcp-config", type=Path)
+    mcp_input.add_argument("--trusted-mcp-server-map", type=Path)
+    parser.add_argument("--max-steps", type=positive_int)
     parser.add_argument("--timeout-seconds", type=float, default=7200)
     return parser.parse_args(argv)
 
@@ -1115,6 +1223,8 @@ def main(argv: list[str] | None = None) -> int:
         paths=BridgePaths(),
         source_env=source_env,
         trusted_mcp_config=cast(Path | None, args.trusted_mcp_config),
+        trusted_mcp_server_map=cast(Path | None, args.trusted_mcp_server_map),
+        max_steps=cast(int | None, args.max_steps),
         stop_event=stop_event,
     )
 

@@ -13,7 +13,8 @@ The historical two-task run is diagnostic only. One task retrieved the exact ups
 - Every run must declare the Vals model key `openai/gpt-5.6-sol`; the bridge runs the pinned direct Pi model `openai/gpt-5.6-sol` and rejects other labels.
 - Every run must explicitly supply `prompt_profile=simple` or `prompt_profile=adapted`; neither contract has a default.
 - The restricted contract deadline is 7,200 seconds.
-- ValSmith owns task resolution; bridge settlement is not a correctness verdict.
+- The SREBench contract has a 14,400-second primary-bridge deadline and a 500-primary-tool-completion default.
+- ValSmith owns task resolution; bridge settlement or step-limit termination is not a correctness verdict.
 
 The raw `{problem_statement_path}` replacement is safe only for the Valkyrie-owned fixed path above. Other benchmark providers require a separately reviewed contract.
 
@@ -30,6 +31,14 @@ The corresponding run shape must include an external path, for example:
 ```text
 valk run start --benchmark vcb --agent ok-pi-agent-vcb --model openai/gpt-5.6-sol -k prompt_profile=adapted -k trusted_mcp_config_path=/run/benchmark/mcp.json --concurrency 40 --lambda vcb-final-view-lambda
 ```
+
+### SREBench contract
+
+`contract.srebench.yaml` retains the restricted contract's complete Pi tool, package, npm, Context7, model, prompt, and egress surface. It has a 14,400-second primary-bridge deadline and defaults `max_steps` to 500. For publication, it must be selected as `contract.yaml` in a disposable bundle named `ok-pi-agent-srebench`.
+
+The trusted SREBench contract identifies `/workspace/mcp.json` as benchmark-owned input created by the pinned sandbox generator before Pi starts. That file is a bare MCP server map, so `--trusted-mcp-server-map` wraps it in memory under `mcpServers` and merges it with the two bundled servers. This explicit input is the only task-workspace MCP exception: Pi still performs no project MCP discovery, and the existing `--trusted-mcp-config` path continues to reject workspace-contained files. The bridge validates regular-file handling and server-name collisions but does not verify generator provenance; infrastructure owns the pinned-source assertion.
+
+`max_steps` counts completed tools observed on the primary Pi RPC stream. Each top-level `subagent` or MCP gateway call counts once. Tool calls inside detached subagents are excluded, and detached work is not guaranteed to stop when the primary limit is reached. The four-hour deadline therefore bounds the primary bridge, not aggregate child work or total cost. Reaching the limit aborts and cleans up the primary Pi process group, writes a gradeable `max_steps_reached` result, and exits `0` without requiring a final message or `agent_settled`.
 
 ## Architecture
 
@@ -70,8 +79,8 @@ The bridge writes under `/logs/ok-pi-agent`:
 - `raw_output.txt`
 - `stderr.txt`
 - `final_message.txt`
-- `summary.json`, including `promptProfile` and `promptSha256`
-- `metrics.json`
+- `summary.json`, including `promptProfile`, `promptSha256`, `maxSteps`, and `primaryToolCompletions`
+- `metrics.json`, including `terminationReason`, `maxSteps`, and `primaryToolCompletions`
 - `tool-state.json`
 - `compactions/`
 
@@ -81,7 +90,7 @@ Valkyrie archives existing output and continues evaluation for exits `0`, `124`,
 
 | Code | Meaning |
 |---:|---|
-| 0 | Pi emitted exactly one task-correlated marked final response and reached `agent_settled`; ValSmith still determines task resolution |
+| 0 | Pi either produced one marked final response and reached `agent_settled`, or reached the configured primary tool-completion limit with outcome `max_steps_reached`; ValSmith still determines task resolution |
 | 20 | Missing or invalid auth secret |
 | 21 | Pinned profile, startup, tool attestation, or handshake failure |
 | 22 | RPC, prompt, or final-message protocol failure |
@@ -108,6 +117,7 @@ The profile RPC check performs a direct MCP `initialize` and `tools/list` exchan
 
 - The restricted contract declares task-time egress only to `api.openai.com` and `mcp.context7.com`. Context Mode's explicit URL-fetch method remains excluded.
 - The VCB contract has unrestricted task-time egress and requires an infrastructure-owned MCP config outside the task workspace. Pi, subagents, and local tool subprocesses share a UID and can read `OPENAI_API_KEY`; agent-facing policy and artifact redaction reduce accidental disclosure but are not a hard credential-isolation boundary.
+- The SREBench contract retains restricted egress and explicitly trusts only its infrastructure-selected `/workspace/mcp.json` bare server map. Other project MCP files remain untrusted and undiscovered.
 - Repository `AGENTS.md`, `CLAUDE.md`, `.pi` resources, package declarations, agents, chains, and MCP files are untrusted and are not loaded by the primary or child Pi runtimes.
 - Only the selected bundled prompt is injected as runtime `AGENTS.md`. The alternate immutable prompt remains readable under `/bundle`, so the single-bundle design is not treatment-blind.
 - Slipstream auto-compaction remains enabled and may use its configured summary and judge models when its threshold is reached; this behavior must be disclosed with benchmark results.

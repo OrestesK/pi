@@ -4,18 +4,21 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import queue
 import signal
 import subprocess
 import sys
 import threading
 import time
-from typing import Any, cast
+from typing import Any, Mapping, cast
 
 import pytest
 
+import run_agent as run_agent_module
 from run_agent import (
     BUNDLE_ROOT,
     BridgePaths,
+    EventQueue,
     EXIT_AUTH,
     EXIT_OK,
     EXIT_PROTOCOL,
@@ -27,6 +30,8 @@ from run_agent import (
     MODEL_PROVIDER,
     VALS_MODEL_ID,
     BridgeFailure,
+    build_runtime_mcp_config,
+    next_event,
     parse_args,
     read_trusted_mcp_config,
     run_bridge,
@@ -127,6 +132,34 @@ def test_cli_accepts_only_the_pinned_vals_model(tmp_path: Path) -> None:
         parse_args([*common, "--declared-model", "openai/gpt-5.6-sol-high"])
 
 
+def test_cli_requires_positive_max_steps_and_exclusive_mcp_inputs(tmp_path: Path) -> None:
+    common = [
+        "--problem-statement",
+        str(tmp_path / "problem.md"),
+        "--task-id",
+        "task-1",
+        "--prompt-profile",
+        "simple",
+        "--declared-model",
+        VALS_MODEL_ID,
+    ]
+
+    assert parse_args([*common, "--max-steps", "3"]).max_steps == 3
+    for invalid in ("0", "-1", "not-an-integer"):
+        with pytest.raises(SystemExit):
+            parse_args([*common, "--max-steps", invalid])
+    with pytest.raises(SystemExit):
+        parse_args(
+            [
+                *common,
+                "--trusted-mcp-config",
+                "/run/benchmark/mcp.json",
+                "--trusted-mcp-server-map",
+                "/workspace/mcp.json",
+            ]
+        )
+
+
 def process_is_dead(pid: int) -> bool:
     stat = Path(f"/proc/{pid}/stat")
     if not stat.exists():
@@ -159,6 +192,9 @@ def test_bridge_settles_and_redacts_all_artifacts(
     assert summary["outcome"] == "agent_settled"
     assert summary["agentSettled"] is True
     assert summary["finalMessageObserved"] is True
+    assert summary["finalMessagePresent"] is True
+    assert summary["maxSteps"] is None
+    assert summary["primaryToolCompletions"] == 0
     assert "terminalGoalState" not in summary
     assert summary["taskId"] == "task-1"
     assert summary["promptProfile"] == prompt_profile
@@ -187,7 +223,137 @@ def test_bridge_settles_and_redacts_all_artifacts(
     assert "[REDACTED]" in artifact_text
     if mode == "malformed":
         assert "not-json-output" in (paths.log_dir / "raw_output.txt").read_text()
+    metrics = read_json(paths.log_dir / "metrics.json")
+    assert metrics["terminationReason"] == "agent_settled"
+    assert metrics["maxSteps"] is None
+    assert metrics["primaryToolCompletions"] == 0
     assert not any(paths.runtime_parent.iterdir())
+
+
+def test_metrics_write_failure_returns_protocol_error_with_safe_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    paths = bridge_paths(tmp_path, "success")
+    real_write_json_atomic = run_agent_module.write_json_atomic
+
+    def fail_metrics_only(path: Path, payload: Mapping[str, object]) -> None:
+        if path.name == "metrics.json":
+            raise OSError(f"disk failure contains {TEST_API_KEY}")
+        real_write_json_atomic(path, payload)
+
+    monkeypatch.setattr(run_agent_module, "write_json_atomic", fail_metrics_only)
+
+    exit_code = run_bridge(
+        problem_statement=tmp_path / "problem.md",
+        problem_text="Fix the task",
+        prompt_profile="simple",
+        timeout_seconds=5,
+        paths=paths,
+        source_env=source_env(),
+    )
+
+    assert exit_code == EXIT_PROTOCOL
+    assert not (paths.log_dir / "metrics.json").exists()
+    summary_path = paths.log_dir / "summary.json"
+    summary = read_json(summary_path)
+    assert summary["outcome"] == "failed"
+    assert summary["agentSettled"] is True
+    assert summary["errorClass"] == "metrics"
+    assert summary["error"] == "metrics write failed: OSError"
+    assert TEST_API_KEY not in summary_path.read_text()
+
+
+def test_primary_tool_completion_limit_allows_below_limit_settlement(tmp_path: Path) -> None:
+    paths = bridge_paths(tmp_path, "success", "--tool-end-count", "2")
+
+    exit_code = run_bridge(
+        problem_statement=tmp_path / "problem.md",
+        problem_text="Fix the task",
+        prompt_profile="simple",
+        timeout_seconds=5,
+        max_steps=3,
+        paths=paths,
+        source_env=source_env(),
+    )
+
+    assert exit_code == EXIT_OK
+    summary = read_json(paths.log_dir / "summary.json")
+    assert summary["outcome"] == "agent_settled"
+    assert summary["agentSettled"] is True
+    assert summary["finalMessagePresent"] is True
+    assert summary["maxSteps"] == 3
+    assert summary["primaryToolCompletions"] == 2
+
+
+def test_omitted_primary_tool_limit_allows_more_tool_completions(tmp_path: Path) -> None:
+    paths = bridge_paths(tmp_path, "success", "--tool-end-count", "4")
+
+    exit_code = run_bridge(
+        problem_statement=tmp_path / "problem.md",
+        problem_text="Fix the task",
+        prompt_profile="simple",
+        timeout_seconds=5,
+        paths=paths,
+        source_env=source_env(),
+    )
+
+    assert exit_code == EXIT_OK
+    summary = read_json(paths.log_dir / "summary.json")
+    assert summary["maxSteps"] is None
+    assert summary["primaryToolCompletions"] == 4
+
+
+def test_exact_primary_tool_limit_aborts_and_remains_gradeable(tmp_path: Path) -> None:
+    abort_path = tmp_path / "abort-observed.txt"
+    child_pid_path = tmp_path / "child.pid"
+    paths = bridge_paths(
+        tmp_path,
+        "step-limit",
+        "--tool-end-count",
+        "3",
+        "--abort-observed-path",
+        str(abort_path),
+        "--fake-child-pid-path",
+        str(child_pid_path),
+    )
+
+    exit_code = run_bridge(
+        problem_statement=tmp_path / "problem.md",
+        problem_text="Fix the task",
+        prompt_profile="simple",
+        timeout_seconds=5,
+        max_steps=3,
+        paths=paths,
+        source_env=source_env(),
+    )
+
+    assert exit_code == EXIT_OK
+    assert abort_path.read_text() == "abort observed\n"
+    child_pid = int(child_pid_path.read_text())
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline and not process_is_dead(child_pid):
+        time.sleep(0.02)
+    child_was_dead = process_is_dead(child_pid)
+    if not child_was_dead:
+        os.kill(child_pid, signal.SIGKILL)
+    assert child_was_dead
+    assert not (paths.log_dir / "final_message.txt").exists()
+
+    summary = read_json(paths.log_dir / "summary.json")
+    assert summary["outcome"] == "max_steps_reached"
+    assert summary["exitCode"] == EXIT_OK
+    assert summary["agentSettled"] is False
+    assert summary["finalMessageObserved"] is False
+    assert summary["finalMessagePresent"] is False
+    assert summary["maxSteps"] == 3
+    assert summary["primaryToolCompletions"] == 3
+    metrics = read_json(paths.log_dir / "metrics.json")
+    assert metrics["terminationReason"] == "max_steps_reached"
+    assert metrics["agentSettled"] is False
+    assert metrics["finalMessageObserved"] is False
+    assert metrics["maxSteps"] == 3
+    assert metrics["primaryToolCompletions"] == 3
 
 
 def test_missing_api_key_stops_before_process_start(tmp_path: Path) -> None:
@@ -210,6 +376,7 @@ def test_missing_api_key_stops_before_process_start(tmp_path: Path) -> None:
     assert summary["promptProfile"] == "simple"
     selected_prompt = paths.static_profile / "prompts" / "simple" / "AGENTS.md"
     assert summary["promptSha256"] == hashlib.sha256(selected_prompt.read_bytes()).hexdigest()
+    assert not (paths.log_dir / "metrics.json").exists()
 
 
 def test_external_trusted_mcp_config_is_merged_and_cleaned(
@@ -241,6 +408,79 @@ def test_external_trusted_mcp_config_is_merged_and_cleaned(
     )
 
     assert exit_code == EXIT_OK
+    assert not any(paths.runtime_parent.iterdir())
+
+
+def test_workspace_server_map_is_wrapped_and_merged_for_explicit_benchmark_input(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+    server_map = workspace / "mcp.json"
+    generated_servers = {
+        "gdb": {"command": "node", "args": ["/opt/mcp-gdb/build/index.js"]},
+        "radare2": {"command": "r2pm", "args": ["-r", "r2mcp"]},
+    }
+    server_map.write_text(json.dumps(generated_servers))
+    paths = bridge_paths(
+        tmp_path / "bundle",
+        "success",
+        "--expected-mcp-servers",
+        "context-mode,context7,gdb,radare2",
+    )
+
+    runtime_mcp = build_runtime_mcp_config(
+        paths.static_profile,
+        trusted_mcp_config=None,
+        trusted_mcp_server_map=server_map,
+        workspace=workspace,
+    )
+    assert runtime_mcp == {
+        "mcpServers": {
+            "context7": {"url": "https://mcp.context7.com/mcp"},
+            "context-mode": {"command": "/bin/true"},
+            **generated_servers,
+        }
+    }
+
+    exit_code = run_bridge(
+        problem_statement=workspace / "problem.md",
+        problem_text="Fix the task",
+        prompt_profile="simple",
+        timeout_seconds=5,
+        paths=paths,
+        source_env=source_env(),
+        trusted_mcp_server_map=server_map,
+    )
+
+    assert exit_code == EXIT_OK
+    assert not any(paths.runtime_parent.iterdir())
+
+
+def test_trusted_mcp_input_modes_are_mutually_exclusive_before_pi(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    trusted_config = tmp_path / "trusted-mcp.json"
+    trusted_config.write_text('{"mcpServers": {}}')
+    server_map = workspace / "mcp.json"
+    server_map.write_text("{}")
+    paths = bridge_paths(tmp_path / "bundle")
+
+    exit_code = run_bridge(
+        problem_statement=workspace / "problem.md",
+        problem_text="Fix the task",
+        prompt_profile="simple",
+        timeout_seconds=5,
+        paths=paths,
+        source_env=source_env(),
+        trusted_mcp_config=trusted_config,
+        trusted_mcp_server_map=server_map,
+    )
+
+    assert exit_code == EXIT_STARTUP
+    assert read_json(paths.log_dir / "summary.json")["errorClass"] == "startup"
     assert not any(paths.runtime_parent.iterdir())
 
 
@@ -417,6 +657,10 @@ def test_bridge_maps_protocol_and_process_failures(
     assert summary["promptProfile"] == "simple"
     selected_prompt = paths.static_profile / "prompts" / "simple" / "AGENTS.md"
     assert summary["promptSha256"] == hashlib.sha256(selected_prompt.read_bytes()).hexdigest()
+    metrics = read_json(paths.log_dir / "metrics.json")
+    assert metrics["terminationReason"] == summary["errorClass"]
+    assert metrics["maxSteps"] is None
+    assert metrics["primaryToolCompletions"] == 0
 
 
 def test_unexpected_pi_exit_kills_surviving_descendant(tmp_path: Path) -> None:
@@ -455,6 +699,8 @@ def test_deadline_kills_pi_process_group_and_descendant(tmp_path: Path) -> None:
         "timeout",
         "--fake-child-pid-path",
         str(child_pid_path),
+        "--tool-end-count",
+        "2",
     )
 
     exit_code = run_bridge(
@@ -462,16 +708,52 @@ def test_deadline_kills_pi_process_group_and_descendant(tmp_path: Path) -> None:
         problem_text="Fix the task",
         prompt_profile="simple",
         timeout_seconds=0.5,
+        max_steps=3,
         paths=paths,
         source_env=source_env(),
     )
 
     assert exit_code == EXIT_TIMEOUT
+    summary = read_json(paths.log_dir / "summary.json")
+    assert summary["outcome"] == "failed"
+    assert summary["maxSteps"] == 3
+    assert summary["primaryToolCompletions"] == 2
+    metrics = read_json(paths.log_dir / "metrics.json")
+    assert metrics["terminationReason"] == "timeout"
+    assert metrics["maxSteps"] == 3
+    assert metrics["primaryToolCompletions"] == 2
     child_pid = int(child_pid_path.read_text())
     deadline = time.monotonic() + 2
     while time.monotonic() < deadline and not process_is_dead(child_pid):
         time.sleep(0.02)
     assert process_is_dead(child_pid)
+
+
+def test_expired_deadline_wins_before_dequeuing_a_queued_event() -> None:
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(300)"],
+        text=True,
+    )
+    events: EventQueue = queue.Queue()
+    queued_event: dict[str, object] = {
+        "type": "tool_execution_end",
+        "toolCallId": "queued",
+    }
+    events.put(("event", queued_event))
+    try:
+        with pytest.raises(BridgeFailure) as raised:
+            next_event(
+                process,
+                events,
+                deadline=time.monotonic() - 1,
+                stop_event=threading.Event(),
+            )
+    finally:
+        process.terminate()
+        process.wait(timeout=2)
+
+    assert raised.value.exit_code == EXIT_TIMEOUT
+    assert events.get_nowait() == ("event", queued_event)
 
 
 def test_stop_event_uses_timeout_cleanup_path(tmp_path: Path) -> None:

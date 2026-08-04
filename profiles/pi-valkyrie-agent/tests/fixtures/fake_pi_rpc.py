@@ -27,6 +27,30 @@ def read_command() -> dict[str, object] | None:
     return cast(dict[str, object], value)
 
 
+def emit_tool_events(count: int) -> None:
+    if count <= 0:
+        return
+    emit(
+        {
+            "type": "tool_execution_start",
+            "toolCallId": "ignored-start",
+            "toolName": "read",
+            "args": {"path": "task.txt"},
+        }
+    )
+    emit({"type": "queue_update", "action": "ignored-event"})
+    for index in range(count):
+        emit(
+            {
+                "type": "tool_execution_end",
+                "toolCallId": f"tool-{index}",
+                "toolName": "read",
+                "result": {"content": "done"},
+                "isError": False,
+            }
+        )
+
+
 def write_tool_state(mode: str) -> None:
     if mode == "missing-tool-state":
         return
@@ -56,6 +80,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--fake-mode", default="success")
     parser.add_argument("--fake-child-pid-path")
+    parser.add_argument("--abort-observed-path")
+    parser.add_argument("--tool-end-count", type=int, default=0)
     parser.add_argument("--expected-agent-prompt")
     parser.add_argument("--expected-mcp-servers", default="context-mode,context7")
     args, unknown = parser.parse_known_args()
@@ -243,6 +269,13 @@ def main() -> int:
                 )
                 emit({"type": "agent_settled"})
 
+            if args.fake_mode == "step-limit":
+                child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"])
+                if args.fake_child_pid_path:
+                    Path(args.fake_child_pid_path).write_text(str(child.pid))
+                emit_tool_events(args.tool_end_count)
+                continue
+
             emit(
                 {
                     "id": request_id,
@@ -256,6 +289,7 @@ def main() -> int:
                 sys.stdout.write("not-json-output\n")
                 sys.stdout.flush()
 
+            emit_tool_events(args.tool_end_count)
             if args.fake_mode == "timeout":
                 child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)"])
                 if args.fake_child_pid_path:
@@ -320,6 +354,8 @@ def main() -> int:
             continue
 
         if command_type == "abort":
+            if args.abort_observed_path:
+                Path(args.abort_observed_path).write_text("abort observed\n")
             emit(
                 {
                     "id": request_id,

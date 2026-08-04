@@ -76,3 +76,28 @@ def test_vcb_contract_has_separate_runtime_policy() -> None:
         "default": 18000,
         "description": "Vibe Code Bench unattended deadline in seconds",
     }
+
+
+def test_srebench_contract_uses_benchmark_server_map_and_primary_step_limit() -> None:
+    contract = load_contract("contract.srebench.yaml")
+
+    assert contract["name"] == "ok-pi-agent-srebench"
+    assert_common_contract(contract, "ok-pi-agent-srebench")
+    assert "--trusted-mcp-server-map /workspace/mcp.json" in contract["run_cmd"]
+    assert "--max-steps {max_steps}" in contract["run_cmd"]
+    assert contract["egress_allowlist"] == [
+        "https://api.openai.com",
+        "https://mcp.context7.com",
+    ]
+    assert contract["defaults"]["max_steps"] == {
+        "type": "int",
+        "required": False,
+        "default": 500,
+        "description": "Primary Pi tool completions only; detached child work is excluded",
+    }
+    assert contract["defaults"]["timeout_seconds"] == {
+        "type": "int",
+        "required": False,
+        "default": 14400,
+        "description": "Primary bridge deadline in seconds",
+    }

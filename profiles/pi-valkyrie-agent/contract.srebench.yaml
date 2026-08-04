@@ -1,0 +1,41 @@
+name: ok-pi-agent-srebench
+install_cmd: bash /bundle/ok-pi-agent-srebench/setup.sh
+run_cmd: >-
+  /usr/local/bin/python3 /bundle/ok-pi-agent-srebench/run_agent.py
+  --problem-statement '{problem_statement_path}'
+  --task-id '{task_id}'
+  --declared-model '{model}'
+  --prompt-profile '{prompt_profile}'
+  --trusted-mcp-server-map /workspace/mcp.json
+  --max-steps {max_steps}
+  --timeout-seconds {timeout_seconds}
+final_output: /logs/ok-pi-agent
+egress_allowlist:
+  - https://api.openai.com
+  - https://mcp.context7.com
+secrets:
+  OPENAI_API_KEY: prodBenchmarksInfraApiKeys
+defaults:
+  model:
+    type: str
+    required: true
+    choices:
+      - openai/gpt-5.6-sol
+    description: Required Vals model key matching the pinned Pi runtime
+  prompt_profile:
+    type: str
+    required: true
+    choices:
+      - simple
+      - adapted
+    description: Required AGENTS prompt profile
+  max_steps:
+    type: int
+    required: false
+    default: 500
+    description: Primary Pi tool completions only; detached child work is excluded
+  timeout_seconds:
+    type: int
+    required: false
+    default: 14400
+    description: Primary bridge deadline in seconds
