@@ -1,0 +1,130 @@
+{
+  "contentHashes": {
+    "directories": {
+      "agents": "498dd1a53ebed6ab3def5dabf9940f4f547dd47972161bf33b70dd4969ab7b3e",
+      "extensions": "c6f016d5a53eb694ca2773cedafe784ba74d716935706e0d136d23de18ccc280",
+      "packages/context-mode": "4bcb8d046a677d4a9e1408c27eab54649ad8770208e33a3f512f10a40d81be38",
+      "packages/pi-fff": "8870791b908cd8e2296f86dd260836d4cb2e6e9d3e7ef946970dcc47ed04ee74",
+      "packages/pi-intercom": "5cebee5bd0bc05308edd7e8ab6c4ee13c7a04ff5f8e710bab6c8b24436f2dba4",
+      "packages/pi-lens": "886c448fef0276cda80c24476e4f15a153761da4887fb665ae457bf062573bf6",
+      "packages/pi-mcp-adapter": "80cf91f039185970095edd5c0f0288be69d9e5ed5088f3985ac90a7e043b3c4e",
+      "packages/pi-slipstream-compact-valkyrie": "7186d50253c48e82e18bd74b87aaf01182b1985471293394eeacf70ae81818f6",
+      "packages/pi-subagents": "4b65bcdc7c81a4a09d80002d0cc13bd81448da9d02d8d869b85adb28d15889d9",
+      "packages/pi-tool-result-virtualizer": "6e9fffaeef184915b810485f349664a5db1f5c2b10615dd4477b6d3a083bc941",
+      "prompts": "430e49fe0346b04300018760c9914a9e968615d3eb3ff0b2bd3c9d4884d3901c",
+      "skills": "d8cd26ade1a49966b08d1fea9b8530df049d9ee9e79b26b9231faf8d5f2d7524",
+      "tests": "c53798dfb817c78f7b9d3fcd3104d5a9b40e5762c0886bb4a318172e336995fd"
+    },
+    "files": {
+      ".gitignore": "a2efb7e3e3eed104b7432a158b2cdb0e49b5fe06da145b7524271818f0dee7a8",
+      "APPEND_SYSTEM.md": "e31a833289436c65ef8438d7fdbf665acb42cd346ab4e7afed7aaab94981fde2",
+      "allowed-tools.json": "c501c51888decde3b3786a485ea997283a3e3049b8179afe0023c7528de27952",
+      "mcp.json": "b2685ee697bf6e1f6a4d9c91539e0b7abf6c24dfaa601226b604293e0ffa9477",
+      "package-lock.json": "c33b7020868b55f6ca90cd81e18692e481dde330f3df586c879ee2fd80974973",
+      "package.json": "d5d7effe20df82697b4031e31e02fd39e5a639b74f2d6de06239abc2e62c7e7d",
+      "settings.json": "10a722352bf91aa8486b34ccb622db611f27a30912ae9a87cd83af2a5c1bc1d5"
+    }
+  },
+  "node": {
+    "sha256": "5c4286dcd5bbd5acb1ccc7eb0e088bd5eb1e3affad671ee9364004f8f6a4a431",
+    "url": "https://nodejs.org/dist/v26.4.0/node-v26.4.0-linux-x64.tar.xz",
+    "version": "26.4.0"
+  },
+  "piConfig": {
+    "commit": "c4ea35540681a4240eae84e3f1eb61c28e6fd9f6",
+    "repository": "https://github.com/OrestesK/pi.git"
+  },
+  "registry": {
+    "@earendil-works/pi-agent-core": {
+      "integrity": "sha512-Lvn89ko42h5ETUb6Z0Ku6ldskEqXaTdQBYvSa0+7bdG9V6rUEpXptv5e0OVZ1HDcvi8s6/2lGCQWsxKX+DFHNw==",
+      "version": "0.80.6"
+    },
+    "@earendil-works/pi-ai": {
+      "integrity": "sha512-7xfLk8sANBp+bpPEbjoOZTbPxsa+++b1JXAoSJsNa3vbs9AHHEclmvg54XLQcxH+fuwaeti/g2jeIfJ+mVYLpA==",
+      "version": "0.80.6"
+    },
+    "@earendil-works/pi-coding-agent": {
+      "integrity": "sha512-vcfD6tOk402isLl3Cm/qbn2O10TvgroMp1+/fEGM24ZdvETFCdOYv5VZ7m59EI5fPsjfSJh+CpQ5bhBrhfOg7g==",
+      "version": "0.80.6"
+    },
+    "@earendil-works/pi-tui": {
+      "integrity": "sha512-bSuzS4EVSqEPj/Qr/p9eqCESfKsGuDNbl77EGci8Iaqqt/C/XCBZL1MjXaxSWW1NsT5afjp/Cb0NTPzOLv/aPA==",
+      "version": "0.80.6"
+    },
+    "@ff-labs/fff-bin-linux-x64-gnu": {
+      "integrity": "sha512-KDpl8lwSEOauP/6FSJIvnARzE+ILm2rVIRQAio9dc5nn56EvlsryBWry0c5V0Tbw1PV0lNrZ+bzcIiPuTacvzw==",
+      "version": "0.10.1"
+    },
+    "@ff-labs/fff-bin-linux-x64-musl": {
+      "integrity": "sha512-mZCpojVtGNDr/wdCUEAHdfrl6qORvKHv3Pw35TaOdshnG4wocoA5bBKTGj/zmAU11o0GMK4V+wUhdNrgqoE10w==",
+      "version": "0.10.1"
+    },
+    "@ff-labs/fff-bun": {
+      "integrity": "sha512-9oUCxypGbf2q3vNfKZ31wdzt5KqjhA9S6TwQaFol/j1lkSHVGvtIa3RvdGHPs1UUuvR/MO7b6pHj054BR9bXPQ==",
+      "version": "0.10.1"
+    },
+    "@ff-labs/fff-node": {
+      "integrity": "sha512-I2TIWHkey4wpLCncUQymBz/yWrjp/TE91yjrPvSLaPMUMRf3wXwEmelGNnZ5ynxy3cUauYg5b5hsUwhOK4skfA==",
+      "version": "0.10.1"
+    },
+    "pi-mcp-adapter": {
+      "integrity": "sha512-4Y/eLbhbxnRih519dJUxMyQ5QASvPcdWyBlS8+dDXteAzaMuLnd4nMTWgoZw3JRIW+0r93KAQcz1Rbli4xCwEQ==",
+      "version": "2.11.0"
+    }
+  },
+  "tools": {
+    "fd": {
+      "sha256": "e3257d48e29a6be965187dbd24ce9af564e0fe67b3e73c9bdcd180f4ec11bdde",
+      "url": "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-x86_64-unknown-linux-musl.tar.gz",
+      "version": "10.4.2"
+    },
+    "ripgrep": {
+      "sha256": "33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c",
+      "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz",
+      "version": "15.2.0"
+    }
+  },
+  "vendored": {
+    "context-mode": {
+      "patch": "adapt the bundled skill to the profile code-intelligence surface and exclude URL fetching",
+      "sourceCommit": "c4ea35540681a4240eae84e3f1eb61c28e6fd9f6",
+      "sourceTree": "a8e68a93960735c7198f74dd2c9b977b7acb469f",
+      "version": "1.0.111"
+    },
+    "pi-fff": {
+      "sourceCommit": "c4ea35540681a4240eae84e3f1eb61c28e6fd9f6",
+      "sourceTree": "a000118df62d80f85b4cf1e93b494c456d5dd601",
+      "version": "0.10.1"
+    },
+    "pi-intercom": {
+      "commit": "e234a4446e2b3f9c13a1ec3151ae2169315c810f",
+      "version": "0.6.0"
+    },
+    "pi-lens": {
+      "commit": "bf2266449c2a1886d6582687b27def5e587e05f2",
+      "patch": "include dist built from the pinned source; bundle the 12 core grammar WASMs declared by scripts/grammars.lock.json; omit development dependencies so the profile runtime owns Pi versions",
+      "version": "3.8.73"
+    },
+    "pi-mcp-adapter": {
+      "patch": "omit upstream development dependencies; ignore project and imported ambient MCP configuration when the profile isolation flag is active",
+      "registryIntegrity": "sha512-4Y/eLbhbxnRih519dJUxMyQ5QASvPcdWyBlS8+dDXteAzaMuLnd4nMTWgoZw3JRIW+0r93KAQcz1Rbli4xCwEQ==",
+      "version": "2.11.0"
+    },
+    "pi-slipstream-compact-valkyrie": {
+      "commit": "8ae78ea3a1f60a9842ebda196b5da265710d157a",
+      "patch": "exact /logs/ok-pi-agent/compactions validator exception; profile settings select noninteractive acceptance and the benchmark artifact root",
+      "upstreamVersion": "0.1.7"
+    },
+    "pi-subagents": {
+      "commit": "c40055035e87f0ad7c447249fa5050f7f1c80423",
+      "patch": "use the profile Pi 0.80.6 runtime; omit upstream Pi 0.74 development dependencies; expose bundled prompts; start the native supervisor channel; reserve the intercom tool name; enforce closed project-resource and runtime-MCP discovery",
+      "version": "0.34.0"
+    },
+    "pi-tool-result-virtualizer": {
+      "sourceCommit": "c4ea35540681a4240eae84e3f1eb61c28e6fd9f6",
+      "sourceTree": "0cf5afff95567504a75d2bd8bdad52aafa008c98",
+      "version": "0.1.0"
+    }
+  },
+  "version": 1
+}
