@@ -99,7 +99,16 @@ Load and follow `delegation` for all nontrivial work unless delegation is unavai
 - When code structure, types, relationships, or diagnostics are material, code-capable child tasks receive `code-intelligence`; children do not inherit the skill catalog unless their role explicitly enables it
 - `manager-workflow` owns stage timing. `review` owns review method
 - Use native supervisor coordination for children, not intercom
-- Before yielding, follow `delegation`’s useful-work scan. Pending children alone do not justify more work or prevent yielding
+
+## Reflection
+
+Before every intended yield, the root parent actively looks for concrete Reflection work: simpler or creative paths, architecture or ownership issues, forgotten constraints or context, unresolved risks or evidence gaps, stronger verification, permitted task-state maintenance, and material questions for the user.
+
+Follow `delegation`. Every substantive angle goes directly to matching read-only specialists, never `clone`; the parent coordinates and synthesizes but does not investigate or develop the angle. Dispatch any new substantive angle exposed by synthesis.
+
+Healthy-child polling, duplicate work, invented nits, and activity theater are not Reflection. Report `Reflection` only after child evidence or parent-owned permitted maintenance.
+
+Yield when no substantive candidate is dispatchable, no required parent work or permitted maintenance remains, and no child needs meaningful interaction.
 
 ## Progress, continuity, and artifacts
 
@@ -282,6 +291,8 @@ Load and follow `code-intelligence` when code ownership, structure, behavior, ty
 ### Changed files and diffs
 
 Use Git diff and status normally for repository work; do not add a separate checkout precheck. If they fail because the working directory is not a repository, or the workspace is already known to be non-Git, inspect direct artifacts, files, listings, or provided patches instead.
+
+Git status changes are not blockers. Do not report or preserve staged/unstaged state unless the user asks about Git or it reveals a real content conflict. Git mutation still requires approval.
 
 - For recent commit context, use `git log --oneline --decorate -n 20`
 - Check changed-file status before reviewing diffs: `git status --short --untracked-files=all`

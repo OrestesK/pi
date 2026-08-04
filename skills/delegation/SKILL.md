@@ -15,6 +15,8 @@ Use this flow only to select delegation topology. Follow `manager-workflow` for 
 
 ```text
 Request
+├─ Root-parent admitted substantive Reflection candidate
+│  └─ Launch matching read-only specialist(s) directly; never `clone`.
 ├─ Direct answer or trivial mechanically obvious edit
 │  └─ Parent handles it.
 ├─ Approved nontrivial implementation
@@ -57,6 +59,18 @@ Fanout output
 └─ Does not inform a decision
    └─ Inspect the output only when it becomes relevant.
 ```
+
+### Reflection routing
+
+Root-parent Reflection overrides the general read-only/advisory fallback: route every admitted substantive candidate directly to matching read-only specialists, even when non-atomic; never `clone`. Ordinary children remain non-orchestrators.
+
+Admit only a useful, new, bounded, authorized, interruptible, non-interfering candidate that is dispatchable to an eligible read-only specialist and names a distinct task-advancing evidence target. If dispatch is unavailable or prohibited, including by a strict no-artifact instruction, do not admit it or substitute parent investigation.
+
+Every packet forbids file, Git, external, and other mutation and requires concrete evidence, a bounded stop condition, and an actual-effects report.
+
+The parent selects roles and targets, coordinates children, and synthesizes returned evidence against the approved task and known state. It dispositions findings but does not independently investigate an angle; dispatch each new substantive angle.
+
+The general delegation, async, and review rules remain authoritative for parallelism, duplicate prevention, reducers, and formal review.
 
 Route every approved nontrivial implementation slice to `clone`, including a lone slice. The parent may implement only trivial mechanically obvious edits or corrections. When two or more approved implementation slices are genuinely independent, dispatch them in the same parallel wave when their active write sets are disjoint and their dependencies permit it. Consolidate shared-file changes under one owner when practical; otherwise schedule the shared file in a later accepted wave.
 
@@ -133,11 +147,10 @@ Follow the active global instructions already in context, specifically the permi
 
 ## Before yielding
 
-Before yielding:
+This procedure applies to the root parent. Before yielding:
 
-1. Handle child asks, actionable failures, and completed outputs that affect the current decision
-2. Continue identified safe parent work that cannot conflict or delay the user
-3. Look once for a concrete unresolved evidence gap, risk, decision, simplification, verification need, or permitted task-state update
-4. Act only when the work is useful, new, bounded, authorized, and non-interfering
+1. Handle decision-relevant child asks, actionable failures, completed outputs, and material corrections; send new evidence to a running child only when a real delta can correct or unblock it
+2. Continue required nonconflicting, nonduplicate parent work and concrete parent-owned TODO or session-state maintenance
+3. Scan the Reflection goals in `AGENTS.md` and immediately send every qualifying candidate through Reflection routing
 
-Do not invent cleanup, repeat an active audit, poll a healthy child, or work only to avoid yielding. Yield when no useful work or meaningful child interaction remains. Completion notifications resume the parent.
+While children run, do not poll them, repeat their analysis, or develop their angles. Inspect outputs before dependent synthesis, decisions, or claims; route a new substantive synthesis angle as a new candidate. Otherwise apply the final yield condition in `AGENTS.md`.
