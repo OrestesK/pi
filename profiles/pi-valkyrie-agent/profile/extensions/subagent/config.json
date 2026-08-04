@@ -1,0 +1,57 @@
+{
+  "waitTool": false,
+  "toolDescriptionMode": "compact",
+  "toolExtensions": {
+    "mcp": {
+      "description": "On-demand generic MCP access for delegated work. When an eligible child needs a configured server, add this bundle with requiresCapabilities: [\"mcp\"] instead of keeping the work in the parent or creating a one-off agent.",
+      "builtinTools": [
+        "mcp"
+      ],
+      "allowedAgents": [
+        "scout",
+        "researcher",
+        "context-builder"
+      ]
+    }
+  },
+  "asyncByDefault": true,
+  "projectResources": "ignore",
+  "forceTopLevelAsync": true,
+  "maxSubagentDepth": 32,
+  "maxSubagentSpawnsPerSession": 20000,
+  "globalConcurrencyLimit": 100,
+  "chain": {
+    "dynamicFanout": {
+      "maxItems": 20000
+    }
+  },
+  "scheduledRuns": {
+    "enabled": false,
+    "maxPending": 20000,
+    "maxLatenessMs": 1209600000
+  },
+  "control": {
+    "enabled": true,
+    "needsAttentionAfterMs": 60000,
+    "activeNoticeAfterMs": 120000,
+    "failedToolAttemptsBeforeAttention": 3,
+    "notifyOn": [
+      "active_long_running",
+      "needs_attention"
+    ],
+    "notifyChannels": [
+      "event",
+      "async"
+    ]
+  },
+  "intercomBridge": {
+    "mode": "off"
+  },
+  "parallel": {
+    "maxTasks": 20000,
+    "concurrency": 20
+  },
+  "progress": {
+    "reportMode": "supervisor"
+  }
+}

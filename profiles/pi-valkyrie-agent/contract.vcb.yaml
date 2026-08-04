@@ -1,0 +1,36 @@
+name: ok-pi-agent-vcb
+install_cmd: bash /bundle/ok-pi-agent-vcb/setup.sh
+run_cmd: >-
+  /usr/local/bin/python3 /bundle/ok-pi-agent-vcb/run_agent.py
+  --problem-statement '{problem_statement_path}'
+  --task-id '{task_id}'
+  --declared-model '{model}'
+  --prompt-profile '{prompt_profile}'
+  --trusted-mcp-config '{trusted_mcp_config_path}'
+  --timeout-seconds {timeout_seconds}
+final_output: /logs/ok-pi-agent
+secrets:
+  OPENAI_API_KEY: prodBenchmarksInfraApiKeys
+defaults:
+  model:
+    type: str
+    required: true
+    choices:
+      - openai/gpt-5.6-sol
+    description: Required Vals model key matching the pinned Pi runtime
+  prompt_profile:
+    type: str
+    required: true
+    choices:
+      - simple
+      - adapted
+    description: Required AGENTS prompt profile
+  trusted_mcp_config_path:
+    type: str
+    required: true
+    description: Infrastructure-owned MCP config outside the task workspace
+  timeout_seconds:
+    type: int
+    required: false
+    default: 18000
+    description: Vibe Code Bench unattended deadline in seconds

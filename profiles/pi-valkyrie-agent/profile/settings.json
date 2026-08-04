@@ -1,0 +1,82 @@
+{
+  "defaultProvider": "openai",
+  "defaultModel": "gpt-5.6-sol",
+  "defaultThinkingLevel": "high",
+  "quietStartup": true,
+  "defaultProjectTrust": "never",
+  "steeringMode": "all",
+  "followUpMode": "all",
+  "collapseChangelog": true,
+  "enableInstallTelemetry": false,
+  "npmCommand": [
+    "sh",
+    "-lc",
+    "npm --prefix \"$PI_CODING_AGENT_DIR\" \"$@\"",
+    "npm"
+  ],
+  "branchSummary": {
+    "skipPrompt": true
+  },
+  "hideThinkingBlock": true,
+  "retry": {
+    "maxRetries": 3,
+    "baseDelayMs": 2000
+  },
+  "transport": "auto",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 24000,
+    "keepRecentTokens": 20000
+  },
+  "slipstreamCompact": {
+    "enabled": true,
+    "autoTrigger": true,
+    "triggerContextPercent": 0.6,
+    "slipstreamKeepRecentTokens": 50000,
+    "summaryModel": "openai/gpt-5.6-terra",
+    "judgeModel": "openai/gpt-5.6-sol",
+    "judgeThreshold": 7,
+    "repairAttempts": 3,
+    "rejectedSummaryMode": "accept",
+    "pendingTtlMs": 300000,
+    "artifactRoot": "/logs/ok-pi-agent/compactions"
+  },
+  "skills": [
+    "skills"
+  ],
+  "subagents": {
+    "defaultModel": "openai/gpt-5.6-terra",
+    "disableBuiltins": true,
+    "agentOverrides": {
+      "delegate": {
+        "disabled": true
+      },
+      "worker": {
+        "disabled": true
+      }
+    }
+  },
+  "packages": [
+    "packages/pi-mcp-adapter",
+    "packages/pi-lens",
+    {
+      "source": "packages/pi-intercom",
+      "skills": []
+    },
+    "packages/pi-subagents",
+    "packages/pi-fff",
+    "packages/pi-tool-result-virtualizer",
+    "packages/context-mode",
+    "packages/pi-slipstream-compact-valkyrie"
+  ],
+  "autocompleteMaxVisible": 10,
+  "httpIdleTimeoutMs": 3600000,
+  "enabledModels": [
+    "openai/gpt-5.4",
+    "openai/gpt-5.4-mini",
+    "openai/gpt-5.5",
+    "openai/gpt-5.6-luna",
+    "openai/gpt-5.6-sol",
+    "openai/gpt-5.6-terra"
+  ]
+}

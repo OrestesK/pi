@@ -1,0 +1,9 @@
+node_modules/
+runtime/
+mcp-cache.json
+.pi-lens/
+.pi-subagents/
+.ruff_cache/
+.pytest_cache/
+.scratch/
+*.tmp
