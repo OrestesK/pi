@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Use after the requirements or design are approved when the user explicitly requests a durable plan or it is materially useful. Produces precise implementation tasks that may be saved under `.scratch/`, plus a behavioral-proof strategy, verification commands, and review checkpoints.
+description: Use for writing durable implementation plans after requirements or design are approved
 ---
 
 # Writing Plans

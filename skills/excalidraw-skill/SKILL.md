@@ -1,6 +1,6 @@
 ---
 name: excalidraw-skill
-description: Excalidraw design and live-canvas toolkit for reference-matched, clean technical diagrams. Use to plan/reduce diagram content, infer style from supplied PNG/.excalidraw references, draw or refine scenes, validate target-scale/grayscale readability and topology, export native/PNG/SVG artifacts, convert Mermaid, or perform element CRUD and layout. The default local profile is a white canvas, transparent rounded boxes, sparse semantic color, 20px labels, and direct bound 2px arrows. Primary interface is `npx -y mcp-excalidraw-server`; MCP and REST alternatives are supported.
+description: Use for creating, refining, validating, or exporting Excalidraw technical diagrams, including reference-matched designs and Mermaid conversions
 ---
 
 # Excalidraw Skill

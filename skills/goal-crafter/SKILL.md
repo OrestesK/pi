@@ -1,6 +1,6 @@
 ---
 name: goal-crafter
-description: "Use when the user explicitly asks to write, review, refine, or turn current work into a /goal command. Crafts one paste-ready, evidence-grounded Pi /goal from current session context, session history, compactions, todos, artifacts, and relevant repo/docs as re-verifiable pointers, without hardcoding old context or starting/implementing the goal."
+description: Use when explicitly asked to create or refine a paste-ready Pi /goal from current session evidence
 ---
 
 # Goal Crafter

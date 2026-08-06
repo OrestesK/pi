@@ -1,6 +1,6 @@
 ---
 name: github
-description: GitHub operations via gh CLI — PRs, issues, CI, API queries. Use when working with pull requests, GitHub issues, CI workflows, or any GitHub operations. Never use the GitHub MCP server.
+description: Use for GitHub pull requests, issues, CI workflows, and API queries
 ---
 
 # GitHub (gh CLI)

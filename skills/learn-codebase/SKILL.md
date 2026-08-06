@@ -1,6 +1,6 @@
 ---
 name: learn-codebase
-description: First-session project orientation — scan conventions, structure, and instruction files. Use when starting work in a new or unfamiliar project, when asked to "learn the codebase", "onboard", "check project rules", or "what's this project".
+description: Use for first-session orientation in an unfamiliar repository or when explicitly asked to learn the codebase
 ---
 
 # Learn Codebase

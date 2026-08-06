@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Generate and review concise Conventional Commit messages and `ok/` branch names. Advisory-only; does not authorize Git mutations.
+description: Use for drafting commit messages and branch names
 ---
 
 # Commit Conventions

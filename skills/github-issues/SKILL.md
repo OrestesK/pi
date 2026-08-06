@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: Create and improve GitHub issues from verified evidence. Use for issue triage, drafting, standardization, evidence updates, or deciding whether a finding needs a ticket; interview before drafting and require approval before any GitHub change.
+description: Use for triaging, drafting, or improving GitHub issues from verified evidence
 ---
 
 # GitHub Issue Authoring

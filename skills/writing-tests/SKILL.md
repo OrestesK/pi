@@ -1,6 +1,6 @@
 ---
 name: writing-tests
-description: Generic conventions and rubrics for writing, editing, and reviewing tests. Use whenever adding or changing test files, test helpers, fixtures, mocks, or test-review feedback.
+description: Use for writing or changing tests, test helpers, fixtures, mocks, or test-review feedback
 ---
 
 # Writing Tests

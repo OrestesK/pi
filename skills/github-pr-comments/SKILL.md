@@ -1,6 +1,6 @@
 ---
 name: github-pr-comments
-description: Draft and post GitHub PR review comments with verified evidence, casual actionable wording, inline/general placement, and safe gh-based posting. Use when asked to write, format, verify, or post PR comments, inline comments, review comments, GitHub-ready comments, or a PR review payload.
+description: Use for drafting, verifying, or posting actionable GitHub PR review comments
 ---
 
 # GitHub PR Comments

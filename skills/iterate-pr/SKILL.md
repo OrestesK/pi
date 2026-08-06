@@ -1,6 +1,6 @@
 ---
 name: iterate-pr
-description: Automated PR iteration loop — fix CI failures or review feedback, present changes, let the user push, then monitor and repeat. Use when asked to "iterate on PR", "fix CI", "PR is failing", "address review comments", or continuously iterate on fixes until checks pass.
+description: Use for iterating on a pull request until CI failures and review feedback are resolved
 ---
 
 # Iterate PR

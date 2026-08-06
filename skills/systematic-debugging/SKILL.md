@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: Structured debugging workflow — root-cause investigation before fixes. Use for bugs, test failures, crashes, flaky behavior, build failures, or unexpected output before proposing or implementing changes.
+description: Use for investigating bugs, test failures, crashes, flaky behavior, build failures, or unexpected output
 ---
 
 # Systematic Debugging

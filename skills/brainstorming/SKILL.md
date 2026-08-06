@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: "Use before creative or non-trivial implementation work: new features, behavior changes, UI/API design, architecture choices, or ambiguous requirements. Refines intent into an approved design using code/docs inspection and focused user questions."
+description: Use for refining ambiguous or nontrivial feature, behavior, UI, API, or architecture requests into an approved design
 ---
 
 # Brainstorming

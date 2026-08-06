@@ -1,6 +1,6 @@
 ---
 name: manager-workflow
-description: Owns decision-ready proposal contents, stage flow, execution boundaries, and manager-local handoffs for nontrivial or material implementation work.
+description: Use for managing implementation work through proposal, approval, execution, and review
 ---
 
 # Manager Workflow

@@ -1,6 +1,6 @@
 ---
 name: semantic-git
-description: Entity-level git analysis with sem CLI — structural diffs, impact analysis, blame. Use when asked for "blast radius", "impact analysis", "what functions changed", "semantic diff", or structural code change analysis beyond line-level diffs.
+description: Use for structural Git analysis such as changed functions, semantic diffs, impact analysis, and blame
 ---
 
 # Semantic Git (sem CLI)

@@ -1,6 +1,6 @@
 ---
 name: delegation
-description: Use for subagent role selection, topology, task packets, parallelism, async handling, tool routing, and supervisor coordination after the active global delegation trigger applies and within the active global parent-child authority boundary.
+description: Use for coordinating subagent delegation after the global delegation trigger applies
 ---
 
 # Delegation

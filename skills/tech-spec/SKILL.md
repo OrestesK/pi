@@ -1,6 +1,6 @@
 ---
 name: tech-spec
-description: Produces an implementation-ready, typed call-stack design proposal for architecture-heavy work or whenever the user asks for a full tech spec. Use within manager-workflow when a change crosses a material ownership or data-flow boundary, changes public APIs, schemas, protocols, persistence, migrations, or external integrations, requires transaction, concurrency, retry, cancellation, idempotency, authorization-flow, or shared-state-machine design, or has several credible architectures. Do not use automatically for small local fixes, wording or style changes, mechanical refactors, simple config edits, isolated test corrections, isolated bugs with a clear owner and proof path, ordinary implementation with no changed boundary, review, verification, or test-only work with no new architecture, or clearly single-owner changes.
+description: Use for writing implementation-ready technical specifications
 license: MIT; see LICENSE
 ---
 

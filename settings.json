@@ -55,9 +55,12 @@
   ],
   "packages": [
     "extensions/claude-ui",
-    "git:github.com/nicobailon/pi-intercom@e234a4446e2b3f9c13a1ec3151ae2169315c810f",
     {
-      "source": "git:github.com/aws/agent-toolkit-for-aws@fae975d565b6c1752e3f4795c499fb3951039777",
+      "source": "git:github.com/nicobailon/pi-intercom@e234a4446e2b3f9c13a1ec3151ae2169315c810f",
+      "skills": []
+    },
+    {
+      "source": "git:github.com/OrestesK/agent-toolkit-for-aws@11d76e13231ac28b5e71980481485639268a964e",
       "extensions": [],
       "skills": [
         "skills/core-skills/aws-cdk",

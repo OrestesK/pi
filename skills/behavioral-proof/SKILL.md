@@ -1,6 +1,6 @@
 ---
 name: behavioral-proof
-description: Selects proportionate evidence for material behavior changes and bug fixes. Use to choose test-first, characterization, reproduction, existing coverage, integration, live, or manual proof without imposing one sequence.
+description: Use for selecting proportionate evidence for behavior changes and bug fixes
 ---
 
 # Behavioral Proof

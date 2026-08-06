@@ -1,6 +1,6 @@
 ---
 name: verification-before-completion
-description: Use before claiming work is done, fixed, passing, reviewed, or ready. Requires fresh evidence from commands, diffs, or explicit inspection and prevents trusting stale or subagent-only success claims.
+description: Use before claiming work is done, fixed, passing, reviewed, or ready
 ---
 
 # Verification Before Completion

@@ -1,6 +1,6 @@
 ---
 name: vals-pr
-description: Prepare or review a Vals pull request. Use this when putting a PR up for human review, checking whether it is ready, responding to feedback, or reviewing someone else's PR.
+description: Use for preparing, reviewing, or responding to feedback on pull requests in the Vals GitHub organization
 ---
 
 # Vals Pull Requests

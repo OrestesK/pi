@@ -1,6 +1,6 @@
 ---
 name: review
-description: Code, plan, and implementation review against requirements and configured project standards. Use for review requests, after non-trivial implementation, or when dispatching reviewer subagents in spec-compliance or code-quality mode.
+description: Use for reviewing code, plans, and implementations against requirements and project standards
 ---
 
 # Review

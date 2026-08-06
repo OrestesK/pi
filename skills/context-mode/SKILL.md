@@ -1,6 +1,6 @@
 ---
 name: context-mode
-description: Use Context Mode for large command, test, log, API, document, data, browser, or MCP output that would otherwise flood the model context. Keep small reads and ordinary code discovery in normal Pi tools.
+description: Use for processing large command, test, log, API, document, data, browser, or MCP output
 ---
 
 # Context Mode

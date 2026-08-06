@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: React and TypeScript implementation conventions for state, effects, component APIs, accessibility, and existing project patterns. Use when creating, modifying, or reviewing .tsx/.jsx components and frontend interfaces.
+description: Use for creating, changing, or reviewing React and TypeScript components and frontend interfaces
 ---
 
 # Frontend Conventions

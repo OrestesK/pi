@@ -1,6 +1,6 @@
 ---
 name: code-intelligence
-description: Use for code ownership, structure, symbols, types, references, call relationships, structural patterns, and diagnostics. Select the smallest relevant combination of symbol/module, LSP, AST, and diagnostic tools.
+description: Use for code ownership, structure, symbols, types, references, call relationships, structural patterns, and diagnostics
 ---
 
 # Code Intelligence
