@@ -22,7 +22,7 @@ test("model-facing discovery is scoped while parent exact and global access stay
 			assert.deepEqual(schemaProperties(listTool).includeGlobal, {
 				type: "boolean",
 				description:
-					"Include sources from every project scope. Parent-only; defaults to false.",
+					"Include every project scope; parent-only; default false.",
 			});
 			for (const tool of tools.values())
 				assert.equal(
