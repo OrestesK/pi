@@ -123,7 +123,7 @@ After launch:
 - steer or interrupt only when the child is blocked, drifting, or needs corrected evidence
 - answer child decision requests through the native supervisor channel
 
-Use a `run-monitor` for long tmux, log, server, build, or test commands when monitoring is useful and native async completion does not already cover the run. The monitor stays read-only.
+Use a `run-monitor` when the default-pairing rule in `AGENTS.md` applies. Give it the relevant tmux, log, and status evidence plus the core progress facts the parent needs. The monitor stays read-only, and the parent does not routinely poll the target.
 
 ## MCP capability routing
 

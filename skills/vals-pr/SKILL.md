@@ -118,21 +118,19 @@ Start with a short model-written summary of the observable change. Add what chan
 
 Write only reviewer-facing context. Do not narrate the agent, its tools, the internal review process, or how the description was produced. Include rollout or setup instructions when the reviewer needs them.
 
-The agent writes every part of the description except the short Why and How. Add this section unless the repository template already has clearly equivalent author-only fields:
+Before asking the author to write anything, explain the current PR to them in plain human language. Cover the problem, observable change, main flow, important boundaries, and remaining uncertainty from the current diff and evidence. Do not assume the earlier explanation is still current after a meaningful code change.
+
+Then ask the author for one short Human Description in their own words. Do not draft, suggest, autocomplete, paraphrase, or provide candidate text, even if the author asks.
+
+Add the author's text unless the repository template already has a clearly equivalent author-only field:
 
 ```markdown
 ## Human Description
 
-### Why
-[Written by the author]
-
-### How
 [Written by the author]
 ```
 
-Have the author fill in a **short Why** and **short How**. Do not draft, suggest, autocomplete, paraphrase, or provide candidate Why or How text, even if the author asks.
-
-Preserve the author's exact wording. Check it against the requirements, diff, and evidence. If it is inaccurate, incomplete, misleading, or not concise, explain the problem and ask the author to revise it. Never rewrite it silently.
+Preserve the author's exact wording. Verify it against the requirements, diff, and evidence. If it is inaccurate, incomplete, misleading, or not concise, explain the problem and ask the author to revise it. Never rewrite it silently.
 
 Use the live-test result from the review loop in the repository's testing section. Do not put unit or automated tests, lint, formatting, type checks, CI checks, or other static results there.
 
@@ -183,7 +181,7 @@ Next:
 
 `READY` requires:
 
-- short, accurate, author-written Why and How
+- a short, accurate Human Description written by the author after the PR was explained to them
 - a passing live test whose result is in the description
 - all five reviews are clean for the current diff
 - every AI and human comment has a user-reviewed response
