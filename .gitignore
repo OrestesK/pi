@@ -3,6 +3,9 @@
 
 # Runtime/session state
 sessions/
+/pi-hermes-memory/
+/projects-memory/
+/.pi-hermes-locks.sqlite*
 run-history.jsonl
 mcp-cache.json
 pi-crash.log

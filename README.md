@@ -14,6 +14,7 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 | [`AGENTS.md`](AGENTS.md) | Executable policy | Always-loaded agent rules and workflow routing |
 | [`APPEND_SYSTEM.md`](APPEND_SYSTEM.md) | Executable policy | Coding toolchain, core clipboard, and selected local CLI overlay |
 | [`settings.json`](settings.json) | Runtime config | Models, packages, UI, and compaction |
+| [`hermes-memory-config.json`](hermes-memory-config.json) | Runtime config | Hermes automatic learning, recall, search, and storage behavior |
 | [`models.json`](models.json) | Runtime config | Custom model definitions |
 | [`mcp.json`](mcp.json) | Runtime config | MCP server registry |
 | [`permissions.json`](permissions.json) | Inactive artifact | Not consumed by Pi 0.80.6 or the loaded extensions |
@@ -29,12 +30,21 @@ This is the canonical map of configuration surfaces. The linked policy and promp
 ## Runtime at a glance
 
 - The main model and enabled packages are configured in [`settings.json`](settings.json).
+- Hermes provides persistent memory and model-facing session search using [`hermes-memory-config.json`](hermes-memory-config.json).
 - MCP servers are registered in [`mcp.json`](mcp.json); most load lazily.
 - Local role prompts in [`agents/`](agents/) override packaged roles with the same name.
 - Skills expose short descriptions and load their full instructions only when needed.
 - Extensions under [`extensions/`](extensions/) are auto-discovered.
 - Safety combines prompt policy with configured guardrails. `permissions.json` is
   retained as an inactive artifact and does not control Pi 0.80.6 permissions.
+
+## Hermes memory
+
+`pi-hermes-memory` is pinned at 0.9.4. It automatically reviews conversations, captures corrections, flushes eligible sessions before compaction and at shutdown, and consolidates full memory files. Recurring learning calls use `openai-codex/gpt-5.6-terra` with low thinking.
+
+Memory uses policy-only retrieval: the model receives search guidance and fetches relevant entries on demand instead of injecting all learned content into every prompt. `AGENTS.md` remains the authority for mandatory rules, and Hermes standing instructions are disabled.
+
+Hermes stores generated global memory and its transcript index under `pi-hermes-memory/`, project-scoped memory under `projects-memory/`, and its cross-session consolidation lock in `.pi-hermes-locks.sqlite`; these paths are ignored runtime state. Session indexing copies Pi transcript content into local SQLite search, and automatic learning sends eligible conversation and memory content to the configured model provider.
 
 ## MCP servers
 
@@ -87,7 +97,7 @@ The script repairs an ordinary non-recursive clone, synchronizes submodule URLs,
 
 The repository excludes secrets, sessions, caches, logs, generated artifacts, and dependency installs. See [`.gitignore`](.gitignore) for the exact list. Important examples include:
 
-- `.scratch/` and `sessions/`
+- `.scratch/`, `sessions/`, `pi-hermes-memory/`, `projects-memory/`, and `.pi-hermes-locks.sqlite*`
 - OAuth credentials and MCP onboarding state
 - crash logs, run history, and caches
 - `node_modules/` and Python bytecode/tool caches
