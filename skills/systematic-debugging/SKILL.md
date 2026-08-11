@@ -78,13 +78,27 @@ For asynchronous or flaky behavior:
 4. Treat timeout as evidence rather than increasing the delay blindly
 5. Use a fixed sleep only when elapsed timing is itself the behavior under test
 
-The condition must represent the real lifecycle contract and must not hide an impossible state. External polling still obeys authorization, rate, data, and cost boundaries. This method does not authorize polling detached Pi subagents; follow the active async lifecycle rules. `writing-tests` owns any persistent test helper or fixture.
+Keep the condition tied to the real lifecycle contract. Do not use a condition that hides a state the system cannot produce
+
+External polling still obeys authorization, rate, data, and cost boundaries
+
+Do not use this method to poll detached Pi subagents. Follow the active async lifecycle rules
+
+Use `writing-tests` for any persistent test helper or fixture
 
 ## When Fix Progress Stalls
 
-Continue only while each attempted fix tests a supported root-cause hypothesis and produces material new evidence or progress. Stop when failures repeat, progress stalls, each change only reveals unrelated symptoms, evidence invalidates the architecture or plan, or a material/protected boundary is reached.
+Continue only while each attempted fix tests a supported root-cause hypothesis and produces material new evidence or progress
 
-Summarize the attempts and evidence, question the architecture or original plan, and route the next decision through the active workflow. Do not use an arbitrary attempt count.
+Stop when:
+
+- failures repeat
+- progress stalls
+- each change reveals only unrelated symptoms
+- evidence invalidates the architecture or plan
+- you reach a material or protected boundary
+
+Summarize the attempts and evidence. Question the architecture or original plan, then route the next decision through the active workflow. Do not use an arbitrary attempt count
 
 ## Red Flags
 

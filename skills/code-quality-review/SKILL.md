@@ -9,7 +9,9 @@ Review completed work for the best behavior-preserving implementation: correct, 
 
 This is not a style pass and not a contest to minimize lines. “Simple” means the fewest justified concepts, branches, states, layers, and invariants—not compressed or clever code.
 
-Use this specialized skill when the user explicitly requests a deep structural/simplification review; that request makes behavior-preserving simplification the primary in-scope target. It may also run opportunistically during ordinary nontrivial work when a concrete useful quality, structure, simplicity, or ownership question warrants a read-only background lane. Opportunistic review is nonblocking, does not require a known defect, stops when no novel useful target remains, and cannot authorize fixes or delay readiness unless the parent validates and accepts a concrete finding into the primary scope.
+Use this skill when the user asks for a deep structural or simplification review. In that review, behavior-preserving simplification is the main target.
+
+You may also run it as a read-only, nonblocking background review during ordinary nontrivial work when there is a specific quality, structure, simplicity, or ownership question. A known defect is not required. Stop when no new useful target remains. This review cannot authorize fixes or delay readiness; the parent must validate and accept a finding before it affects the primary scope.
 
 Use `review` for finding partitions and standards. Route cleanup-only requests and every fix pass through `manager-workflow`; this skill does not own orchestration.
 
@@ -47,12 +49,12 @@ Before judging code:
   - staged and unstaged changes together;
   - in-scope untracked file bodies separately.
 - State the intended behavior in one sentence.
-- Identify the behavior owner: entrypoint, canonical module/layer, outputs, side effects, and proof surface.
-- For each changed section or newly introduced concept, state what it does, why it exists, who owns it, and what would break if it were removed. If its purpose or necessity is not justified by the approved behavior, treat it as a deletion or simplification candidate.
+- Identify where the behavior starts and which module or layer owns it. Record its outputs, side effects, and the tests or other evidence that can prove it.
+- For each changed section or new concept, say what it does, why it is needed, who owns it, and what would break if it were removed. Treat it as a deletion or simplification candidate unless the approved behavior justifies it.
 - List changed files and directly affected unchanged code that must be traced.
 - Distinguish intended feature work from cleanup/refactor work.
 
-If intent or review range cannot be established, ask one focused question. When the answer is unavailable, return `INCONCLUSIVE` and name the missing fact. Do not guess a base, contract, or desired behavior.
+If you cannot establish intent or review range, follow **Stop conditions**. Do not guess the base, contract, or desired behavior.
 
 ### 2. Lock behavior before proposing simplification
 
@@ -101,7 +103,7 @@ When proposing a major simplification, show the current concepts that disappear 
 
 ### 4. Review by distinct lenses
 
-Assess the applicability of each lens before reviewing it so broad checklists do not blur evidence. Correctness, simplicity, and structure are presumptively applicable to code changes; investigate other lenses only when the affected path reaches them. Do not output empty checklist sections.
+Before using a lens, decide whether the affected path makes it relevant. Always review correctness, simplicity, and structure for code changes. Review other lenses only when the path reaches them. Do not include empty checklist sections.
 
 Core lenses:
 
@@ -129,7 +131,7 @@ Use `module_report`, `read_symbol`, and `read_enclosing` for code structure and 
 
 After the parent locks scope, intent, and the behavior-preservation contract, enter the review stage owned by `manager-workflow`. This skill supplies the code-quality evidence targets; it does not own reviewer selection or fanout.
 
-Every selected reviewer receives the approved behavior/non-goals, relevant decisions, target/effective change, proof/evidence, assigned angle/evidence target, and stop condition. The parent's direct inspection remains mandatory.
+Give every reviewer the approved behavior and non-goals, relevant decisions, the change to inspect, available proof, a named review angle, and a stop condition. The parent must still inspect the work directly.
 
 Scale evidence targets by risk and shape:
 
@@ -224,7 +226,7 @@ When fixes are explicitly authorized:
    - optional improvements;
    - rejected/deferred feedback;
    - decisions requiring approval.
-3. Apply one coherent authorized fix group at a time under the active global and `delegation` ownership rules; this workflow does not choose or override the writer.
+3. Apply one authorized fix group at a time. Follow the project's global ownership rules and `delegation`; this workflow does not select or override the writer.
 4. For behavior-preserving refactors, capture focused baseline evidence first; do not invent new behavior tests for purely mechanical cleanup unless existing proof is insufficient.
 5. For behavior changes or bug fixes, use `behavioral-proof` to select proportionate evidence.
 6. After each meaningful fix group, run the narrowest proof that can detect drift, then relevant broader checks.

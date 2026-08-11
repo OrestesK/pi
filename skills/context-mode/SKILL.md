@@ -1,11 +1,11 @@
 ---
 name: context-mode
-description: Use for processing large command, test, log, API, document, data, browser, or MCP output
+description: Process large command, test, log, API, document, data, browser, or MCP output
 ---
 
 # Context Mode
 
-Use Context Mode when an operation can return more than about 20 lines or when the full input must be processed but only a compact result belongs in the conversation.
+Use Context Mode when an operation can return more than about 20 lines. Also use it when you must process the full input but need only a compact result in the conversation.
 
 Good targets include:
 
@@ -29,10 +29,10 @@ Print only the result needed for the current decision. Do not truncate the input
 
 ## File-first flow
 
-When a browser or another tool can save large output directly, save it under `.scratch/`, then give the path to `context_mode_ctx_execute_file` or `context_mode_ctx_index`. Do not return the large result to the model and then pass the same content back through an inline `content` argument.
+When a browser or another tool can save large output directly, save it under `.scratch/`. Pass that path to `context_mode_ctx_execute_file` or `context_mode_ctx_index`. Do not first return the large result to the model and then send the same content again through an inline `content` argument.
 
 Use the same file-first flow for large console output, network requests, generated reports, and local data. An explicit no-file or no-artifact instruction overrides `.scratch/` permission.
 
 ## Boundaries
 
-Context Mode changes how output is processed, not what actions are authorized. Read-only, mutation, external-effect, credential, and protected-action rules remain unchanged.
+Context Mode changes only how output is processed. It does not change authorization. All existing rules for read-only work, mutations, external effects, credentials, and protected actions still apply.

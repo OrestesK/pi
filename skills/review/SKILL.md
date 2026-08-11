@@ -11,15 +11,79 @@ Review is evidence gathering, not rubber-stamping.
 
 `manager-workflow` decides when review occurs inside an implementation stage. Standalone reviews enter this skill directly. This skill owns review method. `delegation` dispatches the selected roles, and the Pi Subagents package executes them.
 
-For every nontrivial plan review, nontrivial review request, and first implementation-readiness review, use at least three fresh parallel reviewers with genuinely different evidence targets. Add more only for another useful surface. The parent also inspects the target, validates findings, synthesizes `PASS`, `FAIL`, or `INCONCLUSIVE`, and owns every decision.
+For every nontrivial plan review, nontrivial review request, and first implementation-readiness review, require current independent coverage of all five base angles below. Build a coverage map before fanout.
 
-Every reviewer receives the approved behavior, non-goals, relevant decisions, actual target/effective change, required proof and available evidence, one assigned angle/evidence target, and a stop condition. Reviewers never edit, become writers, amend the behavioral contract, or authorize scope expansion.
+Count an angle as covered only when:
+
+- a fresh independent reviewer was explicitly assigned that exact angle, with its complete description and a distinct evidence target
+- the result addresses the current approved behavior and the exact item or effective change relevant to that angle
+- its conclusion and evidence remain usable
+- no later correction changed that angle’s approved contract, evidence target, relevant item or effective change, conclusion, or proof
+
+Treat uncertain, implicit, parent-only, combined-angle, stale, inaccessible, or superseded evidence as uncovered. Launch one fresh independent reviewer for each uncovered base angle, assigned to exactly that one angle. One reviewer cannot satisfy two uncovered base angles. Do not relaunch an angle with valid current coverage only because the overall diff changed outside the evidence it covers. When no angle has valid coverage, launch five base reviewers. Record each angle’s status, evidence boundary, and review artifact before synthesizing `PASS`, `FAIL`, or `INCONCLUSIVE`.
+
+The parent also inspects the target, validates findings, synthesizes the result, and owns every decision.
+
+Every selected reviewer receives the approved behavior, non-goals, relevant decisions, actual target/effective change, required proof and available evidence, a distinct evidence target, and a stop condition. Each base reviewer additionally receives exactly one complete assigned base angle description, its defect target, and review questions. Each specialist receives exactly one additional-surface assignment. Reviewers never edit, become writers, vote, amend the behavioral contract, authorize scope expansion, or invent findings to fill a lane.
+
+### Five base angles
+
+1. **Contract, user impact, and approved scope**
+   - Defect target: work that is plausible or correct in isolation but solves the wrong problem or expands scope
+   - Evidence: approved requirements, non-goals, user/caller behavior, public contracts, and reached compatibility effects
+   - Questions: Does the result match the approved intent? Is behavior missing or extra? Are reached user, caller, API, or compatibility consequences intentional?
+   - Stop: conclude when the approved contract and every reached public consequence are accounted for
+
+2. **Reachable correctness, producers, and boundaries**
+   - **Correctness:** inspect logic, states, regressions, real failure paths, concurrency, and consumer effects
+   - **Defensive-boundary discipline:** trace each value to its real producer. Ask to remove checks, fallbacks, conversions, cleanup, or error handling for states that producer cannot create. Keep required handling at genuine user-input, external-service, trust, lifecycle, protocol, persistence, configuration, platform, or other demonstrated boundaries. When the producer or ownership is unclear, investigate before deciding
+   - Defect target: behavior that breaks under real reachable conditions, hides an established invariant violation, or keeps defensive code for impossible producer-owned states
+   - Evidence: real producers, call paths, types, runtime states, failure evidence, and demonstrated boundaries
+   - Questions: What can the producer actually create? Does ordinary behavior remain correct? Which defensive handling should be kept, removed, or marked as needing more information? Is required boundary handling missing, duplicated, or placed downstream of its owner?
+   - Stop: conclude when ordinary correctness and defensive-boundary discipline have each been assessed explicitly and every relevant defensive guard is classified as keep, remove, or needs more information
+
+3. **Architecture, ownership, integration, and consumers**
+   - Defect target: locally correct work placed at the wrong owner or not reached by the real system
+   - Evidence: canonical sources of truth, effective runtime/discovery/activation paths, callers, consumers, dependencies, and integration seams
+   - Questions: Does the effective resource win at runtime? Is this the canonical owner? Are all real consumers and demonstrated compatibility or migration needs covered?
+   - Stop: conclude when ownership, reachability, integration, and consumers are established from current evidence
+
+4. **Simplicity, maintainability, and local fit**
+   - **Simplicity and cleanliness:** inspect unnecessary concepts, abstraction, duplication, indirection, wrappers, branches, weak type boundaries, AI slop, and future-change cost
+   - Defect target: correct work that creates avoidable structural cost or conflicts with repository patterns
+   - Evidence: the named structural surface, current code patterns, ownership boundaries, and effective diff
+   - Questions: Is this the smallest coherent design? Can a concept, branch, layer, or duplicate owner be deleted without losing behavior? Does it fit local style and architecture?
+   - Stop: conclude at concrete behavior-preserving findings; do not manufacture style comments
+
+5. **Claim-bound proof and validation**
+   - **Test and evidence quality:** inspect whether tests, live/integration/manual evidence, static checks, and artifacts prove the changed claim
+   - Defect target: implementation accepted on stale, partial, non-rerunnable, wrong-boundary, or implementation-only evidence
+   - Evidence: proof contract, exact commands/flows, outputs, unavailable boundaries, and current claim identity
+   - Questions: Could this evidence disprove a wrong implementation? Does it reach the claimed boundary? Are operational, rollback, or readiness checks needed on this path?
+   - Stop: conclude when every material claim has sufficient current evidence or an explicit unavailable boundary
+
+### Conditional specialists
+
+Add a fresh specialist only for a demonstrated additional surface, such as:
+
+- security, privacy, or supply chain
+- runtime operations, deployment, rollback, performance, capacity, or observability
+- data/schema migration or persisted compatibility
+- concurrency or distributed protocols
+- accessibility or internationalization
+- domain or regulatory correctness
+- platform lifecycle or API behavior
+- ML/data quality, evaluation, or fairness
+
+Specialists are not standing sixth or seventh reviewers and remain outside base-angle coverage reuse.
+
+Before fanout, confirm that every selected reviewer can independently access the exact target. Supply the complete target inline, an identified readable repository or scratch path with its validity boundary, fixed Git refs and the effective diff, or an existing artifact with retrieval instructions. A reference only to visible or latest parent-session content is not a target. If the exact target cannot be supplied, return `INCONCLUSIVE` before fanout. Do not create a manifest or receipt only for this preflight.
 
 After a coherent review-fix group, choose the follow-up by effective risk:
 
 - **Tiny mechanical fix:** no behavior, contract, reachability, or proof meaning changed. The parent inspects the final diff and runs the narrowest check; no child reviewer is required
 - **Contained correction:** one localized behavior, correctness, or proof defect is corrected without changing a public contract, security/data boundary, shared abstraction, cross-owner behavior, or new reachable consumer. Use one fresh targeted reviewer or validator
-- **Broad or high-risk correction:** architecture or ownership, public contracts, security/data boundaries, concurrency, compatibility, shared abstractions, several consumers, or a materially changed proof strategy. Run a new review with at least three fresh reviewers and distinct targets
+- **Broad or high-risk correction:** architecture or ownership, public contracts, security/data boundaries, concurrency, compatibility, shared abstractions, several consumers, or a materially changed proof strategy. Reassess which base-angle coverage the correction invalidated, launch one fresh reviewer for each now-uncovered base angle, and add any fresh change-triggered specialists
 
 Use the broader tier when classification is unclear. Continue only while a new validated primary finding produces a material correction. Stop when review is clean, only incidental or rejected findings remain, evidence stalls, a blocker appears, or another approval is required.
 
@@ -150,7 +214,7 @@ Do not fetch or mutate Git to resolve a target. Ordinary working-tree review is 
 
 When dispatching a reviewer subagent, treat `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/agents/reviewer.md` as the authoritative child contract. The reviewer agent does not inherit this skill by default, so standards that must apply inside delegated reviews must exist in the reviewer agent prompt or be included explicitly in the subagent task.
 
-For delegated review, give each selected reviewer a distinct packet: approved behavior, non-goals, relevant decisions, target/effective change, proof/evidence, assigned angle/evidence target, and stop condition.
+For delegated reviews, send the reviewer packet required above. Keep each reviewer’s assigned angle or specialist surface and evidence target distinct.
 
 The parent session owns synthesis and decisions. It validates every candidate finding against scope, producer/reachability, concrete impact, proof, local fit, and behavior preservation. Reviewer findings are evidence, not orders. Do not let a reviewer expand scope, approve architecture changes, or trigger implementation. Feedback requiring a material behavior, architecture, schema, config, security, data, or public-contract decision returns to the user.
 

@@ -5,13 +5,13 @@ description: Use for structural Git analysis such as changed functions, semantic
 
 # Semantic Git (sem CLI)
 
-Use the `sem` CLI for structural code change analysis:
+Use `sem` to inspect code-level changes and dependencies. These commands read Git state without mutating it:
 
-- `sem diff` — entity-level diff (functions/classes changed, not line-level)
-- `sem impact` — blast radius analysis (what depends on changed code)
-- `sem context` — surrounding context for changes
-- `sem blame` — entity-level blame (who last changed this function)
-- `sem log` — entity-level git log
-- `sem entities` — list all code entities in a file
+- `sem diff` — show which functions or classes changed
+- `sem impact` — show dependencies, dependent code, transitive impact, and tests for an entity
+- `sem context [ENTITY]` — get surrounding code for an entity
+- `sem blame <FILE>` — see who last changed each entity in a file
+- `sem log` — trace an entity through Git history
+- `sem entities [PATH]` — list entities in a file or directory
 
-Use `sem` alongside raw `git diff` when entity-level structural analysis is needed; retain raw diffs for line-level and total-effective-diff review.
+Use raw `git diff` too when you need the complete line-by-line patch. Do not use `sem setup` or `sem unsetup`; they change global Git diff behavior.

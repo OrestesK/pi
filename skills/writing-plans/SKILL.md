@@ -27,15 +27,15 @@ Not allowed:
 
 ## Before Planning
 
-Verify you have:
+Before you plan, confirm you know:
 
-- approved design or approved, sufficiently clear requirements,
-- known constraints from project instructions,
-- likely files/symbols affected,
-- project test/lint/typecheck commands when discoverable,
-- human review triggers identified.
+- the approved design, or requirements that are approved and clear enough to plan
+- the project constraints
+- the likely files and symbols to change
+- the test, lint, and type-check commands when you can find them
+- when human review is required
 
-If not, use `brainstorming` or `scout` first.
+If any of these is missing, use `brainstorming` or `scout` first
 
 ## Plan Format
 
@@ -45,7 +45,7 @@ Avoid tables in generated plan Markdown. Every implementation plan should includ
 # <Feature> Implementation Plan
 
 **Recommendation and outcome:** <chosen approach and observable result>
-**Previous behavior and delta:** <verified current state and proposed change>
+**Current behavior and planned change:** <verified current state and proposed change>
 **Approved design or requirements:** <compact summary; a path is supporting evidence only>
 **Changed behavior:** <material changes>
 **Unchanged behavior / non-goals:** <preserved boundaries>
@@ -88,7 +88,7 @@ These locations guide execution and concurrent ownership; they are not the user 
 
 **Implementation:**
 
-- Minimal target at the canonical owner. Include exact symbols or small snippets only when necessary.
+- Make the smallest change at the canonical owner. Include exact symbols or small snippets only when necessary
 
 **Verification:**
 
@@ -96,7 +96,7 @@ These locations guide execution and concurrent ownership; they are not the user 
 
 **Review:**
 
-- Approved behavior/non-goals, relevant decisions, proof/evidence packet, review focus points, and stop conditions.
+- Give reviewers the approved behavior and non-goals, relevant decisions, proof and evidence, review focus points, and stop conditions
 
 ## Approval and stop conditions
 
@@ -105,7 +105,7 @@ These locations guide execution and concurrent ownership; they are not the user 
 
 ## Task Granularity
 
-Make tasks small enough for the parent or an exceptional concurrent worker to complete without redesigning:
+Make each task small enough for the parent to complete without redesigning. A concurrent worker may do the same only when an exception allows it:
 
 - one behavior or one coherent refactor per task,
 - one coherent proof target per changed behavior where practical,
@@ -146,7 +146,7 @@ If a handoff command is useful, label it as **User-run only** and prefer copying
 Choose the path that matches the request:
 
 - **Plan only:** present the complete plan directly in chat, save it only when requested or materially useful, then stop. Do not start implementation or approval flow.
-- **Standalone nontrivial plan review:** route directly to `review`. Its three fresh reviewers remain required; `delegation` dispatches them.
+- **Standalone nontrivial plan review:** route directly to `review`. It owns reviewer count, angles, packet content, and method; `delegation` dispatches the selected reviewers.
 - **Manager-attached plan:** return the task breakdown to the active `manager-workflow` stage. It does not add review or approval unless it introduces a material behavioral delta.
 
 This skill owns the executable task breakdown and proof detail.

@@ -7,29 +7,37 @@ description: Use for managing implementation work through proposal, approval, ex
 
 ## Decision-ready proposal
 
-The active global instructions already in context own work classification through the global work-classification policy. The `Approval` section specifically owns the exact visible draft → asynchronous review → complete revised proposal → implementation approval sequence. When that sequence activates this skill, the proposal includes:
+Use the global work-classification rules already in context. Their `Approval` section defines the sequence: show a draft, review it asynchronously, show the complete revised proposal, then obtain approval to implement.
 
-- recommendation, observable outcome, previous behavior, and proposed delta
-- complete material phases plus changed and unchanged behavior
-- why it is the simplest coherent option, meaningful alternatives, and why rejected
+When that sequence sends work here, include:
+
+- the recommendation, expected outcome, previous behavior, and proposed change
+- all material phases and what changes or stays the same
+- why this is the simplest coherent option, the meaningful alternatives, and why they were rejected
 - every material assumption, uncertainty, risk, tradeoff, reversibility concern, and safer alternative
-- evidence, failed or unexecuted checks, verification and review strategy, and focus points
-- the exact behavioral authorization boundary, exclusions, stop conditions, next separately authorized action, and one focused approval question
+- evidence, failed or unexecuted checks, the verification and review plan, and review focus points
+- the exact authorization boundary, exclusions, stop conditions, next separately authorized action, and one focused approval question
 
 A saved plan can preserve implementation detail, but the complete proposal must remain in chat.
 
-### Task contract
+### Define the task contract
 
-Before mutation, bind the current request and latest correction to:
+Before mutating anything, use the current request and latest correction to define:
 
 - observable behavior and non-goals
 - repository root, active worktree when applicable, and likely implementation owners
 - proof strategy and focused checks
-- behavioral approval boundary and protected-action stops
+- the approval boundary and protected-action stops
 
-The active global instructions already in context, specifically the `Approval` section, define approval scope and when material expansion or a protected action requires a stop. Exact files, ranges, and line budgets remain optional implementation or concurrent-writer controls. Implement the smallest coherent solution at the canonical owner. Reviewer and diagnostic findings are evidence, not authority.
+Use the global `Approval` rules to decide what approval covers and when a material expansion or protected action must stop. File lists, ranges, and line budgets are optional controls for implementation or concurrent writers. Put the smallest coherent change in its canonical owner. Treat reviewer and diagnostic findings as evidence, not authority.
 
-A later user correction supersedes conflicting terms and stale child work. When the corrected direction is nontrivial/material, re-present and review the amended proposal before mutation resumes.
+A later user correction replaces conflicting terms and makes affected child work stale. If the correction is nontrivial or material, show and review the amended proposal before mutating again.
+
+### Keep the stage and findings visible
+
+At the start of material work, whenever you enter a manager stage, and after a user correction, give the normal progress update. Name the current stage and approval or decision status. After a correction, also say what was dropped or superseded. Use one update; do not send an extra status or acknowledgement message. Do not wait unless a decision is needed.
+
+Before a child, reviewer, diagnostic, or tool finding changes the plan or active work, state which goal assumption it relies on. State whether it is necessary for the approved outcome or adds scope. Reject unrelated suggestions. Ask before adopting an unclear assumption or added behavior, scope, tests, compatibility work, or cleanup. Do not make rejected or deferred suggestions active work.
 
 ## Stage flow
 
@@ -45,11 +53,11 @@ An extra milestone is a wait only when the decision-ready proposal names it and 
 
 ## Progress and continuity
 
-Follow the active global instructions already in context, specifically the progress, TODO, continuity, and `.scratch/` policies. This workflow adds only the current manager stage, approval status, evidence links, changed assumptions, blockers, unverified boundaries, and next action when a complex `.scratch/sessions/` record is needed.
+Follow the global progress, TODO, continuity, and `.scratch/` rules. If complex work needs a `.scratch/sessions/` record, this workflow adds only evidence links, changed assumptions, blockers, and unverified boundaries. `Keep the stage and findings visible` owns current-stage and approval-status updates.
 
 ## Manager-local handoffs
 
-The active global instructions already in context, specifically the `Workflow routing` section, own the workflow-routing map. Inside an active manager stage, applicable `brainstorming`, `tech-spec`, `writing-plans`, `behavioral-proof`, `writing-tests`, `systematic-debugging`, `review`, `delegation`, and verification handoffs return to this workflow; they do not create another implementation-approval path. Do not stack blocking workflows on trivial mechanical work.
+The global `Workflow routing` rules choose which workflow to start. While a manager stage is active, applicable `brainstorming`, `tech-spec`, `writing-plans`, `behavioral-proof`, `writing-tests`, `systematic-debugging`, `review`, `delegation`, and verification handoffs return here when complete. They do not create another implementation-approval path. Do not stack blocking workflows on trivial mechanical work.
 
 ## Tech-spec routing
 
@@ -80,20 +88,25 @@ The tech spec does not create another stage, approval wait, or implementation au
 
 ## Delegation
 
-Follow the delegation-trigger policy in the active global instructions already in context and the parent/child authority boundary specifically defined in their `Orchestration boundary` section, then load and follow `delegation` for execution mechanics. This workflow decides when the implementation and review stages dispatch work; it does not redefine role selection, topology, async handling, MCP routing, supervisor coordination, or review method.
+Use the global delegation trigger and `Orchestration boundary` for parent/child authority. Then load `delegation` for execution mechanics. This workflow decides when implementation and review dispatch work. It does not choose roles, topology, async handling, MCP routing, supervisor coordination, or review method.
 
 ## Implementation
 
-Before editing, identify the observable behavior, normal entrypoint and canonical owner, approved non-goals and protected boundaries, and the smallest proof that could disprove a wrong implementation.
+Before editing, identify:
 
-Follow the active global instructions already in context, specifically the implementation invariants, parent/child authority, changed-file inspection, and test-timing policies.
+- the observable behavior
+- the normal entrypoint and canonical owner
+- approved non-goals and protected boundaries
+- the smallest proof that could disprove a wrong implementation
+
+Follow the global implementation invariants, parent/child authority, changed-file inspection, and test-timing rules.
 
 For each coherent edit group:
 
-1. implement the smallest approved change at the existing owner
-2. run applicable static, discovery, or diagnostic evidence
-3. inspect the effective diff
-4. stop for stale evidence, a material scope conflict, or a protected action
+1. Make the smallest approved change at the existing owner
+2. Run relevant static, discovery, or diagnostic checks
+3. Inspect the effective diff
+4. Stop when evidence is stale, scope conflicts materially, or a protected action is needed
 
 Complete the approved implementation batch, collect applicable evidence, report the implementation result, then continue automatically into review/fix.
 

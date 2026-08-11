@@ -5,21 +5,21 @@ description: Use for creating, refining, validating, or exporting Excalidraw tec
 
 # Excalidraw Skill
 
-## Mandatory Design Controls
+## Design and validation for new diagrams
 
-This skill is not only a canvas API manual. For every nontrivial new diagram, follow the design and validation gates before treating tool success as completion.
+For every nontrivial new diagram, complete these design and validation steps before you call the result complete.
 
 1. Read [`references/orestes-clean-style.md`](references/orestes-clean-style.md). It is the default style for this Pi installation.
 2. Read [`references/quality-gates.md`](references/quality-gates.md).
 3. If the user supplies visual references or native `.excalidraw` files, inspect them before layout. Reference-established traits override every generic default.
-4. Establish audience, one-sentence takeaway, target render size, overview/detail mode, required claims, and non-goals.
-5. Create a semantic cut. Do not force every source fact into one canvas. Material abstraction or omission requires approval.
+4. Decide who will read the diagram, its one-sentence takeaway, output size, overview or detail level, required claims, and non-goals.
+5. Make a semantic cut: choose the facts the diagram needs to show. Do not force every source fact onto one canvas. Ask for approval before omitting or materially abstracting facts.
 6. Use the overview budget by default: at most 9 primary nodes, 11 primary edges, 3 callouts, 5 accent families, one feedback loop, and one obvious endpoint. Split into panels or another diagram when exceeded.
 7. Construct and screenshot in stages: skeleton → primary arrows → optional clusters. Do not generate a complex full scene in one batch.
 8. Run the native scene audit and inspect the final export at native, 50%, 35%, and grayscale sizes.
 9. For nontrivial work, run a broad blind adversarial review. A reviewer prompted only to confirm previous fixes is not a final gate.
 
-**Readiness rule:** valid JSON, complete labels, arrow counts, no clipping at full zoom, and successful canvas commands are necessary but not sufficient.
+Valid JSON and successful canvas commands do not prove the diagram is ready. It must also have complete labels, the allowed arrow count, no clipping at full zoom, and pass the required reviews.
 
 ## Step 0: Pick an Interface
 
@@ -118,7 +118,7 @@ An arrow from an element in one layout zone to an element in a distant zone will
 
 **Design rule:** Keep arrows within the same zone or tier. To show cross-zone relationships, make zone edges adjacent, use one explicit cross-panel edge, or split the content into separate views.
 
-Do not use a canvas-spanning perimeter arrow as the default escape hatch. A long return path, multi-bend route, or global loop is evidence that responsibilities should move, duplicate concepts should collapse, or the diagram should split.
+Do not use a canvas-spanning perimeter arrow as the usual workaround. A long return path, multi-bend route, or global loop usually means the diagram should move responsibilities, merge duplicate concepts, or split into views.
 
 ### 3. Use arrow labels sparingly
 
@@ -130,13 +130,9 @@ Arrow labels are placed at the midpoint of the arrow. On short arrows, they over
 
 ---
 
-## Quality: Why It Matters (and How to Check)
+## Check each staged batch
 
-Excalidraw diagrams are visual communication. If text is cut off, elements overlap, or arrows cross through unrelated shapes, the diagram becomes confusing and unprofessional — it defeats the whole purpose of drawing it. So after every batch of elements, verify before adding more.
-
-### Quality Checklist
-
-After each staged `add` / `apply` / `batch_create_elements`, take a screenshot and check:
+After every staged `add`, `apply`, or `batch_create_elements`, take a screenshot and check:
 
 1. **Primary story** — Can the intended route and endpoint be identified in under three seconds without reading supporting notes?
 2. **Hierarchy** — Is one route dominant and every optional/automatic/rare route visibly subordinate?
@@ -165,7 +161,7 @@ If any issue appears: **stop, fix it, re-screenshot, then continue.** The comple
 
 ### Steps (CLI shown; MCP tools are 1:1 — see cheatsheet)
 
-1. Complete the diagram contract, reference-style contract, semantic cut, and overview/detail decision from `references/quality-gates.md`.
+1. Complete the design steps above. `references/quality-gates.md` gives the required detail.
 2. Plan the coordinate grid, panels, primary route, and endpoint before writing JSON.
 3. Only after the user approves discarding the current scene, or after a named snapshot under an approved replacement workflow, run `npx -y mcp-excalidraw-server clear --yes`.
 4. Create only title/boundaries and primary nodes first. Use descriptive IDs. Screenshot and correct hierarchy/whitespace before arrows:
@@ -227,17 +223,17 @@ The intermediate waypoint `[50, -40]` lifts the arrow upward. `roundness: {type:
 
 ## Workflow: Iterative Refinement
 
-Pairing `describe` with `screenshot` is what makes this skill powerful.
+Use `describe` to inspect scene data and `screenshot` to inspect the rendered result.
 
-- **`describe`** (`describe_scene` in MCP) → structured text: element IDs, types, positions, labels, connections. Use it to know *what's on the canvas* before making programmatic updates (find IDs, understand bounding boxes).
-- **`screenshot`** (`get_canvas_screenshot` in MCP) → PNG of the actual rendered canvas. Use it for *visual quality verification* — it shows exactly what the user sees, including truncation, overlap, and arrow routing. The CLI prints the saved file path as JSON; read/view that file.
+- **`describe`** (`describe_scene` in MCP) returns element IDs, types, positions, labels, and connections. Use it before programmatic updates to find IDs and understand bounding boxes.
+- **`screenshot`** (`get_canvas_screenshot` in MCP) returns a PNG of the rendered canvas. Use it to check what the user sees, including truncation, overlap, and arrow routing. The CLI prints the saved file path as JSON; read or view that file.
 
 **Feedback loop:**
 ```
 add elements
   → screenshot → view → "text truncated on auth-svc"
   → update auth-svc --set '{"width": 220}' → screenshot → "overlap between auth-svc and rate-limiter"
-  → update rate-limiter --set '{"x": 520}' → screenshot → "this batch is locally clean"
+  → update rate-limiter --set '{"x": 520}' → screenshot → "check the next cluster; final gates still remain"
   → continue to the next staged cluster; final gates still remain
 ```
 
@@ -245,8 +241,8 @@ add elements
 
 1. Classify the change:
    - **Localized non-semantic:** one move, resize, typo, or style correction that does not alter the final scene's story or topology.
-   - **Material:** adds/removes nodes or routes, changes hierarchy, expands scope, changes visual grammar, or prepares a final deliverable.
-2. Material refinements must re-enter the diagram contract/semantic-cut gates as needed and complete native audit, target-size, 50%, 35%, grayscale, semantic, and blind visual final gates. Do not bypass safeguards by calling a redesign a refinement.
+   - **Material:** adds or removes nodes or routes, changes hierarchy, scope, or visual grammar, or prepares the final deliverable.
+2. For a material change, repeat the applicable design steps and complete the native audit plus the target-size, 50%, 35%, grayscale, semantic, and blind visual reviews. Do not classify a redesign as a localized refinement.
 3. `describe` to understand current state — note element IDs and positions.
 4. Identify elements by `id` or label text, not coordinates.
 5. Update, delete, or use one `apply` patch. Bound arrows re-route when endpoints move; do not replace a semantic edge with disconnected line pieces.
@@ -289,7 +285,7 @@ This is how diagrams live in a repo: commit the `.excalidraw` file, and re-`impo
 - **Arrow not connecting?** Verify element IDs with `get <id>`. Make sure `startElementId`/`endElementId` match existing element IDs.
 - **Canvas in a bad state?** Prefer `snapshot restore` when a suitable snapshot exists. Otherwise, save a named snapshot and obtain approval to discard the current scene before `clear --yes` and rebuild.
 - **Element won't update?** It may be locked — `arrange unlock --ids <id>` first.
-- **Duplicate text elements / element count doubling?** The frontend auto-sync timer periodically writes the full Excalidraw scene back to the server. Excalidraw internally generates a bound text element for every shape with a label; clearing and re-sending elements can re-inject cached bound texts. Clean up: `query --type text` to find elements with a `containerId`, `delete` the unwanted ones, wait a few seconds for auto-sync to settle. The safest prevention: **never put labels on background zone rectangles** — use free-standing text elements.
+- **Duplicate text elements / element count doubling?** The frontend auto-sync timer periodically writes the full Excalidraw scene back to the server. Excalidraw internally generates a bound text element for every shape with a label; clearing and re-sending elements can re-inject cached bound texts. Clean up: `query --type text` to find elements with a `containerId`, `delete` the unwanted ones, wait a few seconds for auto-sync to settle. To prevent this, follow the background-zone labeling rule above.
 
 ---
 

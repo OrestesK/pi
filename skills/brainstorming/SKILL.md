@@ -55,12 +55,12 @@ Ask only what tools cannot answer. If evidence does not settle user intent, defe
 Rules:
 
 - Ask one focused question per `ask_user` call
-- During pre-approval nontrivial design, ask about every consequential user-owned assumption, preference, or tradeoff that could noticeably affect the solution, workflow, UX, tradeoff, or maintenance shape after tools and evidence resolve factual or routine questions. A material choice always qualifies
-- Briefly explain why the choice matters, recommend an option when useful, and ask in normal language
-- Proactively map and verify materially reachable workflows, roles, states, failure paths, and consequences. Ask about unresolved reachable behavior; do not invent impossible hypotheticals or ask questions tools can answer.
-- When cost, time, downtime, rollout, production load, or resource tolerance could materially change the design, show the consequence and ask whether it is acceptable instead of silently optimizing around it.
-- Do not proceed from clarification to planning while a consequential user-owned assumption, material requirement, scope boundary, or design choice remains unresolved.
-- Prefer structured options when there are clear choices.
+- During pre-approval nontrivial design, first use tools and evidence to resolve factual and routine questions. Then ask about every consequential user-owned assumption, preference, or tradeoff that could noticeably change the solution, workflow, user experience, tradeoffs, or maintenance. Every material choice needs a question
+- Before asking a consequential design question, explain the behavior at stake and recommend an option. Give a short practical example and explain the meaningful downside. Offer an alternative only when it would produce materially different behavior
+- Map the workflows, roles, states, failure paths, and consequences that can actually occur. Ask about unresolved behavior in those paths. Do not invent impossible cases or ask questions tools can answer
+- When cost, time, downtime, rollout, production load, or resource tolerance could change the design, explain the consequence and ask whether it is acceptable. Do not silently optimize around it
+- Do not start planning while a consequential user-owned assumption, material requirement, scope boundary, or design choice is unresolved
+- Invite normal-language discussion first. Use structured options only when the choice is discrete and the alternatives are already understandable. Do not ask the user to compare wording, internal mechanisms, or near-equivalent alternatives unless that distinction is the real user-owned decision
 - Include a short context summary in `ask_user` so the user sees why the question matters.
 - Do not bundle unrelated questions.
 
@@ -76,13 +76,13 @@ Clarify:
 
 ### 3. Explore approaches
 
-Present only credible, materially different approaches; do not force an arbitrary count. Lead with the recommendation and confidence level. Explain observable differences, tradeoffs, risks, and why the preferred option is the simplest coherent solution. If one option is clearly wrong, say so and explain why.
+Present only credible approaches that would produce materially different outcomes. Do not force an arbitrary number of options. Lead with the recommendation and confidence level. Explain what changes for the user, the tradeoffs and risks, and why the preferred option is the simplest coherent solution. If one option is clearly wrong, say so and explain why
 
 Use bullets or short labeled options in generated Markdown. Use a table in direct chat only when it makes the choice clearer.
 
 ### 4. Validate design
 
-For larger work, present the design in short sections for inspectability and non-blocking feedback; this incremental presentation is not an approval wait or permission to omit the complete reviewed design:
+For larger work, show the design in short sections so it is easy to inspect and comment on without stopping progress. These sections are not an approval wait and do not replace the complete reviewed design:
 
 - architecture / placement
 - data/control flow

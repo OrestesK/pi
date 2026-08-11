@@ -60,11 +60,19 @@ Fanout output
    └─ Inspect the output only when it becomes relevant.
 ```
 
-### Reflection routing
+### Route Reflection work
 
-Root-parent Reflection overrides the general read-only/advisory fallback: route every admitted substantive candidate directly to matching read-only specialists, even when non-atomic; never `clone`. Ordinary children remain non-orchestrators.
+Reflection work has a special route. When the root parent admits a substantive candidate, send it directly to the matching read-only specialist, even when the task is not atomic. Never send it to `clone`. Ordinary children do not orchestrate.
 
-Admit only a useful, new, bounded, authorized, interruptible, non-interfering candidate that is dispatchable to an eligible read-only specialist and names a distinct task-advancing evidence target. If dispatch is unavailable or prohibited, including by a strict no-artifact instruction, do not admit it or substitute parent investigation.
+Admit a candidate only when it is:
+
+- useful and new
+- bounded and authorized
+- interruptible and non-interfering
+- suitable for an eligible read-only specialist
+- aimed at a distinct evidence target that can advance the task
+
+If dispatch is unavailable or prohibited, including by a strict no-artifact instruction, do not admit the candidate or substitute parent investigation.
 
 Every packet forbids file, Git, external, and other mutation and requires concrete evidence, a bounded stop condition, and an actual-effects report.
 
@@ -74,7 +82,18 @@ The general delegation, async, and review rules remain authoritative for paralle
 
 Route every approved nontrivial implementation slice to `clone`, including a lone slice. The parent may implement only trivial mechanically obvious edits or corrections. When two or more approved implementation slices are genuinely independent, dispatch them in the same parallel wave when their active write sets are disjoint and their dependencies permit it. Consolidate shared-file changes under one owner when practical; otherwise schedule the shared file in a later accepted wave.
 
-Before each write wave involving a clone, the parent creates one allocation map containing its own and every active clone’s write set as exact paths or unambiguous globs. Include the complete map in every clone packet. All participants may read shared files. A clone stops through `contact_supervisor` before writing outside its assigned set, including an apparently unowned file. Ownership never changes mid-wave. For a normal handoff, the parent accepts the current wave before starting the next map. If missing ownership blocks the slice, the parent instructs the clone to end the current wave and return partial evidence, inspects it, releases the allocation, and starts a fresh wave whose map includes the required files. Dependent work waits until the new wave’s prerequisite evidence is green. Never launch a nested clone.
+### Allocate each write wave
+
+Before a write wave involving a clone:
+
+- Create one allocation map with the parent’s write set and every active clone’s exact paths or unambiguous globs
+- Include the complete map in every clone packet
+- Allow shared reads, but keep writes exclusive
+- Require a clone to stop through `contact_supervisor` before writing outside its set, including an apparently unowned file
+- Keep ownership fixed for the whole wave
+- Accept the current wave before creating the next map
+
+If missing ownership blocks a slice, tell the clone to end the current wave and return partial evidence. Inspect that evidence, release the allocation, and start a fresh wave that owns the required files. Dependent work waits until the new wave’s prerequisite evidence is green. Never launch a nested clone.
 
 Use only distinct roles or evidence targets that can change the decision, implementation, risk, or proof. Size parallelism from concrete independent evidence gaps, risk surfaces, and useful roles. Stop when evidence is sufficient; pending work or cost alone does not justify another wave. Do not launch duplicate children only to satisfy a number.
 
@@ -86,7 +105,9 @@ Use the smallest topology that preserves dependencies, exclusive active write ow
 
 ## Parent and child execution
 
-Follow the active global instructions already in context, specifically the parent-child authority and integration rules in the `Orchestration boundary` section. Assign each clone one bounded coherent task and require the canonical event protocol in `agents/clone.md` without duplicating it here. Progress reports are non-blocking; use `need_decision` and wait only when parent input is required. The parent inspects or steers only for concrete drift, conflict, blockers, runtime control notices, or useful new evidence. Continue useful non-overlapping work while clones run; do not duplicate implementation or routinely poll.
+Follow the global parent-child authority and integration rules in `Orchestration boundary`. Give each clone one bounded coherent task. Use `agents/clone.md` for its canonical event protocol instead of duplicating it here. Keep progress non-blocking; use `need_decision` and wait only when parent input is required. Inspect or steer only for concrete drift, conflicts, blockers, runtime control notices, or useful new evidence. Continue useful non-overlapping work while clones run. Do not duplicate their implementation or routinely poll.
+
+For substantive child work other than a Run Monitor using its existing protocol, do not set turn, tool, or runtime budgets. Bound the task by its outcome, evidence target, scope and effect boundaries, and stop condition. Keep any limits set by the user, platform, or provider, and surface them. Do not add local numeric caps. The Run Monitor keeps its existing dispatch and steering thresholds, cadence, and monitor-lifetime overrides.
 
 Each clone runs complete but proportionate verification for its slice and returns actual changed files plus named commands and results. Dependent phases wait until the parent accepts prerequisite evidence as green; independent phases continue concurrently.
 
@@ -143,7 +164,7 @@ For implementation reviews, follow `manager-workflow`; for standalone reviews, f
 
 ## Artifacts
 
-Follow the active global instructions already in context, specifically the permission and override policy in the `.scratch/ workspace` section. When artifacts are allowed, use `.scratch/pi-subagents/` for project-scoped Pi Subagents runtime artifacts. A strict no-file or no-artifact instruction forbids subagent runs because child sessions and logs are artifacts. A repository-only no-artifact instruction may still allow child runs with repository output and progress artifacts disabled.
+Follow the global artifact permission and override rules in `.scratch/ workspace`. When artifacts are allowed, use `.scratch/pi-subagents/` for project-scoped Pi Subagents runtime artifacts. A strict no-file or no-artifact instruction forbids subagent runs because child sessions and logs are artifacts. A repository-only no-artifact instruction may still allow child runs when repository output and progress artifacts are disabled.
 
 ## Before yielding
 

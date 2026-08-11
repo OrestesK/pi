@@ -43,13 +43,13 @@ Pi's local `/goal` is session-scoped and continuation-oriented:
 
 ## Resource posture
 
-`/goal` uses the same normal configuration, tools, skills, subagent delegation, implementation ownership, proof, review, reflection, progress, safety boundaries, and completion behavior as an interactive session. It retains normal goal continuation semantics. Its only decision-authority override is that a material question that would normally go to the user goes through forced decision review instead.
+`/goal` follows all normal session rules. This includes configuration, tools, skills, delegation and implementation ownership, proof, review, reflection, progress, safety, and completion. The one change is that a material question that would go to the user goes through forced decision review.
 
-Default goal shape for this user is adaptive and long-horizon: the goal should keep choosing safe useful evidence-producing work until the user explicitly ends it or the goal runner can show that no safe useful in-scope options remain. Use a short bounded goal only when the user explicitly asks for one.
+Default to an adaptive, long-horizon goal that keeps choosing safe, useful, evidence-producing work until the user ends it or no safe useful in-scope option remains. Use a short bounded goal only when the user explicitly asks for one.
 
-When crafting or supervising goals, keep the normal-session resource posture and add only the question-review substitution:
+Apply these goal-specific rules:
 
-- Follow the normal delegation, implementation ownership, subagent use, proof, review, progress, and verification rules. Goal mode does not add another general swarm or workflow layer merely because it is active.
+- Goal mode does not add another general swarm or workflow layer.
 - For every in-scope material choice that would normally ask the user, run a substantial review of that exact question with at least three distinct relevant advisors—reviewer, researcher, planner, adversarial, or another fitting role. Gather further evidence or review angles as needed, validate and synthesize the results, choose the best supported in-scope answer, and record the decision, evidence, assumptions, uncertainty, and rejected alternatives. The gate always chooses; it never returns `INCONCLUSIVE` or blocks on ambiguity.
 - Advisors cannot authorize destructive actions, external mutations, deployment, disclosure, export, persistence, or other protected actions. Read-only work follows the global rule. If a protected action is required and no safe alternative can complete the goal, emit only the supervisor-supported blocker.
 - For nontrivial, multi-owner, behavior/API/schema, PR-sized, migration, cross-file, or otherwise risk-bearing goals, create the same visible contract card, plan, and owner map required by the normal workflow before editing. Replace the normal user approval question with the forced decision-review gate.
@@ -212,7 +212,29 @@ When live-testing goal-crafter behavior or prompt/skill changes, use natural und
 
 Treat phrases such as "overnight", "keep going", "don't stop", "dont stop", "constant improvement", "hillclimb", "ratchet", "fully exhaust options", or "make it better" as cues for the adaptive long-horizon form. These cues strengthen continuation and evidence-refresh policy; they do not authorize unsafe actions, unbounded history mining, or hardcoded old context.
 
-For delegated subagent goals, state that inherited conversation is reference-only unless the task explicitly says to continue it, and give each child a concrete deliverable, scope boundary, validation target, and output contract. For subagent configuration work, verify discovery/registration with `subagent doctor/list/get`, fix frontmatter schema before assuming files are active, check duplicate builtin/user shadowing, disable only duplicated builtins instead of deleting packaged agents, and explicitly grant needed direct tools rather than relying on parent inheritance. Preserve exact output shape constraints such as bullet counts; when the task says to return exact text, the output contract must forbid extra explanation. For async or long-running delegated goals, include observability handles: run id when known, output/result/session paths, progress files, control thresholds, and when the parent must inspect them. For Pi subagent responsiveness/config goals, verify async support with doctor/status after reload, distinguish `asyncByDefault` from force-top-level async, and check required runtime pieces such as session dir, jiti resolution, intercom bridge, and lazily-created chain-run directories before declaring the setup broken. For async debugging, include foreground replay, artifact existence checks, and detached stderr/stdout capture when background runs vanish silently. For tool-demo goals, avoid mutating persistence tools unless explicitly permitted and reversible or cleanup is available. If the task is read-only or no-edit/no-artifact, align prose with runtime/output policy: no writes means no output files unless an explicit artifact path is part of the task; do not create `.scratch/`, change `.gitignore`, or make convenience artifact setup edits. If the task says do not inspect files, do not include file-read requirements.
+#### Delegated subagent goals
+
+- Treat inherited conversation as reference-only unless the task explicitly continues it.
+- Give each child a concrete deliverable, scope boundary, validation target, and output contract.
+- Preserve exact output constraints such as bullet counts. When the task requires exact text, forbid extra explanation.
+
+#### Subagent configuration
+
+- Verify discovery and registration with `subagent doctor/list/get`. Fix frontmatter before assuming files are active.
+- Check builtin/user shadowing. Disable only duplicated builtins instead of deleting packaged agents.
+- Grant required direct tools explicitly instead of relying on parent inheritance.
+- For responsiveness or configuration work, verify async support with doctor/status after reload. Distinguish `asyncByDefault` from forced top-level async. Check the session directory, jiti resolution, intercom bridge, and lazily created chain-run directories before declaring the setup broken.
+
+#### Async and debugging
+
+- For async or long-running delegated goals, include observable handles: run id when known, output/result/session paths, progress files, control thresholds, and when the parent must inspect them.
+- When background runs disappear, include foreground replay, artifact existence checks, and detached stderr/stdout capture.
+
+#### Tool demos and read-only tasks
+
+- Avoid mutating persistence tools unless explicitly permitted and reversible, or cleanup is available.
+- Match prose to a read-only, no-edit, or no-artifact boundary. No writes means no output files unless the task provides an explicit artifact path. Do not create `.scratch/`, change `.gitignore`, or add convenience artifacts.
+- If the task forbids file inspection, do not require file reads.
 
 For review goals, include exact target files/diffs/artifacts, named risk surfaces, review angle, severity contract (`must-fix` vs notes), direct inspection requirement, changed-file justification when reviewing a broad diff, and explicit reporting when a relevant check is unavailable rather than passed. If named context files/artifacts are missing, report that and use next-best evidence only when safe and in scope. For post-fix follow-up, return the findings and evidence to `manager-workflow`; do not reopen unrelated optional cleanup unless requested. Confirm preserved invariants as well as failures so fix passes know what not to break. For PR-comment review goals, revalidate each visible comment against current HEAD and classify it as still-valid blocker, stale/resolved, unverifiable, or non-actionable with direct evidence; do not edit unless the user explicitly asks for fixes.
 
@@ -266,67 +288,31 @@ For cancellation, timeout, queue, retry, or long-running provider goals, include
 
 For schema or data-contract docs, include source/derivation annotations when relevant: which fields are copied from source artifacts, which are derived, which are optional/future, and which raw details are retained for downstream recalculation. Prefer a clear order such as current/top-level facts, then derived fields, then raw details.
 
-Use the expanded continuity form for explicit resume/high-risk/cross-session requests, or whenever the user uses long-horizon cues such as "overnight", "keep going", "don't stop", "constant improvement", "hillclimb", "ratchet", or "fully exhaust options":
+Use the expanded continuity form for explicit resume, high-risk, or cross-session requests, and for long-horizon cues such as "overnight", "keep going", "don't stop", "constant improvement", "hillclimb", "ratchet", or "fully exhaust options".
+
+Start with the canonical base template in step 4. Keep its full standalone `Scope`, `Constraints`, `Minimum acceptance`, `Verification`, `Continuation policy`, and `Blocked only if` sections. Replace only `Context discovery` with:
 
 ```text
-/goal <one measurable objective>.
-
 Context discovery:
 - Current task: <fresh current-session task>
 - Known current state: <confirmed facts with file/session/artifact refs>
 - Historical continuity: <prior session/compaction facts, explicitly marked historical>
 - Stale branches to ignore: <superseded work, if any>
 - Discovery rule: treat TODOs, compactions, prior sessions, and `.scratch` artifacts as pointers to re-verify, not as hardcoded required paths, stale findings, fixed scope, or mandatory execution order.
-
-Scope:
-- In scope: <bounded areas plus safe source-of-truth discovery and quality ratchet work>
-- Out of scope: <non-goals and approval-required/unsafe/private/destructive routes>
-- Keep the approved scope fixed. Within it, shift priority only when fresh evidence identifies a better target, and record the reason before continuing.
-
-Constraints:
-- <preserve invariants>
-- <protected actions unavailable unless already authorized>
-- <follow the active instructions already in context, specifically the applicable project, workflow, and tool rules>
-- Use the normal session config without asking the user questions while the goal runs.
-- Follow the normal delegation, implementation ownership, subagent use, proof, review, progress, and verification contract; do not add a second goal-only orchestration layer.
-- For every in-scope material decision that would normally ask, force substantial review by at least three distinct relevant advisors, gather more evidence as needed, choose the best supported answer, and record the decision, evidence, assumptions, uncertainty, and rejected alternatives. Never return `INCONCLUSIVE` or block on decision ambiguity.
-- For nontrivial work, use the normal visible contract card and owner map, then final independent review against them.
-
-Minimum acceptance:
-1. <criterion with required proof>
-2. <criterion with required proof>
-3. <criterion with required proof>
-
-Verification:
-- <safe local commands, artifact checks, review checks, screenshots, logs, file:line refs, or other proof>
-- Match verification scope to requirement scope; narrow checks cannot prove broad claims.
-- Map each Minimum acceptance item to fresh evidence from transcript, artifacts, effective changes, checks, docs, or review.
-- Complete the review/fix stage owned by `manager-workflow` and synthesize its evidence.
-- Include final verification against the contract card, owner map, tests/docs evidence, scope and artifact hygiene, and forbidden artifacts.
-- Account for generated/untracked artifacts, debug outputs, and implementation locations before GOAL_DONE.
-- Do not run live/external/expensive/effectful/protected validation unless its exact action and boundary were already authorized.
-
-Continuation policy:
-- Work in smallest evidence-producing steps.
-- After a failed check, inspect root cause before retrying.
-- Do not redefine success around partial progress or an easier subset.
-- Do not treat first passing checks, first working output, first benchmark win, or status/morning summary as completion.
-- Re-read current goal/continuity notes after compaction or long interruption.
-- After each meaningful step, choose the next safest useful in-scope action until the user explicitly ends the goal or no safe useful in-scope options remain.
-- GOAL_DONE only when Minimum acceptance is proved and either the user explicitly asks to end/finish/ship the active goal or the runner can state with evidence that no safe useful in-scope option remains.
-
-Blocked only if:
-- A verified automatic command/tool/runtime guardrail blocks every viable safe path.
-- A required tool, resource, credential, auth, access, or service is missing, and no safe non-asking workaround exists.
-- A required protected action is not authorized and no safe alternative can complete the goal.
-- Never use GOAL_BLOCKED for an unresolved engineering, product, or workflow decision; the forced decision-review gate must choose the best supported answer.
-- For the protected-action class, emit exactly `GOAL_BLOCKED: required protected action not authorized; no safe alternative: action=<specific action>; effect=<required effect>; evidence=<evidence>`.
-- For another allowed class, emit GOAL_BLOCKED with the specific blocker and proof that no safe non-asking next step exists.
 ```
+
+Add these continuity-specific rules to the rendered command:
+
+- Under `Constraints`, follow the active project, workflow, and tool instructions already in context.
+- Under `Verification`, match the proof scope to the requirement scope; narrow checks cannot prove broad claims.
+- Under `Continuation policy`, inspect root cause before retrying a failed check.
+- Under `Continuation policy`, re-read the current goal and continuity notes after compaction or a long interruption.
+
+The rendered `/goal` must remain standalone. Do not output a reference to the base template.
 
 ## Ambiguity handling
 
-Research first. Collect unresolved material questions instead of interrupting the user one by one. Immediately before rendering, ask once for all still-unresolved related material decisions. Prefer a structured review UI when available, with each item limited to one focused decision; never combine unrelated questions into a broad multipart questionnaire. When only one decision remains, ask one focused question. A direct safety or permission blocker that prevents safe research must be surfaced immediately rather than deferred.
+Research first. Gather related material decisions. Just before rendering, ask once about every unresolved related decision. Prefer a structured review UI when available, with one focused decision per item; never combine unrelated questions into a broad multipart questionnaire. When only one decision remains, ask one focused question. Surface a safety or permission blocker immediately when it prevents safe research.
 
 A pre-render clarification is required when missing information materially changes:
 

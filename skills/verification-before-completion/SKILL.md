@@ -7,7 +7,7 @@ description: Use before claiming work is done, fixed, passing, reviewed, or read
 
 Do not claim success without fresh evidence.
 
-## Gate Function
+## Before making a completion claim
 
 Before saying work is done, fixed, passing, ready, clean, or complete:
 
@@ -22,7 +22,7 @@ Run all relevant read-only verification automatically. Store temporary data and 
 
 If you cannot run a required check, say so. Do not convert inability to verify into confidence.
 
-## Relevance-gated completion categories
+## Check categories that could affect readiness
 
 Assess each category when it can materially change the readiness claim; do not perform speculative security/data hardening or irrelevant ritual to fill the list:
 
@@ -32,18 +32,18 @@ Assess each category when it can materially change the readiness claim; do not p
 - **Simplicity:** no avoidable concept, branch, mode, wrapper, fallback, compatibility path, or duplicated owner was added
 - **Fresh claim-bound evidence:** proof was captured after the latest relevant edit with a method proportionate to the claim
 - **Public representations:** affected API/schema/config/docs/comments/user-facing names and examples match behavior that actually exists
-- **Final effective change and delegated-work disposition:** the parent inspected the final change, every readiness-relevant output, accepted/rejected findings, and remaining incidental/background work
+- **Final change and delegated work:** the parent inspected the final change, each readiness-relevant output, the disposition of findings, and remaining incidental or background work
 
 A materially expected category may be inapplicable, but state why. Do not silently skip it.
 
-## Claim Binding
+## Tie the claim to the completed work
 
 Bind every completion claim to the exact thing being completed:
 
-- current approved behavioral contract and requested outcome/non-goals,
-- final repository root/worktree and effective implementation locations,
-- current observable implementation route when it is material to the claim,
-- evidence captured after the latest relevant edit or correction.
+- the current approved behavior and requested outcome/non-goals
+- the repository or worktree that contains the final change, and the files or runtime path where it takes effect
+- the current observable implementation route when it matters to the claim
+- evidence captured after the latest relevant edit or correction
 
 Evidence from a superseded direction, different checkout, replaced implementation path, or pre-fix run is stale. A passing test proves only the behavior it exercises; it does not justify unrelated work. Return `INCONCLUSIVE` when the claim cannot be bound to the current requested behavior and final target.
 
@@ -82,7 +82,7 @@ Do not trust “worker/reviewer says done” by itself.
 
 The parent inspects the actual target/effective change, relevant child outputs, and fresh claim-bound evidence. For nontrivial readiness, the review/fix stage required by `manager-workflow` must be complete. Reviewer packet and fanout details are outside this skill.
 
-The parent validates candidate findings for scope, producer/reachability, impact, proof, and behavior preservation before disposition. `review` owns review method and finding partitions; accepted in-scope required findings must be fixed or explicitly user-deferred before `PASS`. If the parent cannot verify directly, report the exact unverified boundary and return `INCONCLUSIVE` where it affects the claim.
+Before accepting or rejecting a finding, the parent checks that it is in scope, traces it to its producer and reachable behavior, confirms its impact and evidence, and checks that the approved behavior is preserved. `review` owns review method and finding partitions. Any accepted in-scope required finding must be fixed or explicitly deferred by the user before `PASS`. If the parent cannot verify directly, report the exact unverified boundary and return `INCONCLUSIVE` where it affects the claim.
 
 ## Completion Report Format
 
@@ -91,7 +91,7 @@ Use this shape:
 ```text
 Contract: <approved behavior/non-goals or not applicable>
 Outcome: <observable result>
-Implementation: <owners/areas used as evidence, not approval boundaries>
+Implementation: <owners and files inspected as evidence; this does not expand the approved scope>
 Verification: <commands/evidence and results>
 Completion categories: <material categories and any inapplicable reason>
 Review: <required review and follow-up status for nontrivial work, with finding dispositions>

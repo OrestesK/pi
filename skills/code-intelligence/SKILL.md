@@ -1,22 +1,22 @@
 ---
 name: code-intelligence
-description: Use for code ownership, structure, symbols, types, references, call relationships, structural patterns, and diagnostics
+description: Use when you need to find code ownership, structure, symbols, types, references, call relationships, structural patterns, or diagnostics
 ---
 
 # Code Intelligence
 
-Use semantic code tools when code structure, behavior, types, relationships, or diagnostics matter. Plain file and text tools remain correct for filenames, comments, logs, configuration text, and exact strings.
+Use semantic tools to understand code structure, behavior, types, relationships, and diagnostics. Use plain file and text tools for filenames, comments, logs, configuration text, and exact strings
 
 ## Select evidence by question
 
-When a situational Pi Lens tool is unavailable, call `pi_lens_activate_tools` with the needed tool names. Use the activated tools on the next model turn.
+If a Pi Lens tool you need is unavailable, call `pi_lens_activate_tools` with its name. Use the activated tool on the next model turn
 
 - **Ownership and shape:** `symbol_search`, then `module_report`; read exact bodies with `read_symbol` or `read_enclosing`
 - **Types and relationships:** `lsp_navigation` for definitions, references, implementations, hover, symbols, rename previews, and call hierarchy
-- **Structural patterns:** `ast_grep_search`; use `ast_grep_replace` for structural rewrites and dry-run before applying. Use `ast_grep_outline` for syntax-only structure and `ast_grep_dump` when the AST shape is unclear
+- **Structural patterns:** Use `ast_grep_search`. For a structural rewrite, use `ast_grep_replace` and dry-run it before applying changes. Use `ast_grep_outline` for syntax-only structure and `ast_grep_dump` when the AST shape is unclear
 - **Diagnostics:** `lsp_diagnostics` for focused language-server checks and `lens_diagnostics` for aggregate edited-file or project findings
 
-Use every evidence group that answers a material question, but do not call groups mechanically. Gather the minimum evidence that can settle ownership, implementation, or correctness.
+Use every evidence group that can answer a material question. Do not call a group only because it is listed. Stop when you have enough evidence to settle ownership, implementation, or correctness
 
 ## Read before editing
 
@@ -24,16 +24,14 @@ Before changing an identifiable function, class, method, callback, or symbol, re
 
 ## Structural search
 
-Use specific valid code patterns and scope them to relevant paths. If a search returns no match, simplify it once. Use `ast_grep_dump` when node kinds or nesting are unclear, then fall back to text search only when structure is not the right query.
-
-Dry-run structural replacements before applying them.
+Use specific valid code patterns and limit them to the relevant paths. If a search finds no match, simplify it once. Use `ast_grep_dump` when node kinds or nesting are unclear. Fall back to text search only when code structure cannot answer the question
 
 ## LSP use
 
-Use each tool's registered `path` or `paths` field. Start from a real file in the project when workspace symbol or project resolution needs context. Query references from the definition when usage-site results can be partial.
+Pass paths through each tool's registered `path` or `paths` parameter. When workspace symbol lookup or project resolution needs context, start from a real project file. If usage-site results can be partial, query references from the definition
 
-Run targeted LSP diagnostics after each coherent code edit group and again after the final relevant edit. State the concrete reason when a required semantic or diagnostic surface is unavailable or does not apply.
+Run targeted LSP diagnostics after each coherent code-edit group and once more after the final relevant edit. If a needed semantic or diagnostic check is unavailable or does not apply, state exactly why
 
-## Trust the result boundary
+## Treat findings as evidence, not approval
 
-Code-intelligence findings guide investigation and review. They do not authorize edits outside the approved behavior. Validate diagnostics and reviewer findings against the real producer, reachable state, scope, and contract before changing code.
+Code-intelligence findings guide investigation and review. They do not authorize edits outside approved behavior. Before changing code, validate each diagnostic or reviewer finding against the actual producer, the states the program can reach, the approved scope, and the contract

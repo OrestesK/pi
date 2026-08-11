@@ -1,6 +1,6 @@
 ---
 name: tech-spec
-description: Use for writing implementation-ready technical specifications
+description: Write implementation-ready technical specifications
 license: MIT; see LICENSE
 ---
 
@@ -8,17 +8,17 @@ license: MIT; see LICENSE
 
 Produce a code-shaped architecture proposal with concrete contracts and end-to-end execution flows. This skill is design-only. It does not authorize implementation or tracked source/config mutation.
 
-`manager-workflow` owns activation, approval, stage flow, and review. `brainstorming` owns unresolved product/design intent and user questions. When used during implementation planning, this spec is the proposal inside the existing design/plan stage, not another stage or approval gate.
+`manager-workflow` starts this skill and controls its stage, approval, and review. `brainstorming` resolves product or design intent and user questions. During implementation planning, this spec stays inside the current design/plan stage; it does not add another stage or approval gate
 
 ## Invocation modes
 
 ### Manager-routed architecture work
 
-Use the inspected task context to produce the architecture body of the decision-ready proposal. Return the complete draft to `manager-workflow`; do not ask for implementation approval before its asynchronous plan review.
+Use facts from the inspected task to write the architecture part of the proposal that `manager-workflow` will take to a decision. Return the complete draft to `manager-workflow`. Do not ask for implementation approval before its asynchronous plan review
 
 ### User-requested spec only
 
-When the user asks only for a tech spec, return the spec and stop. Do not implement, offer implementation by default, or create a tracked file. Return the complete spec inline. A user-requested or workflow-useful `.scratch/` artifact may preserve detail but never replaces the complete inline spec.
+When the user asks only for a tech spec, return it and stop. Do not implement, offer implementation by default, or create a tracked file. Return the complete spec inline. A user-requested or workflow-useful `.scratch/` artifact may keep supporting detail, but cannot replace the inline spec
 
 ## Establish sufficient context
 
@@ -26,16 +26,16 @@ Before specifying architecture:
 
 1. Inspect current code, docs, types, call paths, tests, and local conventions that can answer factual questions.
 2. When the design relies on an external framework, provider, protocol, library, or service, verify current version-matched public documentation and the local integration.
-3. Identify the observable problem, callers/users, current behavior, desired behavior, constraints, invariants, affected systems, entrypoints, side effects, and operational concerns.
-4. Classify every architectural statement as one of: **verified fact** with its source, **proposed design** with its rationale, or **open question** with the decision needed. Do not present plausible but unverified details as facts.
+3. Define the observable problem, its callers or users, current and desired behavior, constraints and invariants, affected systems and entrypoints, side effects, and operational concerns
+4. Label every architectural statement as a **verified fact** with its source, a **proposed design** with its rationale, or an **open question** with the decision needed. Never state a plausible but unverified detail as fact
 5. If a material product/design choice or user-owned decision is missing, return to or apply `brainstorming`. Do not create a second interview process inside this skill.
 6. If inspection cannot resolve a fact, mark it as an open question. Do not invent requirements, APIs, files, contracts, or call stacks to make the spec look complete.
 
-Do not produce an implementation-ready spec until the context supports one. Clarification through `brainstorming` remains part of the current design stage; it does not create a new workflow stage.
+Do not call a spec implementation-ready until the context supports it. Clarification through `brainstorming` remains in the current design stage; it does not create another workflow stage
 
 ## Explore credible designs
 
-Describe only materially different alternatives. They must differ in ownership, interface shape, boundary placement, call/data flow, runtime topology, state model, or another decision that changes implementation or risk. Do not force an arbitrary number of options.
+Compare alternatives only when they differ in a way that changes implementation or risk, such as ownership, interface shape, boundary placement, call/data flow, runtime topology, or state model. Do not invent options to meet a count
 
 For each credible option, cover the parts that affect the decision:
 
@@ -66,7 +66,7 @@ Prefer precise values over loose strings, booleans, nullable bags, or untyped ma
 
 ## Specify call stacks and data flow
 
-Start with an affected-behavior inventory. Treat “full” as end-to-end coverage of those affected behaviors and real boundaries, not repository-wide architecture coverage. Every contract, call flow, file, and proof entry must map to that inventory.
+First list the affected behaviors. Here, “full” means end-to-end coverage of those behaviors and their real boundaries, not an architecture survey of the whole repository. Link each contract, call flow, file, and proof item to that list
 
 For every affected behavior, trace the normal path from entrypoint to side effects and response. Include the values or types crossing each step.
 
@@ -84,7 +84,7 @@ raw input
   -> serialized output
 ```
 
-Include failure, retry, cancellation, transaction, concurrency, idempotency, authorization, monitoring, and runtime-hop flows only when they are reachable. State where each responsibility is owned. Do not add generic defensive branches for states the real producer cannot create.
+Add failure, retry, cancellation, transaction, concurrency, idempotency, authorization, monitoring, and runtime-hop flows only when the real runtime can reach them. Name the owner for each responsibility. Do not add generic defensive branches for states no real producer can create
 
 ## Map implementation ownership
 
@@ -94,7 +94,7 @@ These locations guide implementation and concurrent writer safety. They do not n
 
 ## Plan claim-bound behavioral proof
 
-Load and apply `behavioral-proof`. This section plans future evidence; it must not claim that any check passed. Implementation and final verification own executed results.
+Apply `behavioral-proof` to plan future evidence. This section must not say that a check passed. Only implementation and final verification report executed results
 
 For each material changed claim, identify:
 
@@ -149,10 +149,19 @@ When used by `manager-workflow`, also satisfy that workflow's proposal requireme
 - Keep seams real and place each invariant at its canonical owner.
 - State deletions and unchanged boundaries as clearly as additions.
 - Keep unknowns open instead of filling gaps with plausible design.
-- Compress presentation without removing information needed for the decision.
+- Be concise without removing information needed for the decision
 - If a normally expected section is inapplicable, omit it and state the reason in one line rather than emitting boilerplate.
 - Return the complete proposal inline. A user-requested or workflow-useful `.scratch/` artifact may preserve detail but never replaces the complete chat presentation.
 
 ## Completion
 
-A tech spec is complete when another engineer can identify the chosen architecture, every changed contract and owner, each affected end-to-end call/data flow, the likely implementation locations, the selected proof for each material claim, and every unresolved decision without having to invent design.
+Call a tech spec complete only when another engineer can identify:
+
+- the chosen architecture
+- every changed contract and owner
+- each affected end-to-end call and data flow
+- the likely implementation locations
+- the selected proof for each material claim
+- every unresolved decision
+
+They must not have to invent any part of the design

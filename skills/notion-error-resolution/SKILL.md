@@ -1,6 +1,6 @@
 ---
 name: notion-error-resolution
-description: Use for presenting supplied incident findings as Notion error-resolution, reliability, or status pages; not for incident diagnosis
+description: Use when turning supplied incident findings into a Notion error-resolution, reliability, or status page. Do not use it to diagnose an incident.
 ---
 
 # Notion Error Resolution
@@ -44,11 +44,12 @@ Inside, use only labels that add information, such as:
 - Use tables for bounded comparison, not narrative or raw evidence dumps
 - Move long traces, identifier lists, and exhaustive receipts behind toggles or links
 - Omit empty sections instead of inventing content
-- Preserve useful local context when linking to a ticket or other detailed record
+- When linking to a ticket or detailed record, keep enough context for readers to understand the finding without opening the link
 - Use one shared evidence-limit note when the same caveat applies across findings
 
 ## Boundaries
 
-- Preserve supplied evidence and recommendations without turning them into unapproved requirements
-- Do not diagnose the incident, invent facts, or impose a resolution workflow
+- Keep supplied evidence and recommendations intact
+- Do not present a recommendation as a requirement unless the user approves it
+- Do not diagnose the incident, invent facts, or tell people which resolution workflow to follow
 - Do not edit Notion unless the user separately approves the exact mutation

@@ -5,34 +5,22 @@ description: Use for drafting, verifying, or posting actionable GitHub PR review
 
 # GitHub PR Comments
 
-Use this skill when the user wants PR review comments drafted, formatted, verified, or posted to GitHub.
-
-This skill is about **turning reviewed findings into useful GitHub comments**. It does not replace code review. Load/follow `review` for the review itself and `github` for GitHub CLI rules.
+Use this skill to turn reviewed findings into useful GitHub comments. It covers drafting, formatting, verification, and authorized posting; it does not replace code review. Load `review` for the review itself and `github` for GitHub CLI rules.
 
 ## Core Rules
 
 - Use `gh` only for GitHub operations. Never use GitHub MCP.
-- GitHub mutation is allowed only after the user explicitly asks for the exact action, e.g. "post", "submit the review", or "add these inline comments".
-- Recheck the PR head immediately before quoting or posting comments.
-- Verify every finding from source, diff, checks, docs, prior comments, and live checks before drafting it as a postable comment.
-- Prefer live verification over static reading whenever a safe, bounded command can prove or disprove the issue. "Read the file" is enough only for purely structural claims or when no proportional live check exists.
-- List any assumptions the comment depends on. Do not present assumptions as facts.
-- If a claim depends on an assumption, pose it as a question: "Assuming this is meant to do X, should it instead do Y?" If that assumption is likely wrong or unverifiable, do not post it as a finding.
-- Do not post speculative "what if" nits. If the issue depends on an unlikely future collision or invented edge case, drop it unless the user explicitly asks for exhaustive hypotheticals.
-- Heavily prioritize comments about code simplification, design, architecture, structure, source-of-truth ownership, deduplication, typing boundaries, and existing-pattern reuse.
-- Architecture/design/simplification nits are allowed when they are concrete, evidence-backed, and actionable.
-- Other minor nits are not allowed by default; present them to the user first and post only if the user explicitly selects them.
+- Before a GitHub mutation, the user must request and explicitly approve the exact tool (`gh`), command, action, target, and expected effect. Follow `github` for the remaining disclosure and wait requirements
+- Recheck the PR head immediately before quoting or posting comments
+- Verify every finding from source, diff, checks, docs, prior comments, and the proof method selected through `github` → `behavioral-proof`
+- Use the proof method that `github` selects through `behavioral-proof`. Do not run a live, external, credentialed, or effectful probe until its approval gate allows it. If a meaningful live check does not run, name the strongest non-live evidence and say what live behavior remains unchecked
+- State assumptions. If a finding depends on one, ask it as a question; drop it when the assumption is weak or unverifiable
+- Drop speculative "what if" nits unless the user explicitly asks for exhaustive hypotheticals
+- Prioritize concrete, evidence-backed comments about simplification, design, architecture, structure, source-of-truth ownership, deduplication, typing boundaries, and existing-pattern reuse
+- Other minor nits require the user's explicit selection before posting
 - Keep language casual, direct, and code-focused. No filler, praise padding, or performative politeness.
 
-## Evidence Basis
-
-This workflow distills:
-
-- GitHub docs: use inline comments for exact changed lines; use review body/general comments for broad feedback; batch comments in a review.
-- Google code review guidance: explain reasoning, comment on code not people, balance direct guidance with letting the author decide, label optional vs required feedback.
-- GitHub staff guidance: be specific, distinguish blockers from preferences, cite repo patterns, ask questions when author context may matter.
-- Codex/Claude-style PR review skills: use current head SHA, build one atomic review payload, verify inline anchors, and ask before mutation.
-- User preference: casual language; every item should be general or inline; each item should include what is wrong, evidence, verification done, and proposed fix or question; avoid "what if" nits; heavily favor simplicity/dedupe/typing/design/architecture/structure; allow nits in those areas, but route other minor nits through the user before posting.
+These rules combine GitHub review conventions with the user's preference for concise, evidence-backed comments.
 
 ## Preflight Checklist
 
@@ -92,7 +80,7 @@ Before drafting comments:
 Post only findings that pass all gates:
 
 - **Evidence:** Direct source/diff/test/docs/CI evidence exists.
-- **Live verification:** A safe test/build/typecheck/import/runtime probe was run when it could directly verify the claim. If no live check was practical, the comment says why.
+- **Claim-bound proof:** The method selected through `github` → `behavioral-proof` directly supports the claim. If live proof did not run, name the strongest non-live evidence and the live behavior that remains unchecked.
 - **Impact:** The comment explains why it matters.
 - **Actionability:** The author can fix it, answer a focused question, or intentionally decline it.
 - **Scope:** The issue belongs to this PR, not unrelated old code.
@@ -108,7 +96,7 @@ Drop or downgrade:
 - huge refactors not required for the current PR,
 - generic architecture essays that can be split into specific comments,
 - uncertain claims that cannot be verified; ask a question or mark as not 100% instead,
-- claims that could be cheaply live-tested but were only verified by reading files,
+- claims whose selected proof method was skipped or replaced with weaker evidence without justification,
 - assumption-led comments where the assumption is likely wrong, unimportant, or not worth asking about.
 
 ## General vs Inline Placement
@@ -160,13 +148,11 @@ Proposed fix/question:
 - Assuming <specific assumption>, should we <recommended direction>? If that assumption is wrong, what should this path optimize for instead?
 ```
 
-For tiny comments, it is okay to collapse bullets into short paragraphs, but do not omit evidence or verification when the user asked for verified comments. If a live test/build/import/runtime probe is possible, include that result instead of only saying files were read.
+For tiny comments, it is okay to collapse bullets into short paragraphs, but do not omit evidence or verification when the user asked for verified comments. Include a live test, build, import, or runtime result only when the proof method selected through `github` → `behavioral-proof` includes that probe; otherwise report the selected non-live evidence and any applicable unverified boundary.
 
-## Live Verification Standard
+## Claim Verification Examples
 
-Before posting a comment, ask: "What command or runtime probe would prove this issue to the author?" Run it when it is safe, bounded, and proportional.
-
-Prefer:
+The preflight loads `github`, which reaches `behavioral-proof`. Use its selected method for each falsifiable claim. These examples show possible probes; they do not authorize or require one:
 
 - packaging/import claims: build or inspect the wheel/sdist, or run an installed-package import probe;
 - type/schema claims: run the relevant typecheck, schema generation, OpenAPI generation, or a small serialization/validation probe;
@@ -175,9 +161,7 @@ Prefer:
 - dead-code claims: combine source search with an import/test run when removal would otherwise be risky;
 - test-quality claims: run the relevant test and state what it does and does not prove.
 
-Do not run unbounded, destructive, expensive, secret-touching, production-mutating, or broad environment-dependent commands just to strengthen a comment. If the live check is unsafe or disproportionate, say that and keep the comment as a question or lower-confidence note.
-
-A comment is not ready to post when a cheap live check exists but was skipped.
+Follow the proof rule in Core Rules before any live, external, credentialed, or effectful probe. If live proof cannot or should not run, use the strongest named non-live evidence and name the live behavior left unchecked. Do not force a live prompt when no meaningful runtime path exists.
 
 ## Language Style
 
@@ -224,7 +208,7 @@ In comment text, use lightweight severity only when useful:
 1. List candidate findings, sorted with simplification/design/architecture/structure/source-of-truth/deduplication/typing-boundary issues first.
 2. For each candidate, write a one-line falsifiable claim.
 3. Verify it from source/diff/checks.
-4. Identify the strongest safe live verification for the claim. Run it when possible; if not possible, record why and downgrade to a question/not-100-percent item when appropriate.
+4. Use the proof method selected through `github` → `behavioral-proof`. If a meaningful live check does not run, record the strongest non-live evidence, name the unchecked live behavior, and lower confidence when that gap matters.
 5. List every assumption the claim depends on. If the finding only works when an assumption is true, phrase the comment as a question; if the assumption is weak or not worth asking, drop it.
 6. Mark it:
    - `post-inline`,
@@ -353,7 +337,7 @@ Before claiming the review comments are ready or posted:
 
 - PR head was checked after the latest relevant change, and any local file reads were used only after `git rev-parse HEAD` equaled the fetched PR `headRefOid`; otherwise files were read by `git show <HEAD_SHA>:...` or the GitHub contents API.
 - Every comment is verified or explicitly marked as not 100% / question.
-- Every comment used the strongest safe live verification available; if no live check was practical, the comment says why.
+- Every comment used its selected claim-bound proof; for any meaningful live path that did not run, the comment gives the strongest non-live evidence and names the unchecked live behavior.
 - Every assumption is listed; assumption-dependent comments are phrased as questions, not facts.
 - Speculative findings were dropped.
 - Simplification/design/architecture/structure/deduplication/typing-boundary comments were prioritized; ordinary minor nits were either user-approved or omitted.

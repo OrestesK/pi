@@ -5,7 +5,7 @@ description: Use for writing or changing tests, test helpers, fixtures, mocks, o
 
 # Writing Tests
 
-This skill owns test quality and placement. `behavioral-proof` selects whether tests, characterization, reproduction, existing coverage, integration, live, or manual evidence best proves the changed claim.
+Use this skill to choose test quality and placement. Let `behavioral-proof` decide whether tests, characterization, a reproduction, existing coverage, integration, live, or manual evidence best proves the behavior that changed
 
 Use this skill when you are:
 
@@ -37,7 +37,7 @@ Avoid tests that:
 - require production changes solely to make the test convenient,
 - add coverage numbers without increasing bug-catching power.
 
-Do not add tests whose only purpose is to re-prove guarantees already enforced by the language, type system, declarative schema, validation library, or framework. Add tests when repo-owned code composes, configures, narrows, or depends on those guarantees at a boundary.
+Do not test a guarantee that the language, type system, declarative schema, validation library, or framework already enforces. Test repo-owned code when it composes, configures, narrows, or depends on that guarantee at a boundary
 
 Do not test hardcoded implementation/config values merely by duplicating their literals in assertions. Do not copy literals from production code into assertions just to mirror the code. Instead, test behavior, canonical source-of-truth wiring, or meaningful invariants. Exact expected values are appropriate only when the value is itself the user-visible behavior, external contract, canonical fixture, or invariant result.
 
@@ -86,7 +86,7 @@ Before adding a test file or helper:
 3. Add a new test only when the existing file would become confusing, cross ownership boundaries, or mix unrelated behavior.
 4. Keep setup close to the test unless it is reused enough to justify a fixture/helper.
 
-When a task includes an approved spec, reproduction, acceptance scenario, bug report, documented behavior, or user-provided example, derive test cases from that artifact. Make the mapping visible in test names, case labels, or a short report note; do not create a separate traceability artifact unless the project already uses one.
+When a task includes an approved spec, reproduction, acceptance scenario, bug report, documented behavior, or user-provided example, derive the test cases from it. Show the connection in test names, case labels, or a short report note. Create a separate traceability artifact only when the project already uses one
 
 When multiple implementations must satisfy the same stable contract, prefer one reusable contract suite or helper if it reduces duplication without obscuring ownership. Keep local tests focused on local behavior, unique edge cases, and owner-specific guarantees.
 
@@ -212,4 +212,4 @@ When reporting test work, include:
 - any broader lint, typecheck, or format command that was applicable and run,
 - any verification that could not run and why.
 
-If a completion claim depends on a real browser, provider, runtime, benchmark, performance, or external-service environment, unit tests alone are insufficient evidence. Run live validation when allowed, or explicitly report that live validation was not performed and what remains unverified.
+Unit tests are not enough when a completion claim depends on a real browser, provider, runtime, benchmark, performance result, or external service. Run live validation when allowed. Otherwise, say that it was not performed and name the boundary that remains unverified

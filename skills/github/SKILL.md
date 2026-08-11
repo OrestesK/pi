@@ -7,9 +7,9 @@ description: Use for GitHub pull requests, issues, CI workflows, and API queries
 
 Use the `gh` CLI for all GitHub operations. Never use the GitHub MCP server.
 
-## Common Operations
+## Read-only inspection
 
-Read-only PR and CI inspection:
+Use these commands to inspect PRs, issues, and CI:
 
 - `gh pr list`, `gh pr view <number>`
 - `gh pr view <number> --json number,url,state,headRefName,headRefOid,baseRefName,baseRefOid`
@@ -21,19 +21,27 @@ Read-only PR and CI inspection:
 - `gh issue list`, `gh issue view <number>`
 - `gh api repos/{owner}/{repo}/...` for other read-only API queries
 
-## PR Evidence Identity
+## Keep PR evidence current
 
 For a readiness claim or review that depends on current PR content:
 
-1. Select the target PR, then resolve and retain its number, URL, state, head name/OID, and base name/OID with the `gh pr view <number> --json` command above.
-2. Use the retained PR number for every subsequent metadata, diff, check, and review query; gather the applicable evidence for that observed identity.
-3. Immediately before the final claim or an authorized claim-bearing post, resolve the same fields again using the retained PR number.
-4. If the state or any head/base name or OID changed, do not make the claim or post. Reassess the PR state, discard the affected PR-content-dependent evidence, recapture the applicable evidence for the new identity, and repeat the identity check before proceeding.
-5. Report the final identity as `PR <number> <url>; head <name>@<OID>; base <name>@<OID>` with the result.
+1. Select the PR. Use the `gh pr view <number> --json` command above to record its number, URL, state, head name/OID, and base name/OID.
+2. Use that PR number for every later metadata, diff, check, and review query. Collect evidence for the recorded PR state.
+3. Immediately before the final claim or an authorized claim-bearing post, fetch the same identity fields again with that PR number.
+4. If the state, head name/OID, or base name/OID changed, do not claim or post. Reassess the PR, discard evidence that depended on its old content, collect the needed evidence again, and repeat this check.
+5. Report the final identity as `PR <number> <url>; head <name>@<OID>; base <name>@<OID>`.
 
-This is an observational freshness check, not an atomic lock on the PR. It applies only when a conclusion depends on PR content; metadata-only inspection and non-PR reviews do not gain this gate.
+This check confirms freshness; it does not lock the PR. Use it only when the conclusion depends on PR content, not for metadata-only inspection or non-PR reviews.
 
-Mutating operations require the user to explicitly ask for that exact action. One requested GitHub mutation does not authorize another. This skill documents command categories; it does not permit any mutation blocked by the active instructions already in context, specifically the authorization and external-action policies, or by applicable project rules:
+## Choose proof through `behavioral-proof`
+
+Before choosing evidence for a PR review, readiness assessment, evidence report, comment, or iteration, load and follow `behavioral-proof`. It decides whether a representative live path exists, the approval gate, the strongest non-live fallback, and the live-proof status. This skill handles GitHub identity and transport; do not repeat proof-selection rules here.
+
+## GitHub mutations and command rules
+
+For every GitHub mutation, the user must request and explicitly approve the exact tool (`gh`), command, action, target, and expected effect. State every relevant credential, data, cost, time, environment, and destructive boundary, then wait. Approval for one mutation does not allow another. The active authorization, external-action, and project rules still control what is allowed.
+
+Mutation categories include:
 
 - creating a PR with `gh pr create --title "..." --body-file /tmp/pr_body.md`
 - editing a PR description/body
@@ -42,6 +50,11 @@ Mutating operations require the user to explicitly ask for that exact action. On
 - creating an inline PR review comment
 - creating an issue
 - posting an issue comment
+- pushing, merging, closing, or reopening
+- labeling, assigning, or requesting reviewers
+- changing a PR base
+
+Always use `--body-file` for multi-line PR bodies to avoid shell-escaping errors. Check `gh auth status` if an operation fails.
 
 ## PR Description Format
 
@@ -58,16 +71,9 @@ Motivation, context, problem being solved.
 Tests added/updated, manual checks, commands run.
 ```
 
-When a PR is large or noisy, add reviewer guidance:
+For a PR with a large or mixed diff, add guidance that tells reviewers where to start and separates core behavior from generated, mechanical, or formatting-only changes:
 
 - separate core behavior files from generated, mechanical, or formatting-only files;
-- name the best reviewer entry points;
+- say which files or areas reviewers should read first;
 - call out risky behavior changes, migration/order dependencies, rollout notes, and test coverage;
 - recommend splitting the PR instead of polishing the description when the diff is too large or mixed to review safely.
-
-## Rules
-
-- Always use `--body-file` for multi-line PR bodies (avoids shell escaping issues).
-- You may update a PR description/body, post a PR comment, submit a PR review, or create an inline PR review comment only when the user explicitly asks for that exact action.
-- NEVER push, merge, close, reopen, label, assign, request reviewers, change PR bases, or create PRs unless the user explicitly asks for that exact operation.
-- Check `gh auth status` if operations fail.

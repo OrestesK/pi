@@ -5,21 +5,23 @@ description: Use for first-session orientation in an unfamiliar repository or wh
 
 # Learn Codebase
 
-Scan the project to orient yourself before doing any work.
+Before you start work in an unfamiliar repository, scan it to understand how it is organized
 
 ## Steps
 
-1. **Check for instruction files**: AGENTS.md, CLAUDE.md, .cursorrules, README.md, CONTRIBUTING.md
-2. **Check for build system**: Makefile, package.json scripts, pyproject.toml scripts
-3. **Project structure**: Use file discovery and `ast_grep_outline` for structural orientation, then `symbol_search` and `module_report` for relevant modules
-4. **Dependencies**: Read pyproject.toml, package.json, requirements.txt
-5. **Test infrastructure**: Find test directories, check for conftest.py, jest.config, pytest markers
-6. **Conventions**: Look at recent commits (`git log --oneline -20`) to understand naming patterns
+1. Read the repository instructions: AGENTS.md, CLAUDE.md, .cursorrules, README.md, and CONTRIBUTING.md
+2. Identify the build system in the Makefile and package.json or pyproject.toml scripts
+3. Map the project with file discovery and `ast_grep_outline`. Then use `symbol_search` and `module_report` for modules related to the task
+4. Read the dependency manifests: pyproject.toml, package.json, and requirements.txt
+5. Find test directories and inspect conftest.py, jest.config, and pytest markers
+6. Read recent commits with `git log --oneline -20` to learn the project's naming and change patterns
 
 ## Output
-Present a brief summary:
-- What the project does
-- Key directories and their purpose
-- Build/test/lint commands available
-- Conventions observed
-- Instruction files found and key rules from them
+
+Briefly explain:
+
+- what the project does
+- which directories matter and what they own
+- the available build, test, and lint commands
+- the conventions you found
+- the instruction files and their key rules

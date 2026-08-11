@@ -7,14 +7,15 @@ description: Use for triaging, drafting, or improving GitHub issues from verifie
 
 Turn a verified problem into a useful GitHub issue without inventing product decisions or implementation details.
 
-Load `github` for GitHub operations. Use `review` for nontrivial drafts or batches and `manager-workflow` when its global trigger applies. This skill does not authorize GitHub mutation.
+Load `github` for GitHub operations. For a nontrivial draft or batch, load `review`. Load `manager-workflow` when its global trigger applies. This skill does not authorize GitHub mutations.
 
 ## Core Contract
 
-- The user is the source of truth for the issue's goal, scope, high-level direction, completion outcomes, and metadata
+- The user decides the issue's goal, scope, high-level direction, completion outcomes, and metadata
 - Research facts before asking questions; ask the user only for decisions evidence cannot answer
-- Before final drafting, establish or confirm the user-owned goal, scope, high-level direction if any, and observable completion outcomes; when the request already supplies one of these, do not ask for it again
-- Interview before drafting whenever any of those user-owned decisions is missing; never use a finished draft to elicit them
+- Before drafting the final issue, confirm the goal, scope, any high-level direction, and observable completion outcomes
+- Do not ask again about a decision the request already makes
+- If a decision is still missing, interview before drafting; never use a finished draft to obtain it
 - Ask one focused question at a time
 - Work on one viable issue at a time unless the user explicitly requests a batch
 - Prefer an existing canonical issue over creating a duplicate
@@ -53,9 +54,10 @@ Before asking the user:
 
 - Read the current issue or planning source completely
 - Inspect current source, docs, types, tests, logs, runs, and external evidence needed to establish behavior and ownership
-- For operational or reliability issues, inspect every relevant available evidence category that can materially establish or contradict the claim, including Slack, Sentry, service logs, run evidence, current source, and existing issues or PRs; do not require an irrelevant source merely to fill a checklist
-- Keep a concise scratch research record of the sources and time periods checked, unavailable evidence, and the resulting boundaries; put only material proof in the issue body
-- Run a bounded title-and-body search across the proposed repository and every repository the evidence identifies as a plausible canonical or implementation owner
+- For an operational or reliability issue, inspect each available source that could prove or disprove the claim. This can include Slack, Sentry, service logs, run evidence, current source, and existing issues or PRs
+- Do not inspect an irrelevant source just to complete a checklist
+- Keep a short scratch record of the sources and time periods checked, unavailable evidence, and what the evidence establishes about scope and ownership. Put only material proof in the issue body
+- Search titles and bodies in the proposed repository and in every repository that the evidence identifies as a plausible canonical or implementation owner
 - Read every issue, PR, document, or discussion before proposing it as related work
 - Distinguish current behavior from historical proposals, partial fixes, and stale evidence
 - Establish whether grouped telemetry represents unique incidents, wrappers, polling amplification, or heterogeneous causes
@@ -68,8 +70,6 @@ Ask the user, one decision at a time, only when unresolved:
 - Which owner, repository, and title prefix are correct when evidence does not settle them
 - Whether the action should be a new issue, body update, evidence comment, title-only change, or no ticket
 - Whether to assign, label, add to a project, create hierarchy, or synchronize a planning document
-
-Do not draft the final issue first and interview afterward.
 
 ## Title
 
@@ -125,11 +125,7 @@ Formatting rules:
 
 ## Assignee-Owned Implementation
 
-The default Implementation section is exactly:
-
-```text
-TODO — the assignee will review the evidence and propose the implementation before coding.
-```
+Use the exact TODO shown in the default body above.
 
 If the user supplies a high-level direction, include only that conceptual direction before the TODO. Do not invent:
 
@@ -150,8 +146,8 @@ Research and best practices are evidence, not authority to turn a suggestion int
 - Do not generalize one representative event to an entire dynamic group
 - Distinguish issue-lifetime timestamps from the investigated period
 - Do not infer a shared cause from proximity, naming, or grouped telemetry
-- State when later non-recurrence lacks equivalent load and therefore does not prove resolution
-- State when an existing PR is partial, local, undeployed, historical, or solves a different boundary
+- Do not claim resolution from later non-recurrence unless the later load is equivalent; say when it is not
+- Describe an existing PR as partial, local, undeployed, historical, or for a different boundary when that is what the evidence shows
 - Do not include credentials, secrets, or unnecessary personal data
 
 ## Related Work Test
@@ -164,7 +160,7 @@ Include a link only when it materially affects at least one of:
 - the implementation boundary
 - completion or closure
 
-Read the linked material completely enough to verify the relationship. In the issue, explain what it covers and, when useful, what it does not cover. Remove thematic, duplicate, placeholder, stale, or merely adjacent links.
+Read the linked material completely enough to verify the relationship. Explain in the issue what it covers and, when useful, what it does not cover. Remove thematic, duplicate, placeholder, stale, or merely adjacent links.
 
 ## Existing Issue Updates
 
@@ -175,7 +171,7 @@ Choose the smallest useful update:
 - **Ownership/title correction only:** prefer a title-only change when the body remains correct
 - **Body rewrite requested:** preserve verified facts, agreed outcomes, comments, history, metadata, and native relationships
 
-Read the live issue immediately before proposing an update. Record the expected current title, body, and protected metadata. Re-read those exact fields immediately before an approved mutation and abort on any mismatch. Do not silently change title, state, assignee, labels, project status, parent/subissues, or planning documents.
+Immediately before proposing an update, read the live issue. Record its current title, body, and protected metadata. Immediately before an approved mutation, read those fields again. Abort if any field differs. Do not silently change title, state, assignee, labels, project status, parent/subissues, or planning documents.
 
 ## Drafting and Review
 
@@ -186,7 +182,7 @@ Before presenting a complete draft, establish or confirm with the user:
 - intended observable completion outcomes
 - unresolved owner or metadata decisions that affect the draft
 
-Do not use a finished draft as the interview instrument. Once these decisions are established, present:
+Once these decisions are established, present:
 
 1. Target repository
 2. Proposed exact title

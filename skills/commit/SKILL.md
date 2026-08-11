@@ -3,17 +3,17 @@ name: commit
 description: Use for drafting commit messages and branch names
 ---
 
-# Commit Conventions
+# Draft Commit Messages and Branch Names
 
-This skill provides commit-message, change-grouping, and branch-name guidance only.
+Use this skill only to draft commit messages, group changes, and suggest branch names.
 
-Do not use it to authorize `git add`, `git commit`, `git push`, or other Git mutations. Follow the active Git policy and the user's explicit approvals.
+This skill never authorizes `git add`, `git commit`, `git push`, or any other Git mutation. Follow the active Git policy and get the user's explicit approval.
 
 ## Workflow
 
-1. Inspect read-only status and diff information when relevant
+1. When current changes affect the recommendation, inspect status and diffs with read-only Git commands
 2. Group files by one concern per commit
-3. Build and validate a Conventional Commit message
+3. Draft and validate a Conventional Commit message
 4. Present the suggestion and relevant file grouping
 
 ## Format
@@ -44,7 +44,7 @@ Use exactly one supported type:
 
 ## Rules
 
-- Use an optional noun scope to identify the affected area: `fix(parser): ...`
+- If a scope helps name the affected area, use a noun: `fix(parser): ...`
 - Put `!` immediately before `:` for a breaking change: `feat(api)!: ...`
 - Keep non-rename descriptions imperative, lowercase, and without a trailing period
 - Prefer 3–7 words after the prefix
@@ -52,13 +52,13 @@ Use exactly one supported type:
 - Focus on the purpose or observable outcome, not a mechanical file summary
 - Use one concern per commit
 - Use arrow notation for renames: `refactor: old_name -> new_name`
-- Separate an optional body and footer from preceding sections with a blank line
+- Put a blank line between the header, body, and footer when each is present
 - Use `BREAKING CHANGE: <description>` for a breaking-change footer
 - Use Git-style trailers for issue references or other footers
 
 ## Validation
 
-Before presenting a message, verify:
+Before you present a message, check:
 
 - type is supported
 - scope is optional and correctly parenthesized

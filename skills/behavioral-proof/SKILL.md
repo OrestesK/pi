@@ -5,9 +5,9 @@ description: Use for selecting proportionate evidence for behavior changes and b
 
 # Behavioral Proof
 
-Testing is one proof method, not a universal sequence. Start from the observable claim, its real owner/path, and the boundary at which evidence must hold. Select the smallest evidence that could disprove an incorrect implementation.
+Testing is one way to prove a change, not a required sequence. Start with the observable claim, its actual owner and reachable path, and the point where the evidence must hold. Choose the smallest evidence that could show the implementation is wrong.
 
-## Evidence selection
+## Choose evidence
 
 ### Test-first
 
@@ -27,11 +27,36 @@ When existing tests already prove the changed claim, run them after the change. 
 
 ### Integration, live, or manual proof
 
-When a material changed claim crosses a process, provider, browser, database, queue, deployment, rendering, performance, or other runtime boundary, prioritize the reachable live or end-to-end flow, then the closest integration evidence. Focused unit tests support but do not substitute for that runtime claim. If live evidence is unavailable or protected, use the strongest authorized lower-fidelity evidence and state the remaining unverified boundary explicitly. For claims that do not cross a runtime boundary, keep the smallest claim-bound proof instead of forcing a live probe.
+When a material changed claim crosses a process, provider, browser, database, queue, deployment, rendering, performance, or other runtime boundary, identify that boundary. Prioritize the reachable live or end-to-end flow, then use the closest integration evidence. Focused unit tests support that runtime claim but do not replace it.
+
+If live evidence is unavailable or protected, use the strongest authorized lower-fidelity evidence. State the exact runtime boundary that remains unverified. For a claim that does not cross a runtime boundary, use the smallest claim-bound proof instead of forcing a live probe.
 
 ### Non-behavioral work
 
-Do not invent tests for wording, comments, formatting, mechanical renames, or guarantees already owned by the language/framework. Run relevant parsing, discovery, reference, formatting, or contract validation and explain why no behavior test was added.
+Do not invent tests for wording, comments, formatting, mechanical renames, or guarantees already owned by the language or framework. Run relevant parsing, discovery, reference, formatting, or contract checks instead. Explain why no behavior test was added.
+
+### Check live proof for pull requests
+
+For each pull request, first decide whether a meaningful, representative live path exists. Do not invent one for documentation-only or other non-runtime changes.
+
+Before running live, external, credentialed, or effectful validation, state:
+
+- the exact tool and action
+- the target and environment
+- the expected effects
+- the credential and data boundary
+- the expected cost
+- the expected duration
+
+Wait for the user's explicit approval before running it.
+
+Report live-proof status precisely:
+
+- `passed`: approved live proof executed successfully; include the scenario or command, observed result, and environment
+- `failed`: approved live proof executed and failed; include the scenario or command, observed result, environment, and unresolved blocker
+- `not run`: no live proof executed. When no meaningful representative live path exists, report `not run — no meaningful runtime path exists; no live boundary applies` and use the smallest applicable non-live proof. When a meaningful live path exists but its probe is unavailable, inappropriate, declined, blocked, or not authorized, name the reason and exact unverified live boundary
+
+Only approved, executed, passing live evidence supports a live-verified claim. If no meaningful live path exists, use the smallest applicable non-live proof without inventing a boundary. If a meaningful live path exists but the proof does not run, use the strongest named authorized non-live evidence and state why plus the exact unverified live boundary. A separately approved contract can still require live proof for readiness.
 
 ## Proof contract
 
@@ -43,9 +68,13 @@ Before editing material behavior, identify:
 - the narrow command or flow that proves it;
 - broader checks justified by shared risk.
 
-Do not use a weak unit test to support a live/integration claim, require test-first when characterization is more informative, or add malformed-internal-state tests for states the producer cannot create.
+Do not:
 
-## Test Quality Rules
+- use a weak unit test to support a live or integration claim
+- require test-first when characterization is more informative
+- add malformed-internal-state tests for states the producer cannot create
+
+## Test quality
 
 Good tests:
 
@@ -63,6 +92,14 @@ Bad tests:
 - require changing production code solely for tests,
 - cover field existence or trivial mapping without behavior.
 
-## Verification output
+## Report verification
 
-Report the changed claim, evidence method, files or flows exercised, exact commands/results, broader checks, unavailable boundaries, and why no test was added when none was appropriate.
+Report:
+
+- the changed claim
+- the evidence method
+- files or flows exercised
+- exact commands and results
+- broader checks
+- runtime boundaries that remain unverified
+- why no test was added when none was appropriate

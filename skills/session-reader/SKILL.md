@@ -9,7 +9,7 @@ Parse Pi session JSONL files into readable output. `PI_CODING_AGENT_SESSION_DIR`
 
 ## Step 1: Find the Session
 
-Resolve `scripts/read_session.py` relative to this skill directory and set `script_path` to that absolute path. Then list sessions and set `session_path` to the selected JSONL file's absolute path:
+First find `scripts/read_session.py` in this skill directory and save its absolute path in `script_path`. Then list the sessions, choose one JSONL file, and save its absolute path in `session_path`:
 
 ```bash
 script_path="/absolute/path/resolved-from-this-skill/scripts/read_session.py"
@@ -39,7 +39,7 @@ This prints a compact numbered list of every user exchange with timestamps and t
 
 ## Step 3: Read the Conversation
 
-Default mode — shows only user messages and assistant text responses. Tool calls are hidden but hinted at with `[used: tool1, tool2]`.
+Conversation mode, the default, shows user messages and assistant text. It hides tool calls but shows a `[used: tool1, tool2]` hint.
 
 ```bash
 # Full conversation (default mode)
@@ -52,9 +52,9 @@ uv run "$script_path" "$session_path" --offset 5 --limit 3
 uv run "$script_path" "$session_path" --search "error"
 ```
 
-## Step 4: Drill Into a Turn
+## Step 4: Read One Exchange
 
-See everything about a specific exchange — thinking, tool calls, tool results, costs:
+To inspect one exchange in detail, including thinking, tool calls, tool results, and costs, run:
 
 ```bash
 uv run "$script_path" "$session_path" --mode turn --turn 7
@@ -91,12 +91,12 @@ uv run "$script_path" "$session_path" --mode turn --turn 7
 3. `--mode turn --turn N` → drill into specific exchanges
 4. `--mode subagents` → review delegated work and follow subagent session paths
 
-## Subagent Drill-Down
+## Read a Subagent Session
 
 Subagent session files can be read with the same script:
 
 ```bash
-# Set this to the JSONL path returned by --mode subagents
+# Use the JSONL path reported by --mode subagents
 subagent_session_path="/absolute/path/to/subagent-session.jsonl"
 uv run "$script_path" "$subagent_session_path" --mode toc
 ```
