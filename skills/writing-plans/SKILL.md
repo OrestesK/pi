@@ -1,152 +1,125 @@
 ---
 name: writing-plans
-description: Use for writing durable implementation plans after requirements or design are approved
+description: Use for technical specifications, technical designs, architecture proposals, and implementation plans after the goal is clear
+license: MIT; see LICENSE
 ---
 
 # Writing Plans
 
-Create implementation plans that can be executed without implicit design decisions.
+Turn clear intent into a technical specification, an implementation plan, or one plan that covers both.
 
-Use this when the user explicitly asks for a durable task breakdown or one is materially useful for continuity or execution. A plan file is not required for routine work whose approved chat proposal is sufficient.
+This skill plans work. It does not approve or implement it.
 
-Plans live in `.scratch/plans/` unless the user explicitly asks for project documentation. The artifact supports continuity; the complete user-facing plan is still presented directly.
+## Choose the output
+
+Write only what the task needs:
+
+- **Technical specification:** define the architecture, contracts, boundaries, and end-to-end flows
+- **Implementation plan:** break an approved design into ordered tasks, owners, and checks
+- **Integrated plan:** include both when architecture decisions and execution detail belong in one handoff
+
+Use `brainstorming` first when a user-owned product or design choice is still open. Do not invent the missing decision inside the plan.
+
+When the user asks only for a specification or plan, return it inline and stop. Do not implement or offer implementation by default.
 
 ## Boundaries
 
 Allowed:
 
-- Read code, docs, tests, and relevant configs.
-- Dispatch read-only scouts.
-- Write implementation plans to `.scratch/plans/`.
+- Read code, docs, tests, types, configuration, and read-only Git state
+- Use read-only scouts when the area is broad
+- Verify relevant external behavior in current version-matched documentation
+- Save supporting detail in `.scratch/plans/` when the user asks or continuity needs it
 
 Not allowed:
 
-- Editing source/tests/config while planning.
-- Hiding assumptions.
-- Adding mutating git instructions.
+- Edit source, tests, tracked config, or project docs while planning
+- Hide assumptions or present guesses as facts
+- Make product decisions for the user
+- Claim that a planned check passed
+- Include mutating Git commands for the agent to run
 
-## Before Planning
+The complete plan stays in chat. A scratch artifact supports it; it does not replace it.
 
-Before you plan, confirm you know:
+## Inspect first
 
-- the approved design, or requirements that are approved and clear enough to plan
-- the project constraints
-- the likely files and symbols to change
-- the test, lint, and type-check commands when you can find them
-- when human review is required
+Before writing:
 
-If any of these is missing, use `brainstorming` or `scout` first
+1. Confirm the goal, current behavior, desired behavior, limits, and non-goals
+2. Inspect the real entrypoints, owners, types, call paths, tests, and local conventions
+3. Verify external framework, provider, protocol, library, or service behavior when the plan depends on it
+4. Separate verified facts, proposed changes, and open questions
+5. Return unresolved user decisions to `brainstorming`
 
-## Plan Format
+Do not invent requirements, APIs, files, contracts, or call stacks to make the plan look complete.
 
-Avoid tables in generated plan Markdown. Every implementation plan should include:
+## Specify architecture when needed
+
+Include architecture detail when the task changes a boundary, public contract, data flow, state model, persistence model, external integration, or runtime behavior.
+
+Compare alternatives only when they lead to meaningfully different implementation or risk. State the recommendation and why it is the simplest coherent choice.
+
+For each changed boundary, define what matters:
+
+- domain values and state
+- inputs, outputs, request and response shapes, and expected errors
+- public or module interfaces
+- adapters, protocols, persistence, and runtime boundaries
+- ownership and what may cross the boundary
+
+Use the project's language and conventions for code-shaped contracts. Do not add types, adapters, interfaces, or abstractions without a real invariant, boundary, reuse point, or test seam.
+
+Trace each affected behavior from its entrypoint to side effects and response. Show current and proposed flows when behavior changes. Include values or types crossing each step.
+
+Cover failure, retry, cancellation, transaction, concurrency, idempotency, authorization, monitoring, and runtime hops only when the real path can reach them. Name the owner for each responsibility.
+
+A technical specification is complete when another engineer can identify the chosen architecture, every changed contract and owner, each affected end-to-end flow, likely implementation locations, planned proof, and open decisions without inventing missing design.
+
+## Plan implementation tasks when needed
+
+Make each task one small behavior or coherent structural change. The implementer should not need to redesign it.
+
+For each task include:
+
+- **Purpose:** the observable result
+- **Likely owners:** files, modules, symbols, or boundaries when known
+- **Baseline:** current behavior, reproduction, characterization, or why none helps
+- **Implementation:** the smallest change at the canonical owner
+- **Verification:** the future command or user flow and the claim it must prove
+- **Review:** approved behavior, non-goals, risks, focus points, and stop conditions
+
+Locations guide execution and concurrent write ownership. They do not narrow or expand the user's approval boundary.
+
+Split or stop when a task still needs product judgment.
+
+## Plan proof once
+
+Load `behavioral-proof` and use its evidence selection. For each changed claim, name the smallest future evidence that could disprove a wrong implementation, the expected observation, and any unavailable boundary.
+
+A plan names checks to run later. It never reports them as passed.
+
+## Plan shape
+
+Use only the sections that help the task. Avoid empty boilerplate and tables.
 
 ```markdown
-# <Feature> Implementation Plan
+# <Title>
 
-**Recommendation and outcome:** <chosen approach and observable result>
-**Current behavior and planned change:** <verified current state and proposed change>
-**Approved design or requirements:** <compact summary; a path is supporting evidence only>
-**Changed behavior:** <material changes>
-**Unchanged behavior / non-goals:** <preserved boundaries>
-**Constraints:** <protected actions, no mutating git, project conventions>
-**Proof strategy:** <behavioral evidence selected for each material claim>
-**Review handoff:** <plan-only: return the plan and stop; standalone nontrivial plan review: `review`; manager-attached plan: active `manager-workflow` stage>
-**Behavioral approval boundary:** <outcome, risks, stops; not an exact file list>
-
-## Alternatives and rationale
-
-- <meaningful alternative, tradeoff, and why rejected>
-- <why the recommendation is the simplest coherent solution>
-
-## Assumptions, uncertainties, and risks
-
-- **[ASSUMPTION: ...]**
-- **[UNCERTAINTY: confidence and resolution]**
-- **[RISK: impact, reversibility, and safer alternative]**
-
-## Evidence and focus points
-
-- <inspected evidence; passed, failed, and unexecuted checks>
-- <specific sections/decisions requiring close user inspection>
-
-## Tasks
-
-### Task N: <small behavior>
-
-**Purpose:** <observable behavior or coherent structural result>
-**Likely implementation owners:**
-
-- Modify: `path/file.ext` (`symbol` or lines when known)
-- Test/proof: `path/test.ext`, command, live flow, or none with reason
-
-These locations guide execution and concurrent ownership; they are not the user approval boundary.
-
-**Baseline / reproduction:**
-
-- Existing behavior, failing reproduction, characterization, or reason no baseline is informative.
-
-**Implementation:**
-
-- Make the smallest change at the canonical owner. Include exact symbols or small snippets only when necessary
-
-**Verification:**
-
-- Exact command or user flow and the claim it proves.
-
-**Review:**
-
-- Give reviewers the approved behavior and non-goals, relevant decisions, proof and evidence, review focus points, and stop conditions
-
-## Approval and stop conditions
-
-- <exact behavioral authorization, exclusions, next separately authorized action, and material stops>
+## Summary and recommendation
+## Current behavior
+## Goals and non-goals
+## Constraints and open questions
+## Alternatives
+## Architecture
+### Contracts and ownership
+### Current and proposed flows
+### Reachable failure and runtime behavior
+## Implementation tasks
+## Proof plan
+## Risks
+## Review and stop conditions
 ```
 
-## Task Granularity
+Omit architecture sections for a straightforward execution plan. Omit task sections for a specification-only request. Keep both in one document when both are needed.
 
-Make each task small enough for the parent to complete without redesigning. A concurrent worker may do the same only when an exception allows it:
-
-- one behavior or one coherent refactor per task,
-- one coherent proof target per changed behavior where practical,
-- likely owner locations and exact commands,
-- explicit stop conditions.
-
-If a task requires product judgment, split it or return to `brainstorming`.
-
-## Behavioral-proof selection
-
-Load `behavioral-proof` and select the smallest evidence that proves the actual claim:
-
-- test-first when a failing test efficiently isolates new behavior;
-- characterization or baseline-first for existing behavior;
-- reproduction-first for bugs after root-cause evidence;
-- existing coverage plus before/after checks when sufficient;
-- integration, live, or manual evidence when the claim crosses those boundaries;
-- no invented test for non-behavioral or language/framework-guaranteed behavior.
-
-## Git Policy
-
-Do not include agent-run commands for:
-
-- `git add`
-- `git commit`
-- `git push`
-- `git checkout`
-- `git reset`
-- `git stash`
-- `git rebase`
-- `git merge`
-- `git worktree`
-
-If a handoff command is useful, label it as **User-run only** and prefer copying it to the clipboard at completion time, not in the implementation plan.
-
-## Handoff
-
-Choose the path that matches the request:
-
-- **Plan only:** present the complete plan directly in chat, save it only when requested or materially useful, then stop. Do not start implementation or approval flow.
-- **Standalone nontrivial plan review:** route directly to `review`. It owns reviewer count, angles, packet content, and method; `delegation` dispatches the selected reviewers.
-- **Manager-attached plan:** return the task breakdown to the active `manager-workflow` stage. It does not add review or approval unless it introduces a material behavioral delta.
-
-This skill owns the executable task breakdown and proof detail.
+Do not include agent-run commands for `git add`, `git commit`, `git push`, `git checkout`, `git reset`, `git stash`, `git rebase`, `git merge`, or `git worktree`.

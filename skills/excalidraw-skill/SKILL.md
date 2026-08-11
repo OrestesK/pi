@@ -1,6 +1,6 @@
 ---
 name: excalidraw-skill
-description: Use for creating, refining, validating, or exporting Excalidraw technical diagrams, including reference-matched designs and Mermaid conversions
+description: Use for creating, refining, validating, or exporting Excalidraw technical diagrams
 ---
 
 # Excalidraw Skill

@@ -9,9 +9,9 @@ Review is evidence gathering, not rubber-stamping.
 
 ## Independent review routing
 
-`manager-workflow` decides when review occurs inside an implementation stage. Standalone reviews enter this skill directly. This skill owns review method. `delegation` dispatches the selected roles, and the Pi Subagents package executes them.
-
 For every nontrivial plan review, nontrivial review request, and first implementation-readiness review, require current independent coverage of all five base angles below. Build a coverage map before fanout.
+
+An explicit code-quality review uses the five code-quality reviewers below instead of the five base angles.
 
 Count an angle as covered only when:
 
@@ -62,6 +62,28 @@ Every selected reviewer receives the approved behavior, non-goals, relevant deci
    - Questions: Could this evidence disprove a wrong implementation? Does it reach the claimed boundary? Are operational, rollback, or readiness checks needed on this path?
    - Stop: conclude when every material claim has sufficient current evidence or an explicit unavailable boundary
 
+### Explicit code-quality review
+
+When the user asks for a deep code-quality, structure, or simplification review, launch five fresh instances of the same generic reviewer in parallel. Give all five the same approved behavior, target, and available proof. Give each reviewer one complete focus below.
+
+Hold the approved behavior fixed. Read beyond the diff when ownership, duplication, or integration cannot be judged from changed lines alone. A finding needs a real location or relationship, a concrete cost, a smaller safe direction, and evidence that the direction preserves behavior or a clear statement of what remains unverified.
+
+Do not report cosmetic or formatter-only comments, speculative rewrites, generic patterns with no current need, or changes with no concrete benefit. **No findings** is valid.
+
+The parent sends these five focuses unchanged, one per reviewer:
+
+1. **Can we remove anything?** Is code unnecessary, duplicated, or already provided elsewhere?
+2. **Is the code in the right place?** Does the natural module own it, or is the behavior spread across layers, paths, or sources of truth?
+3. **Is this harder than needed?** Are flags, wrappers, branches, casts, guards, types, states, or abstractions hiding a simpler model?
+4. **Does it fit the codebase?** Is it easy to understand, test, debug, and change safely?
+5. **What did the others miss?** Review the whole target independently for the most important remaining behavior-preserving simplification.
+
+Each focus is a starting point, not a fence. A reviewer may report a stronger in-scope code-quality problem found outside its focus. Reviewers never need to produce a finding. After they return, deduplicate findings by root cause, not wording, and apply the normal validation, follow-up, synthesis, and verdict rules in this skill.
+
+The same five-reviewer pass is optional during a normal review or ordinary work. Use it when the change raises a concrete question about unnecessary code, duplication, ownership, complexity, or fit with the codebase. Do not run it just because code changed. Send the five focuses above unchanged.
+
+This optional pass is read-only and nonblocking. It cannot authorize fixes or delay readiness. Stop when no useful target remains.
+
 ### Conditional specialists
 
 Add a fresh specialist only for a demonstrated additional surface, such as:
@@ -89,7 +111,7 @@ Use the broader tier when classification is unclear. Continue only while a new v
 
 A final `PASS` requires every accepted primary in-scope `must-fix` and `should-fix` finding to be fixed or explicitly deferred by the user. Incidental optional cleanup and background quality exploration remain nonblocking.
 
-Only validated, mechanically local, non-material fixes inside the approved behavior may continue automatically. Automatic continuation does not select the writer; use the active global and `delegation` ownership rules. Final claim-bound verification is still required.
+Only validated, mechanically local, non-material fixes inside the approved behavior may continue automatically. Automatic continuation does not select the writer; use the active global ownership rules. Final claim-bound verification is still required.
 
 ## Review Modes
 
@@ -170,7 +192,6 @@ For each item:
    - `needs-discussion`: unclear feedback or feedback that would change behavior, architecture, tests, security, or scope
 4. Push back with evidence when feedback is wrong or conflicts with approved scope
 5. Ask one focused question when feedback changes behavior, architecture, tests, security, or scope
-6. Do not apply fixes from a standalone review-only request. In an approved implementation review/fix stage, validated, mechanically local, non-material fixes inside the approved behavior may continue automatically under the active global and `delegation` ownership rules, then return control to `manager-workflow`. Other fixes route through a reviewed behavioral amendment
 
 Structural feedback is not automatically correct. Verify that the proposed simplification is concrete, behavior-preserving, and compatible with approved scope. If it changes architecture, behavior, schema, config, security, data mutation, or public contracts, ask before implementing.
 
@@ -212,7 +233,7 @@ Do not fetch or mutate Git to resolve a target. Ordinary working-tree review is 
 
 ## Delegated Reviewer Subagents
 
-When dispatching a reviewer subagent, treat `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/agents/reviewer.md` as the authoritative child contract. The reviewer agent does not inherit this skill by default, so standards that must apply inside delegated reviews must exist in the reviewer agent prompt or be included explicitly in the subagent task.
+The reviewer agent does not inherit this skill by default, so standards that must apply inside delegated reviews must exist in the reviewer agent prompt or be included explicitly in the subagent task.
 
 For delegated reviews, send the reviewer packet required above. Keep each reviewer’s assigned angle or specialist surface and evidence target distinct.
 

@@ -31,7 +31,3 @@ Use specific valid code patterns and limit them to the relevant paths. If a sear
 Pass paths through each tool's registered `path` or `paths` parameter. When workspace symbol lookup or project resolution needs context, start from a real project file. If usage-site results can be partial, query references from the definition
 
 Run targeted LSP diagnostics after each coherent code-edit group and once more after the final relevant edit. If a needed semantic or diagnostic check is unavailable or does not apply, state exactly why
-
-## Treat findings as evidence, not approval
-
-Code-intelligence findings guide investigation and review. They do not authorize edits outside approved behavior. Before changing code, validate each diagnostic or reviewer finding against the actual producer, the states the program can reach, the approved scope, and the contract

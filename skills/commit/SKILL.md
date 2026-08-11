@@ -1,20 +1,9 @@
 ---
 name: commit
-description: Use for drafting commit messages and branch names
+description: Use to draft commit messages and branch names
 ---
 
 # Draft Commit Messages and Branch Names
-
-Use this skill only to draft commit messages, group changes, and suggest branch names.
-
-This skill never authorizes `git add`, `git commit`, `git push`, or any other Git mutation. Follow the active Git policy and get the user's explicit approval.
-
-## Workflow
-
-1. When current changes affect the recommendation, inspect status and diffs with read-only Git commands
-2. Group files by one concern per commit
-3. Draft and validate a Conventional Commit message
-4. Present the suggestion and relevant file grouping
 
 ## Format
 
@@ -56,17 +45,6 @@ Use exactly one supported type:
 - Use `BREAKING CHANGE: <description>` for a breaking-change footer
 - Use Git-style trailers for issue references or other footers
 
-## Validation
-
-Before you present a message, check:
-
-- type is supported
-- scope is optional and correctly parenthesized
-- `!` is correctly placed when used
-- description follows the style rules
-- body and footers are separated correctly
-- breaking changes are marked in the header or footer
-
 ## Examples
 
 ```text
@@ -81,12 +59,6 @@ BREAKING CHANGE: unsigned API requests are no longer accepted
 
 ## Branch Names
 
+`ok` is the first and last inital of the curent user
+
 Prefer `ok/<short-topic>`.
-
-## What to Present
-
-When asked for commit-message help, show:
-
-- suggested commit message
-- files that belong in the commit, when relevant
-- files that should not be included, such as secrets, `.env` files, or unrelated changes

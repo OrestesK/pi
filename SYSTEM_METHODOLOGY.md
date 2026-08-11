@@ -61,7 +61,7 @@ I want meaningful progress updates at approval boundaries, material work stages,
 
 Before yielding, look for concrete useful work such as a missing risk, stronger evidence, a simpler path, or necessary task-state maintenance. Dispatch substantive Reflection work to the fitting read-only specialist. Do not poll healthy children, repeat work, invent nits, or create activity only to avoid yielding.
 
-Keep continuity proportional. Use a native TODO for work that may outlive the turn. Use ignored `.scratch/` artifacts only when deeper temporary research, plans, reviews, logs, or session state are useful. Do not create tracked progress files unless the project requires them.
+Keep continuity proportional. Use ignored `.scratch/` artifacts only when deeper temporary research, plans, reviews, logs, or session state are useful. Do not create tracked progress files unless the project requires them.
 
 ### Autonomous reads, explicit protected effects
 
@@ -115,7 +115,7 @@ Independent work runs in parallel. The parent continues useful non-overlapping w
 
 ### 5. Maintain continuity and use Reflection
 
-The native TODO is the routing card for current task state. `.scratch/` holds useful ignored temporary artifacts. Session history, compaction summaries, memory, TODOs, and scratch artifacts are discovery pointers; current source and later user corrections remain authoritative.
+`.scratch/` holds useful ignored temporary artifacts. Session history, compaction summaries, memory, and scratch artifacts are discovery pointers; current source and later user corrections remain authoritative.
 
 Before an intended yield, the root parent performs the Reflection check owned by `AGENTS.md` and routed by `delegation`. A progress report, stage transition, child event, completed check, or asynchronous launch result does not decide that the parent turn should end; apply the same check after it. Do not poll healthy children, repeat work, invent nits, or create activity only to avoid yielding. Reflection does not replace required task work or formal review.
 
@@ -162,7 +162,7 @@ A workflow name in this document describes the current general method. Its detai
 
 Hermes owns automatic durable-memory maintenance and searchable session history. The main session retrieves relevant durable context on demand and treats it as non-authoritative evidence.
 
-The native TODO owns concise current task state. `.scratch/` owns temporary project-local research, plans, reviews, session notes, and run logs. Canonical project knowledge belongs in source or repository documentation rather than memory or task artifacts.
+`.scratch/` owns temporary project-local research, plans, reviews, session notes, and run logs. Canonical project knowledge belongs in source or repository documentation rather than memory or task artifacts.
 
 ### Authority between agents
 

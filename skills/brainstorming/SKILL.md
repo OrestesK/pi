@@ -9,32 +9,6 @@ Turn a rough idea into a concrete design before implementation.
 
 This is a discussion and design skill, not an implementation skill.
 
-## Boundaries
-
-Allowed:
-
-- Read code, docs, config, tests, and recent read-only git state.
-- Use scouts for read-only reconnaissance.
-- Use `ask_user` for one focused decision at a time.
-- Write design notes to `.scratch/plans/` for larger work.
-
-Not allowed:
-
-- Editing source, tests, config, docs, or prompts outside `.scratch/`.
-- Making architectural/product decisions without user approval.
-- Running mutating git commands.
-
-## Tech-spec clarification
-
-When `manager-workflow` uses this skill only to clarify intent before a tech spec:
-
-- Stay in the manager's current design stage
-- Inspect the current state and ask only the questions needed for architecture work
-- Return the resolved goal, behavior, limits, acceptance conditions, and open questions to the manager
-- Do not start another design, review, approval, plan, or implementation flow
-
-Standalone brainstorming still uses the normal process below.
-
 ## Process
 
 ### 1. Understand the current state
@@ -93,21 +67,11 @@ For larger work, show the design in short sections so it is easy to inspect and 
 
 The only default normal-mode wait is after the complete draft, asynchronous review, and complete revised design. Any additional milestone wait must be named in the decision-ready proposal and explicitly approved.
 
-For a nontrivial complete design, hand the visible draft to `manager-workflow`; it owns review timing, revised presentation, and the approval question. This skill owns only the design evidence and decision-ready draft. If the user corrects direction, revise the affected design before that handoff.
-
 ### 5. Save a design when useful
 
-Write `.scratch/plans/YYYY-MM-DD-<topic>-design.md` only when the user explicitly requests it or it is materially useful for continuity. Include the goal and non-goals, chosen and rejected approaches, marked assumptions, affected systems, risks, review triggers, and open questions.
+Write `.scratch/plans/YYYY-MM-DD-<topic>-design.md` when the user explicitly requests it or helps continuity. Include the goal and non-goals, chosen and rejected approaches, marked assumptions, affected systems, risks, review triggers, and open questions.
 
 Do not edit project docs during brainstorming. The artifact preserves detail but never replaces a self-contained decision-ready proposal in chat.
-
-## Handoff
-
-After reviewed design approval:
-
-- Use `writing-plans` only when the user explicitly requested a durable plan or it is materially useful for continuity or execution.
-- Otherwise return to `manager-workflow` execution.
-- If a later material design choice becomes unresolved, return to clarification, ask one clear question at a time, and recommend an option when useful.
 
 ## Quality Bar
 

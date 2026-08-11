@@ -23,7 +23,7 @@ This is the canonical map of configuration surfaces. The `Kind` column distingui
 | [`agents/`](agents/) | Executable prompts | Local subagent roles; same-name files override packaged builtins |
 | [`skills/`](skills/) | Executable workflows | On-demand workflows and domain guidance |
 | [`.agents/skills/`](.agents/skills/) | Project workflows | `agent-evaluation` and `skill-authoring` are project-scoped and narrowly allowlisted; they remain untracked until a later user-authorized Git action |
-| [`extensions/`](extensions/) | Runtime code/config | Commands, UI helpers, todos, and guardrails |
+| [`extensions/`](extensions/) | Runtime code/config | Commands, UI helpers, and guardrails |
 | [`mcp-servers/`](mcp-servers/) | Runtime code | Local MCP implementations |
 | [`themes/`](themes/) | Runtime config | TUI themes |
 | [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md) | Provenance | Copied, adapted, and influential sources |

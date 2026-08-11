@@ -80,8 +80,6 @@ For interactive CLI/TUI claims, prefer the repo's own harness first. If none exi
 
 Do not trust “worker/reviewer says done” by itself.
 
-The parent inspects the actual target/effective change, relevant child outputs, and fresh claim-bound evidence. For nontrivial readiness, the review/fix stage required by `manager-workflow` must be complete. Reviewer packet and fanout details are outside this skill.
-
 Before accepting or rejecting a finding, the parent checks that it is in scope, traces it to its producer and reachable behavior, confirms its impact and evidence, and checks that the approved behavior is preserved. `review` owns review method and finding partitions. Any accepted in-scope required finding must be fixed or explicitly deferred by the user before `PASS`. If the parent cannot verify directly, report the exact unverified boundary and return `INCONCLUSIVE` where it affects the claim.
 
 ## Completion Report Format

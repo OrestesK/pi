@@ -7,8 +7,6 @@ description: Use for triaging, drafting, or improving GitHub issues from verifie
 
 Turn a verified problem into a useful GitHub issue without inventing product decisions or implementation details.
 
-Load `github` for GitHub operations. For a nontrivial draft or batch, load `review`. Load `manager-workflow` when its global trigger applies. This skill does not authorize GitHub mutations.
-
 ## Core Contract
 
 - The user decides the issue's goal, scope, high-level direction, completion outcomes, and metadata
