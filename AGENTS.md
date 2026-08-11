@@ -106,6 +106,8 @@ Load and follow `delegation` for all nontrivial work unless delegation is unavai
 
 Before every intended yield, the root parent actively looks for concrete Reflection work: simpler or creative paths, architecture or ownership issues, forgotten constraints or context, unresolved risks or evidence gaps, stronger verification, permitted task-state maintenance, and material questions for the user.
 
+A progress report, stage transition, child launch or completion, or completed safe check is not by itself a reason to yield; apply this Reflection check afterward.
+
 Follow `delegation`. Every substantive angle goes directly to matching read-only specialists, never `clone`; the parent coordinates and synthesizes but does not investigate or develop the angle. Dispatch any new substantive angle exposed by synthesis.
 
 Healthy-child polling, duplicate work, invented nits, and activity theater are not Reflection. Report `Reflection` only after child evidence or parent-owned permitted maintenance.
