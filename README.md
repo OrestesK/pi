@@ -2,17 +2,18 @@
 
 Personal configuration for the Pi coding agent.
 
-- Maintaining the config: start with the file map below
+- Maintaining the config: read [System Methodology](SYSTEM_METHODOLOGY.md), then use the file map below
 - Source provenance: [Attributions](ATTRIBUTIONS.md)
 
 ## File map
 
-This is the canonical map of configuration surfaces. The linked policy and prompt files are executable instructions, not ordinary documentation.
+This is the canonical map of configuration surfaces. The `Kind` column distinguishes executable instructions and runtime config from non-executable references.
 
 | Path | Kind | Purpose |
 | --- | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | Executable policy | Always-loaded agent rules and workflow routing |
 | [`APPEND_SYSTEM.md`](APPEND_SYSTEM.md) | Executable policy | Coding toolchain, core clipboard, and selected local CLI overlay |
+| [`SYSTEM_METHODOLOGY.md`](SYSTEM_METHODOLOGY.md) | Design intent | Current general workflow, goals, and ownership model for config maintainers |
 | [`settings.json`](settings.json) | Runtime config | Models, packages, UI, and compaction |
 | [`hermes-memory-config.json`](hermes-memory-config.json) | Runtime config | Hermes automatic learning, recall, search, and storage behavior |
 | [`models.json`](models.json) | Runtime config | Custom model definitions |
