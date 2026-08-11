@@ -53,7 +53,7 @@ An extra milestone is a wait only when the decision-ready proposal names it and 
 
 ## Progress and continuity
 
-Follow the global progress, TODO, continuity, and `.scratch/` rules. If complex work needs a `.scratch/sessions/` record, this workflow adds only evidence links, changed assumptions, blockers, and unverified boundaries. `Keep the stage and findings visible` owns current-stage and approval-status updates.
+Follow the global progress, continuity, and `.scratch/` rules. If complex work needs a `.scratch/sessions/` record, this workflow adds only evidence links, changed assumptions, blockers, and unverified boundaries. `Keep the stage and findings visible` owns current-stage and approval-status updates.
 
 ## Manager-local handoffs
 

@@ -5,13 +5,9 @@ description: Use for coordinating subagent delegation after the global delegatio
 
 # Delegation
 
-This skill owns this setup's delegation procedure after the active global delegation trigger applies.
-
-The Pi Subagents package owns dispatch, chains, async execution, supervisor messaging, and agent discovery. The active global instructions already in context own the relevant boundaries, specifically parent-child authority, global progress/continuity, authorization, and artifact permission.
+You must aggressively parallize and always find something to dispatch
 
 ## Workflow routing
-
-Use this flow only to select delegation topology. Follow `manager-workflow` for stages and approval, and `review` for review fanout and method.
 
 ```text
 Request
@@ -171,7 +167,7 @@ Follow the global artifact permission and override rules in `.scratch/ workspace
 This procedure applies to the root parent. Before yielding:
 
 1. Handle decision-relevant child asks, actionable failures, completed outputs, and material corrections; send new evidence to a running child only when a real delta can correct or unblock it
-2. Continue required nonconflicting, nonduplicate parent work and concrete parent-owned TODO or session-state maintenance
+2. Continue required nonconflicting, nonduplicate parent work or session-state maintenance
 3. Scan the Reflection goals in `AGENTS.md` and immediately send every qualifying candidate through Reflection routing
 
 While children run, do not poll them, repeat their analysis, or develop their angles. Inspect outputs before dependent synthesis, decisions, or claims; route a new substantive synthesis angle as a new candidate. Otherwise apply the final yield condition in `AGENTS.md`.
