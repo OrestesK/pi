@@ -5,20 +5,22 @@ description: Use for managing implementation work through proposal, approval, ex
 
 # Manager Workflow
 
-## Decision-ready proposal
+## What to show the user
 
-This skill owns the implementation-approval sequence: show a draft, review it asynchronously, show the complete revised proposal, then obtain approval to implement.
+Before asking the user to approve implementation, prepare and review the detailed plan. Then explain the proposed work in short, plain language.
 
-When this workflow is active, include:
+Tell the user:
 
-- the recommendation, expected outcome, previous behavior, and proposed change
-- all material phases and what changes or stays the same
-- why this is the simplest coherent option, the meaningful alternatives, and why they were rejected
-- every material assumption, uncertainty, risk, tradeoff, reversibility concern, and safer alternative
-- evidence, failed or unexecuted checks, the verification and review plan, and review focus points
-- the exact authorization boundary, exclusions, stop conditions, next separately authorized action, and one focused approval question
+- what you recommend and why
+- what will change
+- what you are assuming or still do not know
+- the main risks and how you will check the result
+- what will not change
+- exactly what their approval allows
 
-A saved plan can preserve implementation detail, but the complete proposal must remain in chat.
+Include only details that help the user decide. Keep commands, file-by-file steps, and other execution details in the saved plan unless the user asks for them or they affect the decision.
+
+Do not replace this explanation with a plan path, file summary, hash, review result, or progress report. End with one focused question.
 
 ### Define the task contract
 

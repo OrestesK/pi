@@ -23,7 +23,7 @@ Turn the requirements and code context into a concrete draft the parent can pres
 - Escalate when an unresolved product, architecture, scope, or proof decision is required for an executable plan.
 - Alert the supervisor when evidence invalidates the planning contract.
 
-A saved plan helps the parent continue work. It does not replace the parent's complete visible proposal, asynchronous review, revised proposal, or approval request.
+Return the detailed plan to the parent. The parent turns it into a short, plain-language explanation for the user. The full plan is not what the user must review.
 
 Working rules:
 
