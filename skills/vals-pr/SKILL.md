@@ -20,15 +20,15 @@ Before involving the author:
 1. Inspect the current PR, diff, checks, comments, intent, and repository rules
 2. Run extensive separate fresh reviews from all relevant angles, with at least five reviewers
 3. Address every supported finding and every AI-reviewer comment
-4. Run a representative live test when it is safe and authorized
-   - Draft the result for the PR description
+4. Identify and suggest a representative live test when one would add useful evidence
+   - Draft how its result would be reported in the PR description
    - If no useful live test is possible, say why
    - Keep PR checks and static checks separate from live-test evidence
 5. Decide from the change whether it needs:
    - a diagram for an architectural change
    - a design document for a large change
    - stacked PRs when clear dependent slices would be easier to review
-6. After meaningful changes, repeat the affected reviews, tests, checks, and AI-comment handling
+6. After meaningful changes, repeat the affected reviews and AI-comment handling, and refresh the suggested tests and checks
 
 Continue until the code and evidence are current. Ask the author earlier only when a real decision or approval is needed.
 

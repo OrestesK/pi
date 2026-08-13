@@ -5,7 +5,7 @@ description: Use for writing or changing tests, test helpers, fixtures, mocks, o
 
 # Writing Tests
 
-Use this skill to choose test quality and placement. Let `behavioral-proof` decide whether tests, characterization, a reproduction, existing coverage, integration, live, or manual evidence best proves the behavior that changed
+Use this skill to choose test quality and placement. Let `behavioral-proof` decide whether tests, characterization, a reproduction, existing coverage, integration, live, or manual evidence best proves the behavior that changed. This skill can author tests but does not authorize executing them or any other opt-in command category from the global policy
 
 Use this skill when you are:
 
@@ -212,4 +212,4 @@ When reporting test work, include:
 - any broader lint, typecheck, or format command that was applicable and run,
 - any verification that could not run and why.
 
-Unit tests are not enough when a completion claim depends on a real browser, provider, runtime, benchmark, performance result, or external service. Run live validation when allowed. Otherwise, say that it was not performed and name the boundary that remains unverified
+Unit tests are not enough when a completion claim depends on a real browser, provider, runtime, benchmark, performance result, or external service. Identify and recommend representative live validation; execute it only under the global command-execution and authorization policies. When it is not performed, name the boundary that remains unverified

@@ -80,12 +80,12 @@ Before editing, identify:
 - approved non-goals and protected boundaries
 - the smallest proof that could disprove a wrong implementation
 
-Follow the global implementation invariants, parent/child authority, changed-file inspection, and test-timing rules.
+Follow the global implementation invariants, parent/child authority, changed-file inspection, and command-execution policy.
 
 For each coherent edit group:
 
 1. Make the smallest approved change at the existing owner
-2. Run relevant static, discovery, or diagnostic checks
+2. Run targeted LSP diagnostics and relevant discovery checks
 3. Inspect the effective diff
 4. Stop when evidence is stale, scope conflicts with the approved result or boundaries, or a protected action is needed
 

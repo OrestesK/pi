@@ -11,19 +11,19 @@ Testing is one way to prove a change, not a required sequence. Start with the ob
 
 ### Test-first
 
-Use a failing test first when it efficiently isolates genuinely new behavior. Confirm the failure is for the intended missing behavior, implement minimally, then verify the focused and relevant broader checks.
+Select a failing test as the proof method when it efficiently isolates genuinely new behavior. Execute it only under the global command-execution policy. When executed, confirm the failure is for the intended missing behavior, implement minimally, then compare the permitted post-change evidence.
 
 ### Characterization or baseline-first
 
-Use current tests, snapshots, traces, or outputs before changing existing or legacy behavior. Preserve the established contract except for the approved delta, then compare after the edit.
+Inspect available pre-change test, snapshot, trace, or output evidence before changing existing or legacy behavior. Collect new evidence only under the global command-execution policy. Preserve the established contract except for the approved delta, then compare after the edit.
 
 ### Reproduction-first bug proof
 
-Use `systematic-debugging` to establish root cause. Capture the narrow failing reproduction or regression test when practical, fix the canonical owner, then verify the reproduction and relevant suite.
+Use `systematic-debugging` to establish root cause. Capture the narrow failing reproduction or regression test when practical, fix the canonical owner, then verify it with evidence permitted by the global command-execution policy.
 
 ### Existing coverage plus before/after evidence
 
-When existing tests already prove the changed claim, run them after the change. Add or change a test only when the existing contract would not catch the intended regression.
+When existing tests already prove the changed claim, identify them as the preferred post-change proof. Add or change a test only when the existing contract would not catch the intended regression.
 
 ### Integration, live, or manual proof
 
@@ -33,7 +33,7 @@ If live evidence is unavailable or protected, use the strongest authorized lower
 
 ### Non-behavioral work
 
-Do not invent tests for wording, comments, formatting, mechanical renames, or guarantees already owned by the language or framework. Run relevant parsing, discovery, reference, formatting, or contract checks instead. Explain why no behavior test was added.
+Do not invent tests for wording, comments, formatting, mechanical renames, or guarantees already owned by the language or framework. Use relevant parsing, discovery, reference, or contract checks instead. Explain why no behavior test was added.
 
 ### Check live proof for pull requests
 

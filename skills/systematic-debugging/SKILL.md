@@ -7,7 +7,7 @@ description: Use for investigating bugs, test failures, crashes, flaky behavior,
 
 No fixes without root-cause evidence.
 
-Random changes waste time and create new bugs. Follow the phases in order.
+Random changes waste time and create new bugs. Follow the phases in order. Command execution remains subject to the active global verification and command-execution policy.
 
 ## Phase 1: Observe
 
@@ -15,7 +15,7 @@ Read the actual failure completely.
 
 - Read the full error, stack trace, command output, or symptom report.
 - Identify exact file, line, function, test, request, or data path involved.
-- Reproduce with the narrowest safe command unless reproduction is impossible, unsafe, or already captured in reliable evidence.
+- Reproduce with the narrowest permitted evidence unless reproduction is impossible, unsafe, or already captured reliably. When the best reproduction requires an opt-in command, recommend it instead of executing it.
 - Check current diff and recent read-only history if relevant.
 - Use `module_report`, `read_symbol`, `read_enclosing`, or LSP to inspect failing symbols before broad reads.
 
@@ -63,8 +63,8 @@ Once root cause is supported:
 1. Use `behavioral-proof` to select the narrowest evidence that would catch the regression.
 2. Capture a reproduction or regression test when it materially improves the proof.
 3. Make the minimal root-cause fix.
-4. Run the narrow reproduction or selected check.
-5. Run broader checks only when shared risk justifies them.
+4. Collect the narrow permitted reproduction or selected evidence.
+5. Identify broader evidence only when shared risk justifies it, and execute only what the global policy permits.
 
 No “while here” refactors unless the fix requires them.
 

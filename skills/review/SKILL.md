@@ -226,7 +226,7 @@ Do not fetch or mutate Git to resolve a target. Ordinary working-tree review is 
 - Read the approved behavior/non-goals, relevant decisions, plan/spec, proof/evidence, and actual target/effective change before judging
 - Follow the active global instructions already in context, specifically the procedure in the `Changed files and diffs` section, before reviewer dispatch. Review the resulting total effective diffs and the bodies of every in-scope untracked file
 - Treat ownership/navigation, LSP semantics/relationships, AST structure/search/refactor, and diagnostics as separate relevance-gated evidence groups. Use every materially relevant group and state why an expected group is unavailable or inapplicable; do not call irrelevant groups mechanically
-- Run or inspect tests whenever they materially improve review confidence and are safe/proportionate
+- Inspect available test evidence when it materially improves review confidence; follow the global command-execution policy for any new evidence collection
 - Cite file paths and line numbers for findings
 - Categorize findings: `must-fix`, `should-fix`, `nit`, `note`, or `needs-discussion`
 - Follow the active global instructions already in context, specifically the artifact permission and override policy in the `.scratch/ workspace` section. Return findings inline unless an explicit output path or wrapper capture is provided; use `.scratch/reviews/` for allowed review artifacts. Do not use shell writes to create them

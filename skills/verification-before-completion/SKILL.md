@@ -18,7 +18,7 @@ Before saying work is done, fixed, passing, ready, clean, or complete:
 - [ ] **Compare** evidence to the actual claim
 - [ ] **Report** `PASS`, `FAIL`, or `INCONCLUSIVE` with evidence and limitations
 
-Run all relevant read-only verification automatically. Store temporary data and scripts under `.scratch/`. For mutating verification, follow the active global instructions already in context, specifically the authorization policy.
+Automatically collect all relevant read-only evidence permitted by the global verification and command-execution policy. Store temporary data and scripts under `.scratch/`. For mutating verification, follow the active global instructions already in context, specifically the authorization policy.
 
 If you cannot run a required check, say so. Do not convert inability to verify into confidence.
 

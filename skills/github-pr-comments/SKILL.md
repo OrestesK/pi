@@ -152,14 +152,14 @@ For tiny comments, it is okay to collapse bullets into short paragraphs, but do 
 
 ## Claim Verification Examples
 
-The preflight loads `github`, which reaches `behavioral-proof`. Use its selected method for each falsifiable claim. These examples show possible probes; they do not authorize or require one:
+The preflight loads `github`, which reaches `behavioral-proof`. Use its selected method for each falsifiable claim. These examples describe possible evidence; they do not authorize or require command execution:
 
-- packaging/import claims: build or inspect the wheel/sdist, or run an installed-package import probe;
-- type/schema claims: run the relevant typecheck, schema generation, OpenAPI generation, or a small serialization/validation probe;
-- runtime behavior claims: run the narrow unit test, endpoint test, request/response probe, or minimal reproducer;
-- config/docs availability claims: run the command/example/import shown in docs, or inspect generated artifacts produced by the documented flow;
-- dead-code claims: combine source search with an import/test run when removal would otherwise be risky;
-- test-quality claims: run the relevant test and state what it does and does not prove.
+- packaging/import claims: wheel/sdist inspection or an installed-package import result;
+- type/schema claims: typecheck, schema-generation, OpenAPI-generation, or serialization/validation results;
+- runtime behavior claims: narrow unit-test, endpoint-test, request/response-probe, or minimal-reproducer results;
+- config/docs availability claims: output from the documented command/example/import, or inspection of artifacts produced by the documented flow;
+- dead-code claims: source search combined with an available import/test result when removal would otherwise be risky;
+- test-quality claims: the relevant test result plus what it does and does not prove.
 
 Follow the proof rule in Core Rules before any live, external, credentialed, or effectful probe. If live proof cannot or should not run, use the strongest named non-live evidence and name the live behavior left unchecked. Do not force a live prompt when no meaningful runtime path exists.
 

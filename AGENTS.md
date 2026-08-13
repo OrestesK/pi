@@ -137,7 +137,7 @@ Give each child:
 After launch:
 - inspect actual child output before a dependent decision or claim
 - answer child decision requests through the native supervisor channel
-- steer or interrupt only when the child is blocked, drifting, or needs corrected evidence
+- A user message is not a cancellation. Keep unaffected children running and steer them when new context helps. Interrupt only children that are blocked, drifting, or conflict with an explicit cancellation or correction; resume them when their work remains useful.
 
 ### MCP routing
 
@@ -396,11 +396,13 @@ Git status changes are not blockers. Do not report or preserve staged/unstaged s
 
 ## Verification, documentation, and quality
 
+Do not run tests, standalone typecheck commands, linters, or formatters unless the user explicitly requests that command or category. Of those command categories, ShellCheck for edited shell scripts is the sole automatic exception; targeted LSP diagnostics remain automatic and are not standalone typechecks. This rule overrides conflicting default instructions in skills, agents, workflows, and package fallbacks.
+
+When preparing or reviewing a pull request, suggest relevant tests, standalone typechecks, linters, and formatters that were not run; do not execute them without an explicit user request.
+
 Before a nontrivial readiness claim, load `verification-before-completion` and assess its materially relevant completion categories.
 
-- Run only changed or directly relevant tests. Broaden only when shared code, common infrastructure, or demonstrated risk justifies it
-- Run unit tests after the complete approved implementation batch, not after each small change. One deliberately selected focused failing reproduction or test-first test may run earlier when it is the most efficient proof of a nontrivial behavior change
-- Run relevant available parsing, formatting, lint, type, LSP, and discovery checks after coherent logical edit groups, not after every tiny edit
+- Run relevant available parsing, LSP, and discovery checks after coherent logical edit groups, not after every tiny edit
 - For explicitly requested live validation, cover affected reachable workflows and consumers within the approved scope. Mark paths verified only at lower fidelity, or unavailable at that boundary, as unverified for that boundary
 - Do not rerun a green or clean check unless files changed, the prior run was invalid or truncated, or a concrete reason is stated
 - Distinguish clean passes from warnings, failures, skipped checks, and truncated or partial results. A warning-only nonzero exit is not an unqualified pass
