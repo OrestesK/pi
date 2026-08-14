@@ -105,13 +105,42 @@
       "skills": []
     },
     "packages/pi-slipstream-compact",
-    "npm:pi-hermes-memory@0.9.4",
+    "npm:pi-session-search@1.4.3",
+    {
+      "source": "npm:pi-memory-md@0.1.38",
+      "skills": []
+    },
     "packages/pi-sixel",
     "npm:@carter-mcalister/pi-codex-image-gen@0.2.0",
-    "packages/pisesh",
+    "npm:pisesh@0.2.0",
     "npm:pi-btw",
     "packages/pi-goal-supervisor"
   ],
+  "pi-memory-md": {
+    "enabled": false,
+    "memoryDir": {
+      "localPath": "~/.pi/memory",
+      "globalMemory": "global"
+    },
+    "hooks": {
+      "sessionStart": [],
+      "sessionEnd": [],
+      "beforeAgentStart": []
+    },
+    "tape": {
+      "enabled": true,
+      "onlyGit": true,
+      "thread": false,
+      "anchor": {
+        "mode": "auto",
+        "labelPrefix": "⚓ ",
+        "keywords": {
+          "global": [],
+          "project": []
+        }
+      }
+    }
+  },
   "pi-sixel": {
     "maxColumns": 120,
     "maxRows": 36,

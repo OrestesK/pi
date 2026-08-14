@@ -15,7 +15,6 @@ This is the canonical map of configuration surfaces. The `Kind` column distingui
 | [`APPEND_SYSTEM.md`](APPEND_SYSTEM.md) | Executable policy | Coding toolchain, core clipboard, and selected local CLI overlay |
 | [`SYSTEM_METHODOLOGY.md`](SYSTEM_METHODOLOGY.md) | Design intent | Current general workflow, goals, and ownership model for config maintainers |
 | [`settings.json`](settings.json) | Runtime config | Models, packages, UI, and compaction |
-| [`hermes-memory-config.json`](hermes-memory-config.json) | Runtime config | Hermes automatic learning, recall, search, and storage behavior |
 | [`models.json`](models.json) | Runtime config | Custom model definitions |
 | [`mcp.json`](mcp.json) | Runtime config | MCP server registry |
 | [`permissions.json`](permissions.json) | Inactive artifact | Not consumed by Pi 0.80.6 or the loaded extensions |
@@ -31,7 +30,7 @@ This is the canonical map of configuration surfaces. The `Kind` column distingui
 ## Runtime at a glance
 
 - The main model and enabled packages are configured in [`settings.json`](settings.json).
-- Hermes provides persistent memory and model-facing session search using [`hermes-memory-config.json`](hermes-memory-config.json).
+- `pi-memory-md` provides explicit local Markdown memory and Tape; `pi-session-search` provides model-facing session search.
 - MCP servers are registered in [`mcp.json`](mcp.json); most load lazily.
 - Local role prompts in [`agents/`](agents/) override packaged roles with the same name.
 - Skills expose short descriptions and load their full instructions only when needed.
@@ -39,13 +38,15 @@ This is the canonical map of configuration surfaces. The `Kind` column distingui
 - Safety combines prompt policy with configured guardrails. `permissions.json` is
   retained as an inactive artifact and does not control Pi 0.80.6 permissions.
 
-## Hermes memory
+## Memory and session search
 
-`pi-hermes-memory` is pinned at 0.9.4. It automatically reviews conversations, captures corrections, flushes eligible sessions before compaction and at shutdown, and consolidates full memory files. Recurring learning calls use `openai-codex/gpt-5.6-terra` with low thinking.
+`pi-memory-md` stores local Markdown memory under `~/.pi/memory/`. This configuration uses the shared `global/core/` scope, keeps automatic memory delivery disabled, and leaves memory available for on-demand search and normal file reads. Packaged memory skills and automatic synchronization hooks are disabled, and every durable-memory mutation requires explicit user authorization. `AGENTS.md` owns the executable retrieval and mutation policy.
 
-Memory uses policy-only retrieval: the model receives search guidance and fetches relevant entries on demand instead of injecting all learned content into every prompt. `AGENTS.md` remains the authority for mandatory rules, and Hermes standing instructions are disabled.
+Tape remains enabled in Git repositories for automatic lifecycle and model-selected handoff checkpoints. TapeThread is disabled. Tape metadata does not snapshot, restore, or modify code. Project-wide `tape_search`, `tape_read`, and `tape_info` remain unsafe on large session histories because upstream loads full project history before applying its entry limit.
 
-Hermes stores generated global memory and its transcript index under `pi-hermes-memory/`, project-scoped memory under `projects-memory/`, and its cross-session consolidation lock in `.pi-hermes-locks.sqlite`; these paths are ignored runtime state. Session indexing copies Pi transcript content into local SQLite search, and automatic learning sends eligible conversation and memory content to the configured model provider.
+`pi-session-search` indexes Pi session records for model-facing search. Memory and historical sessions are discovery evidence; current user instructions and current source remain authoritative.
+
+The previous `~/.pi/memory-md/` data remains on disk as an inactive artifact. It is not migrated or deleted automatically.
 
 ## MCP servers
 
@@ -98,7 +99,7 @@ The script repairs an ordinary non-recursive clone, synchronizes submodule URLs,
 
 The repository excludes secrets, sessions, caches, logs, generated artifacts, and dependency installs. See [`.gitignore`](.gitignore) for the exact list. Important examples include:
 
-- `.scratch/`, `sessions/`, `pi-hermes-memory/`, `projects-memory/`, and `.pi-hermes-locks.sqlite*`
+- `.scratch/` and `sessions/`
 - OAuth credentials and MCP onboarding state
 - crash logs, run history, and caches
 - `node_modules/` and Python bytecode/tool caches

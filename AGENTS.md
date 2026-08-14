@@ -228,6 +228,13 @@ You must:
 You must not:
 - Forget about work already done
 
+### Durable memory and session history
+
+- Before changing a durable memory, the action must be proposed to the user, or the user must have requested it
+- When durable context may matter, search global memory and read relevant matches before guessing
+- When past conversations may matter, search sessions and read only relevant results
+- Use Tape for handoffs and targeted current-session checkpoints, not broad history search or rollback
+
 ## Decision and workflow kernel
 
 ### Workflow routing
@@ -363,7 +370,6 @@ Load and follow `code-intelligence` when code ownership, structure, behavior, ty
 - Prefer Context7 when it provides the fastest route to current version-matched official documentation. Otherwise use web/content search and prefer official documentation or primary specifications
 - Use semantic code-intelligence tools for local integration inspection; do not substitute broad manual reading when symbol, module, AST, or LSP tools can answer the question
 - Skip external documentation only for demonstrably repository-local or purely mechanical work, or when public documentation cannot answer the question. In the latter case, state the source attempted and unresolved uncertainty
-- Do not rely on memory when current documentation or source can verify the claim
 - Use `code_search` or `web_search` when examples, ecosystem usage, or current external behavior would materially improve confidence
 
 ### Shell and large output
