@@ -30,7 +30,7 @@
     "maxRetries": 3,
     "baseDelayMs": 2000
   },
-  "lastChangelogVersion": "0.80.6",
+  "lastChangelogVersion": "0.84.1",
   "transport": "auto",
   "compaction": {
     "enabled": true,
@@ -114,7 +114,7 @@
     "npm:@carter-mcalister/pi-codex-image-gen@0.2.0",
     "npm:pisesh@0.2.0",
     "npm:pi-btw",
-    "packages/pi-goal-supervisor"
+    "npm:pi-goal-x"
   ],
   "pi-memory-md": {
     "enabled": false,
