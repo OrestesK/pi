@@ -1,23 +1,17 @@
 /**
  * pi-fff: FFF-powered file search extension for pi
  *
- * Overrides built-in `find` and `grep` tools with FFF and adds FFF-backed
- * @-mention autocomplete suggestions to the interactive editor.
+ * Overrides built-in `find` and `grep` tools with FFF.
  */
 
 import nodePath from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  type AutocompleteItem,
-  type AutocompleteProvider,
-  Text,
-} from "@earendil-works/pi-tui";
+import { Text } from "@earendil-works/pi-tui";
 import type {
   FileFinderApi,
   GrepCursor,
   GrepMode,
   GrepResult,
-  MixedItem,
   SearchResult,
 } from "@ff-labs/fff-node";
 import { Type } from "@sinclair/typebox";
@@ -35,7 +29,6 @@ export { SCAN_TIMEOUT_MS } from "./sdk";
 const DEFAULT_GREP_LIMIT = 20;
 const DEFAULT_FIND_LIMIT = 30;
 const GREP_MAX_LINE_LENGTH = 500;
-const MENTION_MAX_RESULTS = 20;
 
 // If we exceed 10 seconds for indexed grep - something is definitely off
 const GREP_TIME_BUDGET_MS = 10_000;
@@ -45,30 +38,10 @@ const HOME_SCAN_POLL_MS = 1_000;
 const HOME_SCAN_DISABLE_HINT =
   "You can prevent home dir indexing with --fff-enable-home-scan=false (or FFF_ENABLE_HOME_SCAN=0).";
 
-type FffMode = "tools-and-ui" | "tools-only" | "override";
-
-const VALID_MODES: FffMode[] = ["tools-and-ui", "tools-only", "override"];
-
-interface ToolNames {
-  grep: string;
-  find: string;
-  multiGrep: string;
-}
-
-const FFF_TOOL_NAMES: ToolNames = {
-  grep: "ffgrep",
-  find: "fffind",
-  multiGrep: "fff-multi-grep",
-};
-const OVERRIDE_TOOL_NAMES: ToolNames = {
+const toolNames = {
   grep: "grep",
   find: "find",
-  multiGrep: "multi_grep",
-};
-
-function resolveToolNames(mode: FffMode): ToolNames {
-  return mode === "override" ? OVERRIDE_TOOL_NAMES : FFF_TOOL_NAMES;
-}
+} as const;
 
 // ---------------------------------------------------------------------------
 // Cursor store — simple bounded Map for pagination cursors
@@ -247,47 +220,6 @@ function formatFindOutput(
 }
 
 // ---------------------------------------------------------------------------
-// Mention autocomplete helpers
-// ---------------------------------------------------------------------------
-
-function extractAtPrefix(textBeforeCursor: string): string | null {
-  const match = textBeforeCursor.match(/(?:^|[ \t])(@(?:"[^"]*|[^\s]*))$/);
-  return match?.[1] ?? null;
-}
-
-function buildAtCompletionValue(path: string): string {
-  return path.includes(" ") ? `@"${path}"` : `@${path}`;
-}
-
-function createFffMentionProvider(
-  getItems: (query: string, signal: AbortSignal) => Promise<AutocompleteItem[]>,
-): AutocompleteProvider {
-  return {
-    async getSuggestions(lines, cursorLine, cursorCol, options) {
-      const currentLine = lines[cursorLine] || "";
-      const prefix = extractAtPrefix(currentLine.slice(0, cursorCol));
-      if (!prefix || options.signal.aborted) return null;
-
-      const query = prefix.startsWith('@"') ? prefix.slice(2) : prefix.slice(1);
-      const items = await getItems(query, options.signal);
-      return options.signal.aborted || items.length === 0 ? null : { items, prefix };
-    },
-    applyCompletion(_lines, cursorLine, cursorCol, item, prefix) {
-      const currentLine = _lines[cursorLine] || "";
-      const before = currentLine.slice(0, cursorCol - prefix.length);
-      const after = currentLine.slice(cursorCol);
-      const newLine = before + item.value + after;
-      const newCursorCol = cursorCol - prefix.length + item.value.length;
-      return {
-        lines: [..._lines.slice(0, cursorLine), newLine, ..._lines.slice(cursorLine + 1)],
-        cursorLine,
-        cursorCol: newCursorCol,
-      };
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Extension
 // ---------------------------------------------------------------------------
 
@@ -304,14 +236,6 @@ export default function fffExtension(pi: ExtensionAPI) {
   // started for a previous session can detect that it's stale and bail out
   // before touching `mainFinder` / notifying a destroyed UI.
   let lifecycleId = 0;
-
-  // Mode resolution: flag > env > default
-  let currentMode: FffMode =
-    (pi.getFlag("fff-mode") as FffMode) ??
-    (process.env.PI_FFF_MODE as FffMode) ??
-    "tools-and-ui";
-
-  const toolNames = resolveToolNames(currentMode);
 
   // DB path resolution: flag > env > undefined (use fff-node defaults)
   const frecencyDbPath =
@@ -349,18 +273,6 @@ export default function fffExtension(pi: ExtensionAPI) {
     "FFF_ENABLE_HOME_SCAN",
     true,
   );
-
-  function getMode(): FffMode {
-    return currentMode;
-  }
-
-  function setMode(mode: FffMode): void {
-    currentMode = mode;
-  }
-
-  function shouldEnableMentions(): boolean {
-    return currentMode !== "tools-only";
-  }
 
   // Set on session_start; the only handle to the UI outside an event handler.
   // setStatus is TUI/RPC-only, hence optional.
@@ -487,83 +399,7 @@ export default function fffExtension(pi: ExtensionAPI) {
     return { finder: aux.finder, query, root: aux.root };
   }
 
-  async function getMentionItems(
-    query: string,
-    signal: AbortSignal,
-  ): Promise<AutocompleteItem[]> {
-    if (signal.aborted) return [];
-    const f = await ensureFinder(activeCwd);
-    if (signal.aborted) return [];
-
-    const result = f.mixedSearch(query, { pageSize: MENTION_MAX_RESULTS });
-    if (!result.ok) return [];
-
-    return result.value.items.slice(0, MENTION_MAX_RESULTS).map((mixed: MixedItem) => {
-      if (mixed.type === "directory") {
-        return {
-          value: buildAtCompletionValue(mixed.item.relativePath),
-          label: mixed.item.dirName,
-          description: mixed.item.relativePath,
-        };
-      }
-      return {
-        value: buildAtCompletionValue(mixed.item.relativePath),
-        label: mixed.item.fileName,
-        description: mixed.item.relativePath,
-      };
-    });
-  }
-
-  function registerAutocompleteProvider(ctx: {
-    ui: {
-      addAutocompleteProvider?: (
-        factory: (current: AutocompleteProvider) => AutocompleteProvider,
-      ) => void;
-    };
-  }) {
-    // pi forks (e.g. omp) may not expose addAutocompleteProvider; skip UI wiring
-    // and let tools continue to work instead of failing session_start.
-    if (typeof ctx.ui.addAutocompleteProvider !== "function") return;
-
-    ctx.ui.addAutocompleteProvider((current) => {
-      const mentionProvider = createFffMentionProvider(getMentionItems);
-
-      return {
-        async getSuggestions(lines, cursorLine, cursorCol, options) {
-          if (shouldEnableMentions()) {
-            try {
-              const mentionResult = await mentionProvider.getSuggestions(
-                lines,
-                cursorLine,
-                cursorCol,
-                options,
-              );
-              if (mentionResult) return mentionResult;
-            } catch {
-              // Delegate when FFF lookup is unavailable.
-            }
-          }
-
-          return current.getSuggestions(lines, cursorLine, cursorCol, options);
-        },
-        applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
-          return current.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
-        },
-        shouldTriggerFileCompletion(lines, cursorLine, cursorCol) {
-          return (
-            current.shouldTriggerFileCompletion?.(lines, cursorLine, cursorCol) ?? true
-          );
-        },
-      };
-    });
-  }
-
   // --- Flags / lifecycle ---
-
-  pi.registerFlag("fff-mode", {
-    description: "FFF mode: tools-and-ui | tools-only | override",
-    type: "string",
-  });
 
   pi.registerFlag("fff-frecency-db", {
     description: "Path to the frecency database (overrides FFF_FRECENCY_DB env)",
@@ -593,34 +429,9 @@ export default function fffExtension(pi: ExtensionAPI) {
       const sessionLifecycleId = ++lifecycleId;
       uiCtx = ctx as unknown as typeof uiCtx;
 
-      // Restore persisted mode from session entries. This handles session
-      // resume after process restart where env vars are lost, and ensures
-      // the env var is set for the next /reload in the same session.
-      const entries = ctx.sessionManager?.getEntries();
-      if (entries) {
-        const modeEntry = [...entries]
-          .reverse()
-          .find(
-            (e: { type: string; customType?: string }) =>
-              e.type === "custom" && e.customType === "fff-mode",
-          );
-        if (
-          modeEntry &&
-          typeof (modeEntry as any).data?.mode === "string" &&
-          VALID_MODES.includes((modeEntry as any).data.mode as FffMode)
-        ) {
-          const restored = (modeEntry as any).data.mode as FffMode;
-          if (restored !== currentMode) {
-            currentMode = restored;
-          }
-        }
-      }
-
-      registerAutocompleteProvider(ctx);
-
       // Warm the finder in the background — Pi /new and /resume must not
-      // wait on the initial scan. Subsequent tool calls / mention lookups
-      // share the same in-flight promise via ensureFinder().
+      // wait on the initial scan. Subsequent tool calls share the same
+      // in-flight promise via ensureFinder().
       setTimeout(() => {
         if (sessionLifecycleId !== lifecycleId) return;
         ensureFinder(activeCwd).catch((e: unknown) => {
@@ -1024,188 +835,4 @@ export default function fffExtension(pi: ExtensionAPI) {
     },
   });
 
-  // --- multi_grep tool ---
-  // My latest tests are showing that the multi grep tool is only harmful, trying to get rid of it
-  const enableMultiGrep = process.env.PI_FFF_MULTIGREP === "1";
-
-  if (enableMultiGrep) {
-    const multiGrepSchema = Type.Object({
-      patterns: Type.Array(Type.String(), {
-        description:
-          "Literal patterns (OR). Include snake_case/camelCase/PascalCase variants.",
-      }),
-      constraints: Type.Optional(
-        Type.String({ description: "File filter, e.g. '*.{ts,tsx} !test/'" }),
-      ),
-      context: Type.Optional(Type.Number({ description: "Context lines before+after" })),
-      limit: Type.Optional(
-        Type.Number({
-          description: `Max matches (default ${DEFAULT_GREP_LIMIT})`,
-        }),
-      ),
-      cursor: Type.Optional(Type.String({ description: "Pagination cursor" })),
-    });
-
-    pi.registerTool({
-      name: toolNames.multiGrep,
-      label: toolNames.multiGrep,
-      description:
-        "Search file contents for ANY of multiple literal patterns (OR, SIMD Aho-Corasick). Faster than regex alternation.",
-      promptSnippet: "Multi-pattern OR content search",
-      promptGuidelines: [
-        `${toolNames.multiGrep}: use when searching for several identifiers at once.`,
-        `${toolNames.multiGrep}: include all naming-convention variants (snake/camel/Pascal).`,
-        `${toolNames.multiGrep}: patterns are literal. Use constraints for file filters.`,
-      ],
-      parameters: multiGrepSchema,
-
-      async execute(_toolCallId, params, signal) {
-        if (signal?.aborted) throw new Error("Operation aborted");
-        if (!params.patterns?.length)
-          throw new Error("patterns array must have at least 1 element");
-
-        const f = await ensureFinder(activeCwd);
-        const effectiveLimit = Math.max(1, params.limit ?? DEFAULT_GREP_LIMIT);
-
-        const grepResult = f.multiGrep({
-          patterns: params.patterns,
-          constraints: params.constraints,
-          maxMatchesPerFile: Math.min(effectiveLimit, 50),
-          smartCase: true,
-          cursor: (params.cursor ? getCursor(params.cursor) : null) ?? null,
-          beforeContext: params.context ?? 0,
-          afterContext: params.context ?? 0,
-        });
-
-        if (!grepResult.ok) throw new Error(grepResult.error);
-
-        const result = grepResult.value;
-        let output = formatGrepOutput(result);
-
-        const notices: string[] = [];
-        if (result.items.length >= effectiveLimit)
-          notices.push(`${effectiveLimit}+ matches (refine patterns)`);
-        if (result.nextCursor)
-          notices.push(
-            `More available. cursor="${storeCursor(result.nextCursor)}" to continue`,
-          );
-
-        if (notices.length > 0) output += `\n\n[${notices.join(". ")}]`;
-
-        return {
-          content: [{ type: "text", text: output }],
-          details: {
-            totalMatched: result.totalMatched,
-            totalFiles: result.totalFiles,
-            patterns: params.patterns,
-          },
-        };
-      },
-
-      renderCall(args, theme, context) {
-        const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
-        const patterns = args?.patterns ?? [];
-        const constraints = args?.constraints;
-        let content =
-          theme.fg("toolTitle", theme.bold(toolNames.multiGrep)) +
-          " " +
-          theme.fg("accent", patterns.map((p: string) => `"${p}"`).join(", "));
-        if (constraints) content += theme.fg("toolOutput", ` (${constraints})`);
-        if (args?.cursor) content += theme.fg("muted", ` (page)`);
-        text.setText(content);
-        return text;
-      },
-
-      renderResult(result, options, theme, context) {
-        return renderTextResult(result, options, theme, context, 15);
-      },
-    });
-  } // end if (enableMultiGrep)
-
-  // --- commands ---
-
-  pi.registerCommand("fff-mode", {
-    description: "Show or set FFF mode: /fff-mode [tools-and-ui | tools-only | override]",
-    handler: async (args, ctx) => {
-      const arg = (args || "").trim();
-
-      // No args - show current mode
-      if (!arg) {
-        const mode = getMode();
-        const flag = pi.getFlag("fff-mode") ?? "unset";
-        ctx.ui.notify(`Current mode: '${mode}' (flag: ${flag})`, "info");
-        return;
-      }
-
-      // Validate and set mode
-      if (!VALID_MODES.includes(arg as FffMode)) {
-        ctx.ui.notify(`Usage: /fff-mode [${VALID_MODES.join(" | ")}]`, "warning");
-        return;
-      }
-
-      const newMode = arg as FffMode;
-      const oldMode = getMode();
-      setMode(newMode);
-
-      pi.appendEntry("fff-mode", { mode: newMode });
-
-      const note =
-        (oldMode === "override") !== (newMode === "override")
-          ? " (tool name change requires /reload)"
-          : "";
-      ctx.ui.notify(`Mode changed: '${oldMode}' → '${newMode}'${note}`, "info");
-    },
-  });
-
-  pi.registerCommand("fff-health", {
-    description: "Show FFF file finder health and status",
-    handler: async (_args, ctx) => {
-      if (!mainFinder || mainFinder.isDestroyed) {
-        ctx.ui.notify("FFF not initialized", "warning");
-        return;
-      }
-
-      const health = mainFinder.healthCheck();
-      if (!health.ok) {
-        ctx.ui.notify(`Health check failed: ${health.error}`, "error");
-        return;
-      }
-
-      const lines = [
-        `FFF v${health.value.version}`,
-        `Mode: ${getMode()}`,
-        `Git: ${health.value.git.repositoryFound ? `yes (${health.value.git.workdir ?? "unknown"})` : "no"}`,
-        `Picker: ${health.value.filePicker.initialized ? `${health.value.filePicker.indexedFiles ?? 0} files` : "not initialized"}`,
-        `Frecency: ${health.value.frecency.initialized ? "active" : "disabled"}`,
-        `Query tracker: ${health.value.queryTracker.initialized ? "active" : "disabled"}`,
-      ];
-
-      const progress = mainFinder.getScanProgress();
-      if (progress.ok) {
-        lines.push(
-          `Scanning: ${progress.value.isScanning ? "yes" : "no"} (${progress.value.scannedFilesCount} files)`,
-        );
-      }
-
-      ctx.ui.notify(lines.join("\n"), "info");
-    },
-  });
-
-  pi.registerCommand("fff-rescan", {
-    description: "Trigger FFF to rescan files",
-    handler: async (_args, ctx) => {
-      if (!mainFinder || mainFinder.isDestroyed) {
-        ctx.ui.notify("FFF not initialized", "warning");
-        return;
-      }
-
-      const result = mainFinder.scanFiles();
-      if (!result.ok) {
-        ctx.ui.notify(`Rescan failed: ${result.error}`, "error");
-        return;
-      }
-
-      ctx.ui.notify("FFF rescan triggered", "info");
-    },
-  });
 }

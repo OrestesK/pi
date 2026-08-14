@@ -21,11 +21,9 @@ import {
 	type BashToolDetails,
 	CustomEditor,
 	createBashTool,
-	createEditTool,
 	createFindTool,
 	createGrepTool,
 	createLsTool,
-	createReadTool,
 	createWriteTool,
 	type EditToolDetails,
 	type ExtensionAPI,
@@ -1632,12 +1630,10 @@ type SubagentToolDisplayEntry = {
 };
 
 type BuiltInTools = {
-	read: ReturnType<typeof createReadTool>;
 	grep: ReturnType<typeof createGrepTool>;
 	find: ReturnType<typeof createFindTool>;
 	ls: ReturnType<typeof createLsTool>;
 	bash: ReturnType<typeof createBashTool>;
-	edit: ReturnType<typeof createEditTool>;
 	write: ReturnType<typeof createWriteTool>;
 };
 
@@ -1787,12 +1783,10 @@ function getBuiltInTools(cwd: string, pi: ExtensionAPI): BuiltInTools {
 	if (tools) return tools;
 
 	tools = {
-		read: createReadTool(cwd),
 		grep: createGrepTool(cwd),
 		find: createFindTool(cwd),
 		ls: createLsTool(cwd),
 		bash: createBashTool(cwd, { spawnHook: createComposedSpawnHook(pi) }),
-		edit: createEditTool(cwd),
 		write: createWriteTool(cwd),
 	};
 	toolsByCwd.set(cwd, tools);
@@ -5269,29 +5263,6 @@ function registerClaudeToolRenderers(pi: ExtensionAPI): void {
 	const bootstrap = getBuiltInTools(process.cwd(), pi);
 
 	pi.registerTool({
-		name: "read",
-		label: bootstrap.read.label,
-		description: bootstrap.read.description,
-		parameters: bootstrap.read.parameters,
-		prepareArguments: bootstrap.read.prepareArguments,
-		executionMode: bootstrap.read.executionMode,
-		renderShell: "self",
-		execute: (toolCallId, params, signal, onUpdate, ctx) =>
-			getBuiltInTools(ctx.cwd, pi).read.execute(
-				toolCallId,
-				params,
-				signal,
-				onUpdate,
-			),
-		renderCall: (args, theme, context) =>
-			setText(
-				context.lastComponent,
-				formatReadCall(args, theme, isToolPending(context)),
-			),
-		renderResult: renderReadResult,
-	});
-
-	pi.registerTool({
 		name: "ls",
 		label: bootstrap.ls.label,
 		description: bootstrap.ls.description,
@@ -5335,29 +5306,6 @@ function registerClaudeToolRenderers(pi: ExtensionAPI): void {
 				formatBashCall(args, theme, isToolPending(context)),
 			),
 		renderResult: renderBashResult,
-	});
-
-	pi.registerTool({
-		name: "edit",
-		label: bootstrap.edit.label,
-		description: bootstrap.edit.description,
-		parameters: bootstrap.edit.parameters,
-		prepareArguments: bootstrap.edit.prepareArguments,
-		executionMode: bootstrap.edit.executionMode,
-		renderShell: "self",
-		execute: async (toolCallId, params, signal, onUpdate, ctx) =>
-			getBuiltInTools(ctx.cwd, pi).edit.execute(
-				toolCallId,
-				params,
-				signal,
-				onUpdate,
-			),
-		renderCall: (args, theme, context) =>
-			setText(
-				context.lastComponent,
-				formatEditCall(args, theme, isToolPending(context)),
-			),
-		renderResult: renderEditResult,
 	});
 
 	pi.registerTool({

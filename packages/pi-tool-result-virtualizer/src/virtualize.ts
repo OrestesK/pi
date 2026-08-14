@@ -209,9 +209,11 @@ function isProtectedToolResult(
 	event: ToolResultEventLike,
 	toolName: string,
 ): boolean {
+	const details = detailsRecord(event.details);
 	return (
 		isProtectedToolName(toolName) ||
-		(toolName === "mcp" && isContextModeMcpInput(event.input))
+		(toolName === "mcp" && isContextModeMcpInput(event.input)) ||
+		(toolName === "read" && typeof details?.snapshotId === "string")
 	);
 }
 

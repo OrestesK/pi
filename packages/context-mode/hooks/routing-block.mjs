@@ -44,7 +44,7 @@ export function createRoutingBlock(t, options = {}) {
   </forbidden_actions>
 
   <file_writing_policy>
-    ALWAYS use native Write/Edit tools for file creation/modification.
+    ALWAYS use the active Write/Replace tools for file creation/modification.
     NEVER use ${t("ctx_execute")}, ${t("ctx_execute_file")}, or Bash to write files.
     Applies to all file types: code, configs, plans, specs, YAML, JSON, markdown.
   </file_writing_policy>

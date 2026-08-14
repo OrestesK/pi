@@ -55,6 +55,7 @@
   ],
   "packages": [
     "extensions/claude-ui",
+    "npm:pi-hashline-edit-pro@2.5.3",
     {
       "source": "git:github.com/nicobailon/pi-intercom@e234a4446e2b3f9c13a1ec3151ae2169315c810f",
       "skills": []
@@ -84,7 +85,16 @@
       "skills": [],
       "prompts": []
     },
-    "packages/pi-fff",
+    {
+      "source": "packages/pi-fff",
+      "autoload": false,
+      "extensions": [
+        "+src/index.ts"
+      ],
+      "skills": [],
+      "prompts": [],
+      "themes": []
+    },
     "npm:pi-mcp-adapter@2.25.0",
     {
       "source": "packages/pi-lens",
