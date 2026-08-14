@@ -322,8 +322,19 @@ export class StoreCatalog {
 		accessContext: StoreAccessContext,
 	): boolean {
 		if (accessContext.actor === "system") return true;
-		if (accessContext.actor === "subagent")
-			return accessContext.grantedSourceIds?.has(entry.sourceId) === true;
+		if (accessContext.actor === "subagent") {
+			const sameRunOwner =
+				entry.subagentRunId !== undefined &&
+				entry.subagentRunId.length > 0 &&
+				entry.agentName !== undefined &&
+				entry.agentName.length > 0 &&
+				entry.subagentRunId === accessContext.subagentRunId &&
+				entry.agentName === accessContext.subagentAgentName;
+			return (
+				sameRunOwner ||
+				accessContext.grantedSourceIds?.has(entry.sourceId) === true
+			);
+		}
 		return true;
 	}
 }

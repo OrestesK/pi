@@ -11,8 +11,11 @@ import {
 	formatSearchMatches,
 	PROTECTED_TOOL_OUTPUT_BYTE_LIMIT,
 } from "./formatting.ts";
-import type { GrantOperation } from "./grants.ts";
-import type { RunBoundGrantRegistry } from "./grants.ts";
+import {
+	RESULT_ANALYST_RUNTIME_NAME,
+	type GrantOperation,
+	type RunBoundGrantRegistry,
+} from "./grants.ts";
 import { formatSourceOutline } from "./outline.ts";
 import {
 	boundedIntegerParam,
@@ -64,6 +67,11 @@ async function grantExactSourceAccess(
 	sourceIds: string[],
 ): Promise<StoreAccessContext> {
 	if (access.actor !== "subagent") return access;
+	if (
+		sourceIds.length > 0 &&
+		access.subagentAgentName !== RESULT_ANALYST_RUNTIME_NAME
+	)
+		return access;
 	await grants.reserve({
 		runId: access.subagentRunId ?? "",
 		agentName: access.subagentAgentName ?? "",

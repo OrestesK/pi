@@ -74,14 +74,27 @@ function analystManifestValid(text: string): boolean {
 	);
 }
 
-function unavailable(reasonCode: string, message: string): DelegationResult {
+function unavailable(
+	reasonCode: string,
+	message: string,
+	diagnostics: Record<string, string> = {},
+): DelegationResult {
 	return {
 		content: [{ type: "text", text: message }],
 		details: {
 			kind: "tool_result_delegation",
 			status: "delegation_unavailable",
 			reasonCode,
+			...diagnostics,
 		},
+	};
+}
+
+function spawnErrorDiagnostics(error: unknown): Record<string, string> {
+	if (!(error instanceof SubagentRpcClientError)) return {};
+	return {
+		clientErrorCode: error.code,
+		...(error.rpcCode === undefined ? {} : { rpcErrorCode: error.rpcCode }),
 	};
 }
 
@@ -182,6 +195,7 @@ export class ResultDelegationService {
 				outcomeUnknown
 					? "Delegation spawn outcome is unknown. No source grant was committed."
 					: "Delegation could not start. No source grant was committed.",
+				spawnErrorDiagnostics(error),
 			);
 		}
 

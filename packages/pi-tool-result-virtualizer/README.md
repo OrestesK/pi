@@ -43,7 +43,7 @@ Search results cite exact `[sourceId:startLine-endLine]` ranges. Normal receipts
 - Broad list, search, diagnostics, and retention previews default to the current project scope.
 - Parent callers can set `includeGlobal: true` to include other project scopes.
 - Captures created before scoped metadata remain readable in place as `legacy` records; they are not silently rewritten. Set `includeLegacy: true` to include them in broad discovery.
-- Unscoped captures are excluded from every broad discovery mode. A known exact `sourceId` is a deliberate parent possession capability across project, unscoped, and legacy records; it does not broaden discovery. Subagents still require an exact run-bound grant, and unavailable sources are not disclosed.
+- Unscoped captures are excluded from every broad discovery mode. A known exact `sourceId` is a deliberate parent possession capability across project, unscoped, and legacy records; it does not broaden discovery. A subagent may retrieve an exact source created by the same run and agent identity; inherited and cross-run sources still require an exact run-bound analyst grant, and unavailable sources are not disclosed.
 - Capture completeness is explicit: `details.fullOutputPath` and ordinary `read.input.path` captures are exact for the captured file/range. Snapshot-bearing reads preserve exact anchor-bearing `event.content`; like other `event.content` captures, it may already reflect upstream truncation or omission.
 
 ## Tools
@@ -71,6 +71,8 @@ The package ships `agents/result-analyst.md`, a fresh-context analyst with no in
 1. The main agent supplies a focused task, such as a summary, comparison, or multi-fact extraction.
 2. The tool performs source, packaged-analyst, RPC, and grant checks internally, then starts one asynchronous run. The result returns its run ID plus typed `subagent` status and interrupt actions.
 3. Retrieval authority is committed only after spawn to the runner-generated run ID. It is bound to the exact analyst identity, source, operations, call/byte budget, and expiry. A `sourceId` alone is not authorization.
+
+Spawn failures retain bounded client and RPC error codes in result details for diagnosis. Raw RPC error messages are not exposed.
 
 Each run is limited to 8 retrieval calls, 64 KiB of retrieved evidence, a 4-minute runtime, a 5-minute grant lifetime, and an 8 KiB/200-line final response. The analyst must return access/completion status, cited findings, uncertainty, and residual risks.
 

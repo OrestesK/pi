@@ -261,6 +261,120 @@ test("runner access preserves run and analyst identity but grants no authority",
 	assert.equal(access.grantedSourceIds, undefined);
 });
 
+test("ordinary subagents retrieve only exact sources created by the same run and agent", async () => {
+	const { dir, store } = await makeStore();
+	const baseProvenance = {
+		scope: "project" as const,
+		classification: "unclassified-local" as const,
+		projectId: "a".repeat(64),
+	};
+	const owned = await store.storeSource({
+		toolName: "bash",
+		text: "owned needle\nsecond line\n",
+		captureStatus: "event.content",
+		provenance: {
+			...baseProvenance,
+			subagentRunId: "ordinary-run",
+			agentName: "scout",
+		},
+	});
+	const otherRun = await store.storeSource({
+		toolName: "bash",
+		text: "other run needle\n",
+		captureStatus: "event.content",
+		provenance: {
+			...baseProvenance,
+			subagentRunId: "other-run",
+			agentName: "scout",
+		},
+	});
+	const otherAgent = await store.storeSource({
+		toolName: "bash",
+		text: "other agent needle\n",
+		captureStatus: "event.content",
+		provenance: {
+			...baseProvenance,
+			subagentRunId: "ordinary-run",
+			agentName: "reviewer",
+		},
+	});
+	const inherited = await store.storeSource({
+		toolName: "bash",
+		text: "inherited needle\n",
+		captureStatus: "event.content",
+		provenance: baseProvenance,
+	});
+	const tools = buildToolResultTools(
+		store,
+		async () => ({
+			actor: "subagent",
+			subagentRunId: "ordinary-run",
+			subagentAgentName: "scout",
+		}),
+		new RunBoundGrantRegistry(dir, { commitWaitMs: 0 }),
+	);
+	const get = tools.find((tool) => tool.name === "tool_result_get");
+	const search = tools.find((tool) => tool.name === "tool_result_search");
+	const outline = tools.find((tool) => tool.name === "tool_result_outline");
+	const list = tools.find((tool) => tool.name === "tool_result_list");
+	assert.ok(get);
+	assert.ok(search);
+	assert.ok(outline);
+	assert.ok(list);
+
+	const window = await get.execute(
+		"owned-get",
+		{ sourceId: owned.sourceId },
+		undefined,
+		undefined,
+		{ cwd: dir },
+	);
+	assert.match(window.content[0]?.text ?? "", /owned needle/);
+	const matches = await search.execute(
+		"owned-search",
+		{ query: "needle", sourceId: owned.sourceId },
+		undefined,
+		undefined,
+		{ cwd: dir },
+	);
+	assert.match(matches.content[0]?.text ?? "", /owned needle/);
+	const summary = await outline.execute(
+		"owned-outline",
+		{ sourceId: owned.sourceId },
+		undefined,
+		undefined,
+		{ cwd: dir },
+	);
+	assert.match(summary.content[0]?.text ?? "", /owned needle/);
+
+	for (const [toolCallId, sourceId] of [
+		["other-run", otherRun.sourceId],
+		["other-agent", otherAgent.sourceId],
+		["inherited", inherited.sourceId],
+	] as const) {
+		await assert.rejects(
+			get.execute(
+				toolCallId,
+				{ sourceId },
+				undefined,
+				undefined,
+				{ cwd: dir },
+			),
+			/source not found or unavailable/i,
+		);
+	}
+	await assert.rejects(
+		search.execute("broad", { query: "needle" }, undefined, undefined, {
+			cwd: dir,
+		}),
+		GRANT_UNAVAILABLE,
+	);
+	const listResult = await list.execute("list", {}, undefined, undefined, {
+		cwd: dir,
+	});
+	assert.equal(listResult.details?.count, 0);
+});
+
 test("real retrieval tools allow only explicitly granted exact sources", async () => {
 	const { dir, store } = await makeStore();
 	const sourceA = await store.storeSource({

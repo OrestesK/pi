@@ -55,6 +55,12 @@ export type SubagentRpcClientErrorCode =
 	| "invalid_reply"
 	| "rpc_error";
 
+function boundedRpcErrorCode(value: string | undefined): string | undefined {
+	return value !== undefined && /^[a-z][a-z0-9_]{0,63}$/.test(value)
+		? value
+		: undefined;
+}
+
 export class SubagentRpcClientError extends Error {
 	readonly code: SubagentRpcClientErrorCode;
 	readonly rpcCode: string | undefined;
@@ -67,7 +73,7 @@ export class SubagentRpcClientError extends Error {
 		super(message);
 		this.name = "SubagentRpcClientError";
 		this.code = code;
-		this.rpcCode = rpcCode;
+		this.rpcCode = boundedRpcErrorCode(rpcCode);
 	}
 }
 

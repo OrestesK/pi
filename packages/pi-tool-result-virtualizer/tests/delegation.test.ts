@@ -408,11 +408,15 @@ test("explicit delegation spawns once, commits the returned run, and exposes typ
 	});
 });
 
-test("spawn failure aborts the pending grant and returns typed unavailability", async () => {
+test("spawn failure aborts the pending grant and returns bounded RPC diagnostics", async () => {
 	const { dir } = await makeStore();
 	const source = await storedSource(dir);
 	const rpc = new FakeRpc();
-	rpc.spawnError = new Error("spawn failed");
+	rpc.spawnError = new SubagentRpcClientError(
+		"rpc_error",
+		"sensitive spawn failure",
+		"execution_failed",
+	);
 	const result = await service(dir, rpc).delegate(
 		{ sourceId: source.sourceId, task: "Summarize" },
 		{ cwd: dir },
@@ -420,6 +424,30 @@ test("spawn failure aborts the pending grant and returns typed unavailability", 
 
 	assert.equal(status(result), "delegation_unavailable");
 	assert.equal(result.details?.reasonCode, "spawn_failed");
+	assert.equal(result.details?.clientErrorCode, "rpc_error");
+	assert.equal(result.details?.rpcErrorCode, "execution_failed");
+	assert.doesNotMatch(JSON.stringify(result), /sensitive spawn failure/);
+	await assert.rejects(readdir(join(dir, "grants")), { code: "ENOENT" });
+});
+
+test("spawn failure omits malformed RPC codes and raw messages", async () => {
+	const { dir } = await makeStore();
+	const source = await storedSource(dir);
+	const rpc = new FakeRpc();
+	rpc.spawnError = new SubagentRpcClientError(
+		"rpc_error",
+		"sensitive malformed reply",
+		"../../not-bounded",
+	);
+	const result = await service(dir, rpc).delegate(
+		{ sourceId: source.sourceId, task: "Summarize" },
+		{ cwd: dir },
+	);
+
+	assert.equal(result.details?.reasonCode, "spawn_failed");
+	assert.equal(result.details?.clientErrorCode, "rpc_error");
+	assert.equal(result.details?.rpcErrorCode, undefined);
+	assert.doesNotMatch(JSON.stringify(result), /sensitive malformed reply|not-bounded/);
 	await assert.rejects(readdir(join(dir, "grants")), { code: "ENOENT" });
 });
 
@@ -427,7 +455,7 @@ test("spawn timeout returns unknown outcome without committing source access", a
 	const { dir } = await makeStore();
 	const source = await storedSource(dir);
 	const rpc = new FakeRpc();
-	rpc.spawnError = new SubagentRpcClientError("timeout", "spawn timeout");
+	rpc.spawnError = new SubagentRpcClientError("timeout", "sensitive timeout");
 	const result = await service(dir, rpc).delegate(
 		{ sourceId: source.sourceId, task: "Summarize" },
 		{ cwd: dir },
@@ -435,6 +463,9 @@ test("spawn timeout returns unknown outcome without committing source access", a
 
 	assert.equal(status(result), "delegation_unavailable");
 	assert.equal(result.details?.reasonCode, "spawn_outcome_unknown");
+	assert.equal(result.details?.clientErrorCode, "timeout");
+	assert.equal(result.details?.rpcErrorCode, undefined);
+	assert.doesNotMatch(JSON.stringify(result), /sensitive timeout/);
 	await assert.rejects(readdir(join(dir, "grants")), { code: "ENOENT" });
 });
 
