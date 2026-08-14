@@ -2,6 +2,7 @@
   "name": "pi-extensions",
   "private": true,
   "dependencies": {
+    "pi-ask-user": "^0.14.0",
     "pi-memory-md": "0.1.38",
     "pi-session-search": "1.4.3",
     "pisesh": "0.2.0"
