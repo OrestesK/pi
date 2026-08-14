@@ -2,8 +2,6 @@
 
 A [pi](https://github.com/badlogic/pi-mono) extension that replaces the built-in `find` and `grep` tools with [FFF](https://github.com/dmtrKovalenko/fff.nvim) — a Rust-native, SIMD-accelerated file finder with built-in memory.
 
-> **Local configuration:** This vendored copy defaults to `override`, so the effective tools are FFF-backed `find` and `grep` plus FFF-backed `@` autocomplete. `fffind`, `ffgrep`, and `multi_grep` are not registered by default. The other modes described below remain available.
-
 ## What it does
 
 | Built-in tool | pi-fff replacement | Improvement |
@@ -77,11 +75,11 @@ Or test directly:
 pi -e /path/to/fff.nvim/packages/pi-fff/src/index.ts
 ```
 
-Tool names depend on the selected mode. This vendored configuration registers FFF-powered `find` and `grep`; multi-grep remains disabled unless `PI_FFF_MULTIGREP=1` is explicitly set.
+This extension registers FFF-powered tools (`fffind`, `ffgrep`, `fff-multi-grep`) alongside pi's built-in tools.
 
 ## Tools
 
-### `grep` (`ffgrep` outside override mode)
+### `ffgrep`
 
 Search file contents. Smart case, plain text by default, regex optional.
 
@@ -94,7 +92,7 @@ Parameters:
 - `limit` — max matches (default: 100)
 - `cursor` — pagination cursor from previous result
 
-### `find` (`fffind` outside override mode)
+### `fffind`
 
 Fuzzy file name search. Frecency-ranked.
 
@@ -103,9 +101,9 @@ Parameters:
 - `path` — directory constraint
 - `limit` — max results (default: 200)
 
-### `multi_grep` (`fff-multi-grep` outside override mode)
+### `fff-multi-grep`
 
-OR-logic multi-pattern content search. SIMD-accelerated Aho-Corasick. Disabled unless `PI_FFF_MULTIGREP=1` is set.
+OR-logic multi-pattern content search. SIMD-accelerated Aho-Corasick.
 
 Parameters:
 - `patterns` — array of literal patterns (OR logic)
@@ -122,21 +120,22 @@ Parameters:
 
 ## Modes
 
-- `tools-and-ui` (upstream default): registers `fffind`, `ffgrep`, `fff-multi-grep` as additional tools + FFF-backed `@` autocomplete
+- `tools-and-ui` (default): registers `fffind`, `ffgrep`, `fff-multi-grep` as additional tools + FFF-backed `@` autocomplete
 - `tools-only`: additional tools only; keep pi's default `@` autocomplete
-- `override` (local default): replaces pi's built-in `find`, `grep`, adds FFF-backed `@` autocomplete, and registers `multi_grep` only when explicitly enabled
+- `override`: replaces pi's built-in `find`, `grep` and adds `multi_grep` + FFF-backed `@` autocomplete
 
 Mode precedence:
 1. `--fff-mode <mode>` CLI flag
 2. `PI_FFF_MODE=<mode>` environment variable
-3. default (`override` in this vendored configuration)
+3. default (`tools-and-ui`)
 
 ## Flags
 
 - `--fff-mode <mode>` — set mode (see above)
 - `--fff-frecency-db <path>` — path to frecency database (also: `FFF_FRECENCY_DB` env)
 - `--fff-history-db <path>` — path to query history database (also: `FFF_HISTORY_DB` env)
-- `--fff-enable-root-scan` — allow indexing when launched from `/` (also: `FFF_ENABLE_ROOT_SCAN=1` env). FFF refuses to init at the filesystem root by default. Home directory scanning is always enabled for pi.
+- `--fff-enable-root-scan` — allow indexing when launched from `/` (also: `FFF_ENABLE_ROOT_SCAN=1` env). FFF refuses to init at the filesystem root by default.
+- `--fff-enable-home-scan` — index the home directory when launched from `$HOME` (also: `FFF_ENABLE_HOME_SCAN` env). Enabled by default. Disable with `--fff-enable-home-scan=false` or `FFF_ENABLE_HOME_SCAN=0` if your `$HOME` contains huge trees (toolchains, kernel sources, build outputs) that make the background index run for a long time. When launched from `$HOME` with this enabled, pi shows a warning that the whole home tree is being indexed.
 
 ## Data
 
