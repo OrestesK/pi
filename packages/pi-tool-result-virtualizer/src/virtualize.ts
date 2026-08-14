@@ -209,11 +209,9 @@ function isProtectedToolResult(
 	event: ToolResultEventLike,
 	toolName: string,
 ): boolean {
-	const details = detailsRecord(event.details);
 	return (
 		isProtectedToolName(toolName) ||
-		(toolName === "mcp" && isContextModeMcpInput(event.input)) ||
-		(toolName === "read" && typeof details?.snapshotId === "string")
+		(toolName === "mcp" && isContextModeMcpInput(event.input))
 	);
 }
 
@@ -321,6 +319,9 @@ async function captureText(
 		}
 	}
 	const inputPath = input ? stringField(input, "path") : undefined;
+	if (toolName === "read" && typeof details?.snapshotId === "string") {
+		return { text: eventText, captureStatus: "event.content" };
+	}
 	if (toolName === "read" && input !== undefined && inputPath !== undefined) {
 		const originalPath = resolve(options.cwd, inputPath);
 		try {

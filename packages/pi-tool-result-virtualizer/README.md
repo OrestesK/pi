@@ -44,7 +44,7 @@ Search results cite exact `[sourceId:startLine-endLine]` ranges. Normal receipts
 - Parent callers can set `includeGlobal: true` to include other project scopes.
 - Captures created before scoped metadata remain readable in place as `legacy` records; they are not silently rewritten. Set `includeLegacy: true` to include them in broad discovery.
 - Unscoped captures are excluded from every broad discovery mode. A known exact `sourceId` is a deliberate parent possession capability across project, unscoped, and legacy records; it does not broaden discovery. Subagents still require an exact run-bound grant, and unavailable sources are not disclosed.
-- Capture completeness is explicit: `details.fullOutputPath` and `read.input.path` captures are exact for the captured file/range, while `event.content` may already reflect upstream truncation or omission.
+- Capture completeness is explicit: `details.fullOutputPath` and ordinary `read.input.path` captures are exact for the captured file/range. Snapshot-bearing reads preserve exact anchor-bearing `event.content`; like other `event.content` captures, it may already reflect upstream truncation or omission.
 
 ## Tools
 
@@ -89,7 +89,7 @@ Events contain allowlisted sizes, counts, decisions, operation/outcome names, an
 
 ## Storage and safety
 
-- For `bash`, `details.fullOutputPath` is preferred when available. For `read`, `event.input.path`, `offset`, and `limit` define the capture.
+- For `bash`, `details.fullOutputPath` is preferred when available. For ordinary `read`, `event.input.path`, `offset`, and `limit` define the capture. Snapshot-bearing reads capture `event.content` so transformed annotations such as hash anchors are preserved.
 - Protected tools, context-mode results, and `details.toolResultVirtualizer` metadata bypass recursive capture. Raw `[tool-result-virtualizer]` text does not.
 - Reads whose requested filename is exactly `SKILL.md` bypass virtualization. Normalized path spellings do not widen this filename rule through symlinks.
 - `sourceId` must match `tr_[a-z0-9_]+` and stay at most 128 bytes.

@@ -535,6 +535,54 @@ test("non-read tools do not receive the SKILL.md bypass", async () => {
 	assert.equal((await store.listSources()).length, 1);
 });
 
+test("small snapshot reads remain inline", async () => {
+	const { store, dir } = await makeStore();
+	const result = await virtualizeToolResult(
+		{
+			toolName: "read",
+			toolCallId: "snapshot_read_small",
+			input: { path: join(dir, "small-snapshot.txt") },
+			content: [{ type: "text", text: "Aa1│small snapshot read\n" }],
+			details: { snapshotId: "v2|small-snapshot" },
+		},
+		store,
+		{ cwd: dir },
+	);
+
+	assert.equal(result, undefined);
+	assert.deepEqual(await store.listSources(), []);
+});
+
+test("large snapshot reads virtualize exact anchor-bearing event content", async () => {
+	const { store, dir } = await makeStore();
+	const readPath = join(dir, "large-snapshot.txt");
+	const raw = markerLines("RAW_FILE_CONTENT", 300);
+	const anchored = markerLines(`Aa1│SNAPSHOT_${"X".repeat(40)}`, 300);
+	await writeFile(readPath, raw, "utf8");
+
+	const result = await virtualizeToolResult(
+		{
+			toolName: "read",
+			toolCallId: "snapshot_read_large",
+			input: { path: readPath },
+			content: [{ type: "text", text: anchored }],
+			details: { snapshotId: "v2|large-snapshot" },
+		},
+		store,
+		{ cwd: dir },
+	);
+
+	assert.ok(result);
+	const details = result.details as Record<string, unknown>;
+	const metadata = details.toolResultVirtualizer as {
+		sourceId: string;
+		captureStatus: string;
+	};
+	assert.equal(metadata.captureStatus, "event.content");
+	assert.equal((await store.readSource(metadata.sourceId)).text, anchored);
+	assert.notEqual((await store.readSource(metadata.sourceId)).text, raw);
+});
+
 test("read virtualization snapshots the requested line range from input.path", async () => {
 	const { store, dir } = await makeStore();
 	const readPath = join(dir, "large-read.txt");
