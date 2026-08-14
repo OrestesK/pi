@@ -85,7 +85,7 @@
       "prompts": []
     },
     "packages/pi-fff",
-    "npm:pi-mcp-adapter",
+    "npm:pi-mcp-adapter@2.25.0",
     {
       "source": "packages/pi-lens",
       "autoload": false,
@@ -93,10 +93,10 @@
         "+dist/index.js"
       ]
     },
-    "npm:pi-web-access",
-    "npm:@aliou/pi-guardrails",
+    "npm:pi-web-access@0.22.0",
+    "npm:@aliou/pi-guardrails@0.17.0",
     {
-      "source": "npm:pi-ask-user",
+      "source": "npm:pi-ask-user@0.14.0",
       "skills": []
     },
     "packages/pi-tool-result-virtualizer",
@@ -113,8 +113,8 @@
     "packages/pi-sixel",
     "npm:@carter-mcalister/pi-codex-image-gen@0.2.0",
     "npm:pisesh@0.2.0",
-    "npm:pi-btw",
-    "npm:pi-goal-x"
+    "npm:pi-btw@0.4.1",
+    "npm:pi-goal-x@0.27.4"
   ],
   "pi-memory-md": {
     "enabled": false,
