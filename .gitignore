@@ -54,3 +54,5 @@ mcp-onboarding.json
 !/.agents/skills/skill-authoring/tests/
 /.agents/skills/skill-authoring/tests/*
 !/.agents/skills/skill-authoring/tests/test_validate_skill.py
+/web-search-cache
+/models-store.json

@@ -5,7 +5,7 @@ description: Use for GitHub pull requests, issues, CI workflows, and API queries
 
 # GitHub (gh CLI)
 
-Use the `gh` CLI for all GitHub operations. Never use the GitHub MCP server.
+Use the `gh` CLI for all GitHub operations
 
 ## Read-only inspection
 
@@ -33,10 +33,6 @@ For a readiness claim or review that depends on current PR content:
 
 This check confirms freshness; it does not lock the PR. Use it only when the conclusion depends on PR content, not for metadata-only inspection or non-PR reviews.
 
-## Choose proof through `behavioral-proof`
-
-Before choosing evidence for a PR review, readiness assessment, evidence report, comment, or iteration, load and follow `behavioral-proof`. It decides whether a representative live path exists, the approval gate, the strongest non-live fallback, and the live-proof status. This skill handles GitHub identity and transport; do not repeat proof-selection rules here.
-
 ## GitHub mutations and command rules
 
 For every GitHub mutation, the user must request and explicitly approve the exact tool (`gh`), command, action, target, and expected effect. State every relevant credential, data, cost, time, environment, and destructive boundary, then wait. Approval for one mutation does not allow another. The active authorization, external-action, and project rules still control what is allowed.
@@ -54,7 +50,7 @@ Mutation categories include:
 - labeling, assigning, or requesting reviewers
 - changing a PR base
 
-Always use `--body-file` for multi-line PR bodies to avoid shell-escaping errors. Check `gh auth status` if an operation fails.
+Always use `--body-file` for multi-line PR bodies to avoid shell-escaping errors. Check `gh auth status` if an operation fails
 
 ## PR Description Format
 
@@ -62,14 +58,18 @@ Use this format when drafting PR text or when the user explicitly asks to update
 
 ```
 ## What changed
-Concise summary. Key files/areas affected.
+Concise summary. Key files/areas affected
 
 ## Why
-Motivation, context, problem being solved.
+Motivation, context, problem being solved
 
 ## How tested
-Tests added/updated, manual checks, commands run.
+Tests added/updated, manual checks, commands run
 ```
+
+This format is not deterministc, you can add sections, and also plug in the format's sections into the existing repository's pr template
+
+When the work context mentions a ticket or issue, attach it to the pr and include it in the desciption
 
 For a PR with a large or mixed diff, add guidance that tells reviewers where to start and separates core behavior from generated, mechanical, or formatting-only changes:
 
