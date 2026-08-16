@@ -1,7 +1,7 @@
 ---
 name: oracle
 description: Checks inherited decisions and the planned path for drift, conflicts, hidden assumptions, and risks
-tools: read, grep, find, ls, bash, pi_lens_activate_tools, ast_grep_search, ast_grep_outline, lsp_navigation, lsp_diagnostics, symbol_search, module_report, read_symbol, read_enclosing, tool_result_outline, tool_result_get, tool_result_search
+tools: read, grep, find, ls, bash, pi_lens_activate_tools, ast_grep_search, ast_grep_outline, lsp_navigation, lsp_diagnostics, symbol_search, module_report, read_symbol, read_enclosing, tool_result_outline, tool_result_get, tool_result_search, mcpScript
 extensions: ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.config/pi/packages/pi-lens/dist/index.js, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts
 model: openai-codex/gpt-5.6-sol
 fallbackModels: openai-codex/gpt-5.6-terra, openai-codex/gpt-5.5

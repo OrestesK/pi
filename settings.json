@@ -158,7 +158,6 @@
   },
   "subagents": {
     "defaultModel": "openai-codex/gpt-5.6-luna",
-    "defaultSessionDir": "~/.pi/subagent-sessions",
     "disableBuiltins": false,
     "agentOverrides": {
       "delegate": {

@@ -1,11 +1,12 @@
 {
   "waitTool": false,
   "toolDescriptionMode": "compact",
+  "defaultSessionDir": "~/.pi/subagent-sessions",
   "toolExtensions": {
     "mcp": {
       "description": "On-demand generic MCP access for delegated work. When an eligible child needs a configured server, add this bundle with requiresCapabilities: [\"mcp\"] instead of keeping the work in the parent or creating a one-off agent.",
       "builtinTools": ["mcp"],
-      "allowedAgents": ["scout", "researcher", "context-builder"]
+      "allowedAgents": ["clone", "context-builder", "oracle", "planner", "researcher", "reviewer", "run-monitor", "scout"]
     }
   },
   "asyncByDefault": true,
@@ -37,8 +38,5 @@
   "parallel": {
     "maxTasks": 20000,
     "concurrency": 20
-  },
-  "progress": {
-    "reportMode": "supervisor"
   }
 }
