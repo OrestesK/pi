@@ -6,10 +6,10 @@
       "lifecycle": "lazy"
     },
     "context-mode": {
-      "command": "bash",
+      "command": "pnpm",
       "args": [
-        "-lc",
-        "exec node \"${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/packages/context-mode/cli.bundle.mjs\""
+        "dlx",
+        "context-mode@1.0.169"
       ],
       "lifecycle": "lazy"
     },

@@ -111,7 +111,7 @@
     },
     "packages/pi-tool-result-virtualizer",
     {
-      "source": "packages/context-mode",
+      "source": "npm:context-mode@1.0.169",
       "skills": []
     },
     "packages/pi-slipstream-compact",
