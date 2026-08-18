@@ -82,8 +82,6 @@ Keep the condition tied to the real lifecycle contract. Do not use a condition t
 
 External polling still obeys authorization, rate, data, and cost boundaries
 
-Do not use this method to poll detached Pi subagents. Follow the active async lifecycle rules
-
 Use `writing-tests` for any persistent test helper or fixture
 
 ## When Fix Progress Stalls

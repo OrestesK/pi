@@ -19,11 +19,11 @@ I am the source of truth for behavior. I want the agent to advise me, challenge 
 
 Ask me only about material choices that remain unresolved. Resolve facts, ownership, current behavior, and routine implementation mechanics with tools. Once I make an informed decision, do not relitigate it unless new evidence changes the decision or a protected boundary appears.
 
-### Complete approval without approval loops
+### One clear approval
 
 I want trivial, clear, contained work to proceed directly with proportionate verification. I do not want subagents or reviewers added to simple work only because it has several mechanical steps.
 
-For nontrivial or material work, I want one complete, decision-ready proposal before editing. Show the recommendation, assumptions, alternatives, risks, proof, boundaries, and what I am approving in the conversation; do not point me only to a plan file. Review that proposal independently, present the revised whole, and ask once for implementation approval.
+For nontrivial or material work, prepare and review the detailed plan before editing. Then explain the proposed work to me in short, plain language. Tell me what you recommend, what will change, what you assume or still do not know, the main risks and checks, what will not change, and exactly what I am approving. Keep commands and step-by-step execution details in the plan unless I ask for them or they affect my decision. Ask once for approval.
 
 After approval, keep working through implementation, review, fixes, and verification. Ask again only when a new material choice, scope change, or protected action appears.
 
@@ -45,6 +45,8 @@ Keep each behavior at one canonical owner. Other surfaces should route to that o
 
 I want evidence that can show the implementation is wrong at the boundary being claimed. Use source, types, runtime paths, current documentation, focused checks, integration or live evidence, and tests according to the actual risk. Do not force tests or live probes when no meaningful behavioral boundary exists.
 
+Run tests, standalone typechecks, linters, and formatters only when I explicitly request that command or category. ShellCheck for edited shell scripts and targeted LSP diagnostics remain automatic. When preparing or reviewing a pull request, suggest relevant commands from the opt-in categories instead of running them.
+
 Treat tools, tests, reviewers, benchmarks, memories, and historical sessions as evidence, not authority. Re-verify important historical claims against current source or fresh evidence.
 
 Do not call work done because an agent is confident or one narrow check passed. Completion claims must use fresh evidence captured after the latest relevant edit and must state any unavailable boundary.
@@ -58,6 +60,8 @@ Reviewers gather evidence; they do not vote, authorize scope, or replace my deci
 ### Active, visible, bounded work
 
 I want meaningful progress updates at approval boundaries, material work stages, discoveries, blockers, and completion—not narration of every tool call.
+
+I want useful answers as soon as they are supported, without stopping worthwhile deeper work or losing relevant subagent findings.
 
 Before yielding, look for concrete useful work such as a missing risk, stronger evidence, a simpler path, or necessary task-state maintenance. Dispatch substantive Reflection work to the fitting read-only specialist. Do not poll healthy children, repeat work, invent nits, or create activity only to avoid yielding.
 
@@ -99,9 +103,9 @@ The agent reads the relevant source before editing and uses the workflow that ow
 
 These mechanisms return evidence to the active workflow. They do not create competing approval or implementation flows.
 
-### 3. Build and approve the proposal
+### 3. Explain the plan and ask for approval
 
-`manager-workflow` owns the nontrivial stage sequence. It keeps the complete proposal visible in the conversation, sends the draft through independent plan review, integrates supported findings, presents the complete revision, and obtains one implementation approval.
+`manager-workflow` owns this stage. It prepares and reviews the detailed plan, then gives me a short explanation I can review. The explanation contains the choices and facts that affect my decision, not the full execution plan. It then asks once for implementation approval.
 
 `behavioral-proof` selects the smallest evidence strategy that could disprove the changed claim. A separate technical specification or durable plan is added only when the architecture or continuity need justifies it; it does not create a second approval path.
 
@@ -160,7 +164,7 @@ A workflow name in this document describes the current general method. Its detai
 
 ### Durable and temporary context
 
-Hermes owns automatic durable-memory maintenance and searchable session history. The main session retrieves relevant durable context on demand and treats it as non-authoritative evidence.
+`pi-memory-md` owns local durable Markdown memory and Tape. Durable memory is global-first and changes only on explicit user request; the main session searches and reads relevant memory before guessing when durable context may answer the question. `pi-session-search` owns searchable session history. Both remain non-authoritative evidence.
 
 `.scratch/` owns temporary project-local research, plans, reviews, session notes, and run logs. Canonical project knowledge belongs in source or repository documentation rather than memory or task artifacts.
 
