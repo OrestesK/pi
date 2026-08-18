@@ -6,6 +6,7 @@ export const ANSI_FG_RESET = "\x1b[39m";
 export const ANSI_BLINK = "\x1b[5m";
 export const ANSI_BLINK_RESET = "\x1b[25m";
 export const EDITOR_RULE_ACCENT = "\x1b[38;2;189;174;147m";
+export const ASSISTANT_MESSAGE_ACCENT = "\x1b[38;2;216;166;87m";
 export const USER_MESSAGE_ACCENT = "\x1b[38;2;131;165;152m";
 
 export function stripAnsi(value: string): string {

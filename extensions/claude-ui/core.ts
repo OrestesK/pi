@@ -7,6 +7,7 @@ import { basename, extname, isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
 	ANSI_FG_RESET,
+	ASSISTANT_MESSAGE_ACCENT,
 	EDITOR_RULE_ACCENT,
 	USER_MESSAGE_ACCENT,
 	fitLine,
@@ -35,6 +36,7 @@ import {
 	type LsToolDetails,
 	type ReadToolDetails,
 	type SessionEntry,
+	SkillInvocationMessageComponent,
 	type Theme,
 	type ThemeColor,
 	ToolExecutionComponent,
@@ -86,10 +88,14 @@ type PatchableUserMessagePrototype = {
 
 type PatchableAssistantMessagePrototype = {
 	render: RenderFn;
-	updateContent: (message: unknown) => void;
+	updateContent: (message: unknown, isStreaming?: boolean) => void;
+	isStreaming: boolean;
 	markdownTheme?: MarkdownTheme;
 	__claudeAssistantMessageOriginalRender?: RenderFn;
-	__claudeAssistantMessageOriginalUpdateContent?: (message: unknown) => void;
+	__claudeAssistantMessageOriginalUpdateContent?: (
+		message: unknown,
+		isStreaming?: boolean,
+	) => void;
 	__claudeAssistantMessagePatched?: boolean;
 };
 
@@ -98,6 +104,15 @@ type PatchableCompactionSummaryPrototype = {
 	children?: Component[];
 	__claudeCompactionSummaryOriginalRender?: RenderFn;
 	__claudeCompactionSummaryPatched?: boolean;
+};
+
+type PatchableSkillInvocationPrototype = {
+	render: RenderFn;
+	expanded?: boolean;
+	skillBlock?: { name?: unknown; content?: unknown };
+	markdownTheme?: MarkdownTheme;
+	__claudeSkillInvocationOriginalRender?: RenderFn;
+	__claudeSkillInvocationPatched?: boolean;
 };
 
 type PatchedToolExecutionPrototype = {
@@ -129,6 +144,7 @@ const toolExecutionRenderCache = new WeakMap<
 >();
 const toolExecutionRenderVersion = new WeakMap<object, number>();
 const toolExecutionExpandedById = new Map<string, boolean>();
+const successfulCreateGoalToolCalls = new Set<string>();
 
 function bumpRenderVersion(
 	store: WeakMap<object, number>,
@@ -903,6 +919,41 @@ function userMessageAccent(value: string): string {
 	return `${USER_MESSAGE_ACCENT}${value}${ANSI_FG_RESET}`;
 }
 
+type MessageRailParts = {
+	left: string;
+	label: string;
+	right: string;
+};
+
+function messageRailParts(width: number, text: string): MessageRailParts {
+	const railWidth = Math.max(1, width);
+	const label = railWidth >= text.length + 4 ? ` ${text} ` : text;
+	const decorationWidth = railWidth - label.length;
+	if (decorationWidth < 2) {
+		return {
+			left: "",
+			label: truncateToWidth(label, railWidth, ""),
+			right: "",
+		};
+	}
+	const leftWidth = Math.floor(decorationWidth / 2);
+	return {
+		left: "─".repeat(leftWidth),
+		label,
+		right: "─".repeat(decorationWidth - leftWidth),
+	};
+}
+
+function userMessageRail(width: number): string {
+	const rail = messageRailParts(width, "USER");
+	return userMessageAccent(`${rail.left}${rail.label}${rail.right}`);
+}
+
+function assistantMessageRail(width: number, text = "ASSISTANT"): string {
+	const rail = messageRailParts(width, text);
+	return `${ASSISTANT_MESSAGE_ACCENT}${rail.left}${ANSI_FG_RESET}\x1b[1m${rail.label}\x1b[22m${ASSISTANT_MESSAGE_ACCENT}${rail.right}${ANSI_FG_RESET}`;
+}
+
 const userMessageRenderCache = new WeakMap<
 	object,
 	{ text: string; width: number; lines: string[] }
@@ -937,17 +988,17 @@ function patchUserMessageRender(): void {
 			return cached.lines;
 		}
 
-		const contentWidth = Math.max(1, width - 2);
+		const contentWidth = Math.max(1, width);
 		const renderer = new Markdown(text, 0, 0, getMarkdownTheme());
 		const lines = renderer.render(contentWidth);
 		const body = lines.length > 0 ? lines : [""];
+		const rail = userMessageRail(width);
 		const rendered = withOscZone([
+			fitLine(rail, width),
 			"",
-			fitLine(userMessageAccent("╭─ You"), width),
-			...body.map((line) =>
-				fitLine(`${userMessageAccent("│")} ${line}`, width),
-			),
-			fitLine(userMessageAccent("╰─"), width),
+			...body.map((line) => fitLine(line, width)),
+			"",
+			fitLine(rail, width),
 		]);
 		userMessageRenderCache.set(cacheKey, { text, width, lines: rendered });
 		return rendered;
@@ -1201,6 +1252,7 @@ function patchAssistantMessageRender(): void {
 		prototype.updateContent;
 	prototype.updateContent = function updateContentWithClaudeMarkdown(
 		message: unknown,
+		isStreaming = this.isStreaming,
 	): void {
 		const cacheKey = this as object;
 		assistantMessageRenderCache.delete(cacheKey);
@@ -1209,7 +1261,7 @@ function patchAssistantMessageRender(): void {
 		const original =
 			prototype.__claudeAssistantMessageOriginalUpdateContent ??
 			prototype.updateContent;
-		original.call(this, preprocessAssistantMessage(message));
+		original.call(this, preprocessAssistantMessage(message), isStreaming);
 	};
 	prototype.render = function renderWithClaudeAssistantMessage(
 		width: number,
@@ -1224,10 +1276,14 @@ function patchAssistantMessageRender(): void {
 		}
 
 		const originalLines = original.call(this, width);
+		const hasLocalImage = originalLines.some((line) =>
+			Boolean(extractLocalImagePath(detachImageLineMarkers(line).line)),
+		);
 		const lines = expandLocalImageLines(originalLines, width);
 		let rendered: string[];
 		if (
 			lines.length === 0 ||
+			hasLocalImage ||
 			(this as { hasToolCalls?: boolean }).hasToolCalls
 		) {
 			rendered = lines;
@@ -1235,21 +1291,24 @@ function patchAssistantMessageRender(): void {
 			const prefixIndex = lines.findIndex(
 				(line) => visibleWidth(line.trim()) > 0,
 			);
-			rendered =
-				prefixIndex === -1
-					? lines
-					: lines.map((line, index) =>
-							index === prefixIndex
-								? fitLine(addAssistantPrefix(line), width)
-								: line,
-						);
+			if (prefixIndex === -1) {
+				rendered = lines;
+			} else {
+				const body = lines.slice(prefixIndex).map((line, index) =>
+					index === 0 ? fitLine(addAssistantPrefix(line), width) : line,
+				);
+				const openingRail = fitLine(assistantMessageRail(width), width);
+				const closingRail = fitLine(
+					assistantMessageRail(width, "END ASSISTANT"),
+					width,
+				);
+				rendered = this.isStreaming
+					? ["", openingRail, "", ...body]
+					: ["", openingRail, "", ...body, "", closingRail];
+			}
 		}
 
-		if (
-			!originalLines.some((line) =>
-				Boolean(extractLocalImagePath(detachImageLineMarkers(line).line)),
-			)
-		) {
+		if (!hasLocalImage) {
 			assistantMessageRenderCache.set(cacheKey, {
 				version,
 				width,
@@ -1280,6 +1339,53 @@ function patchCompactionSummaryRender(): void {
 		return children.flatMap((child) => child.render(width));
 	};
 	prototype.__claudeCompactionSummaryPatched = true;
+}
+
+function patchSkillInvocationRender(): void {
+	const prototype =
+		SkillInvocationMessageComponent.prototype as unknown as PatchableSkillInvocationPrototype;
+	if (prototype.__claudeSkillInvocationPatched) return;
+
+	prototype.__claudeSkillInvocationOriginalRender = prototype.render;
+	prototype.render = function renderClaudeSkillInvocation(
+		width: number,
+	): string[] {
+		const original =
+			prototype.__claudeSkillInvocationOriginalRender ?? prototype.render;
+		const name = this.skillBlock?.name;
+		const content = this.skillBlock?.content;
+		if (
+			typeof name !== "string" ||
+			!name.trim() ||
+			typeof content !== "string"
+		) {
+			return original.call(this, width);
+		}
+
+		const header = fitLine(
+			`${EDITOR_RULE_ACCENT}\x1b[1m[SKILL]\x1b[22m${ANSI_FG_RESET} ${name.trim()}`,
+			width,
+		);
+		if (!this.expanded) return [header];
+
+		const renderWidth = Math.max(1, width);
+		const indentWidth = Math.min(8, Math.max(0, renderWidth - 16));
+		const indent = " ".repeat(indentWidth);
+		const contentWidth = Math.max(1, renderWidth - indentWidth);
+		const renderer = new Markdown(
+			content,
+			0,
+			0,
+			this.markdownTheme ?? getMarkdownTheme(),
+		);
+		return [
+			header,
+			...renderer
+				.render(contentWidth)
+				.map((line: string) => fitLine(`${indent}${line}`, renderWidth)),
+		];
+	};
+	prototype.__claudeSkillInvocationPatched = true;
 }
 
 function patchToolExecutionRenderers(): void {
@@ -1365,7 +1471,7 @@ function patchToolExecutionRenderers(): void {
 			return (args: unknown, theme: Theme, context: ToolRenderContextLike) => {
 				if (
 					PRESERVE_ORIGINAL_TOOL_RENDERERS.has(toolName) &&
-					shouldUseOriginalToolCallRenderer(args) &&
+					shouldUseOriginalToolCallRenderer(args, toolName, context) &&
 					original
 				) {
 					return original(args, theme, context);
@@ -1414,10 +1520,43 @@ function patchToolExecutionRenderers(): void {
 				}
 				if (
 					PRESERVE_ORIGINAL_TOOL_RENDERERS.has(toolName) &&
-					shouldUseOriginalToolRenderer(toolName, context.args, options) &&
+					shouldUseOriginalToolRenderer(
+						toolName,
+						context.args,
+						options,
+						result,
+						context,
+					) &&
 					original
 				) {
 					return original(result, options, theme, context);
+				}
+				if (toolName === "read") {
+					return renderReadResult(
+						result as AgentToolResult<ReadToolDetails | undefined>,
+						options,
+						theme,
+						context,
+					);
+				}
+				if (toolName === "replace") {
+					return renderReplaceResult(result, options, theme, context);
+				}
+				if (toolName === "grep") {
+					return renderGrepResult(
+						result as AgentToolResult<GrepToolDetails | undefined>,
+						options,
+						theme,
+						context,
+					);
+				}
+				if (toolName === "find") {
+					return renderFindResult(
+						result as AgentToolResult<FindToolDetails | undefined>,
+						options,
+						theme,
+						context,
+					);
 				}
 
 				return wrappedToolResult(
@@ -1555,6 +1694,7 @@ type ToolRenderContextLike = {
 	isError: boolean;
 	executionStarted?: boolean;
 	isPartial?: boolean;
+	expanded?: boolean;
 };
 
 interface ContextModeMcpRequest {
@@ -1615,6 +1755,27 @@ type SubagentDetails = {
 	artifacts?: { dir?: string };
 };
 
+type SubagentManagementChild = {
+	index: number;
+	agent: string;
+	label?: string;
+	state?: string;
+	activity?: string;
+};
+
+type SubagentManagementRun = {
+	id: string;
+	mode?: string;
+	state?: string;
+	children: SubagentManagementChild[];
+};
+
+type SubagentManagementDetails = {
+	view: "fleet" | "status" | "transcript";
+	totalRuns: number;
+	runs: SubagentManagementRun[];
+};
+
 type SubagentLaunchDetails = {
 	mode: "single" | "parallel" | "chain";
 	runId: string;
@@ -1650,7 +1811,7 @@ const BASH_OUTPUT_PREVIEW_EDGE_LINES = 5;
 const READ_PREVIEW_LINES = 6;
 const COLLAPSED_EDIT_DIFF_LINES = 80;
 const COLLAPSED_WRITE_DIFF_LINES = 40;
-const EXPANDED_PREVIEW_LINES = 20;
+const EXPANDED_PREVIEW_LINES = Number.POSITIVE_INFINITY;
 const SUBAGENT_RECENT_TOOL_LIMIT = 5;
 const SUBAGENT_HIDDEN_TOOL_TYPE_LIMIT = 5;
 const SUBAGENT_LARGE_RESULT_THRESHOLD = 6;
@@ -1670,16 +1831,35 @@ const OSC133_ZONE_FINAL = "\x1b]133;C\x07";
 const builtInToolCache = new WeakMap<ExtensionAPI, Map<string, BuiltInTools>>();
 const wrappedExtensionTools = new WeakMap<ExtensionAPI, Set<string>>();
 const toolRenderInterceptorInstalled = new WeakSet<ExtensionAPI>();
+const DIRECT_CONTEXT_TOOL_RENDERERS = new Set([
+	"ctx_execute",
+	"ctx_execute_file",
+	"ctx_batch_execute",
+]);
+const SETTLED_COLLAPSED_SLOT_RENDERERS = new Set([
+	"read",
+	"replace",
+]);
 const EXTENSION_TOOL_WRAPPER_ALLOWLIST = new Set([
+	"read",
+	"replace",
+	"grep",
+	"find",
+	...DIRECT_CONTEXT_TOOL_RENDERERS,
 	"web_search",
+	"source_check",
 	"code_search",
 	"fetch_content",
 	"get_search_content",
+	"session_search",
+	"memory_search",
+	"ctx_stats",
 	"Agent",
 	"mcp",
 	"intercom",
 	"contact_supervisor",
 	"subagent",
+	"subagent_supervisor",
 	"subagent_list",
 	"subagent_done",
 	"todo",
@@ -1690,7 +1870,10 @@ const EXTENSION_TOOL_WRAPPER_ALLOWLIST = new Set([
 	"ast_grep_dump",
 	"ast_dump",
 	"lens_diagnostics",
+	"lens_diagnostic_mark",
+	"pi_lens_activate_tools",
 	"symbol_search",
+	"project_report",
 	"module_report",
 	"read_symbol",
 	"read_enclosing",
@@ -1699,16 +1882,20 @@ const EXTENSION_TOOL_WRAPPER_ALLOWLIST = new Set([
 	"tool_result_outline",
 	"tool_result_get",
 	"tool_result_search",
+	"tool_result_delegate",
 	"tool_result_list",
 	"tool_result_diagnostics",
 	"tool_result_retention_preview",
 	"tool_result_export_details",
 	"tool_result_export",
+	"create_goal",
 ]);
 
 const PRESERVE_ORIGINAL_TOOL_RENDERERS = new Set([
 	"subagent",
 	"lens_diagnostics",
+	"create_goal",
+	...SETTLED_COLLAPSED_SLOT_RENDERERS,
 ]);
 
 type WriteSnapshot = {
@@ -1869,17 +2056,88 @@ function parseJsonRecord(value: string): Record<string, unknown> | undefined {
 	}
 }
 
+function hasStructuredCreateGoalSuccess(
+	result: unknown,
+	toolCallId: string | undefined,
+): boolean {
+	if (!toolCallId || !successfulCreateGoalToolCalls.has(toolCallId)) return false;
+	if (!isRecord(result)) return false;
+	const details = result.details;
+	if (!isRecord(details) || details.version !== 3) return false;
+	const goal = details.goal;
+	return (
+		isRecord(goal) &&
+		goal.status === "active" &&
+		goal.autoContinue === true
+	);
+}
+
+function skillNameFromReadPath(path: string | undefined): string | undefined {
+	return path?.match(/\/skills\/([^/]+)\/SKILL\.md$/)?.[1];
+}
+
 function shouldUseOriginalToolRenderer(
 	toolName: string,
 	args: unknown,
 	options?: ToolRenderOptions,
+	result?: unknown,
+	context?: ToolRenderContextLike,
 ): boolean {
 	if (toolName === "lens_diagnostics") return options?.isPartial === true;
+	if (toolName === "create_goal") {
+		return (
+			options?.expanded === true ||
+			options?.isPartial === true ||
+			context?.isError === true ||
+			!hasStructuredCreateGoalSuccess(result, context?.toolCallId)
+		);
+	}
+	if (SETTLED_COLLAPSED_SLOT_RENDERERS.has(toolName)) {
+		if (
+			toolName === "read" &&
+			skillNameFromReadPath(argString(args, "path")) !== undefined &&
+			options?.isPartial !== true &&
+			context?.isError !== true
+		) {
+			return false;
+		}
+		return (
+			options?.expanded === true ||
+			options?.isPartial === true ||
+			context?.isError === true ||
+			(toolName === "replace" && !hasStructuredReplaceResult(result))
+		);
+	}
 	if (toolName !== "subagent") return false;
 	return !isRecord(args) || typeof args.action !== "string";
 }
 
-function shouldUseOriginalToolCallRenderer(args: unknown): boolean {
+function shouldUseOriginalToolCallRenderer(
+	args: unknown,
+	toolName?: string,
+	context?: ToolRenderContextLike,
+): boolean {
+	if (
+		toolName === "create_goal" ||
+		(toolName !== undefined && SETTLED_COLLAPSED_SLOT_RENDERERS.has(toolName))
+	) {
+		if (
+			toolName === "read" &&
+			skillNameFromReadPath(argString(args, "path")) !== undefined &&
+			context?.isError !== true &&
+			(context === undefined || !isToolPending(context))
+		) {
+			return false;
+		}
+		return (
+			!isRecord(args) ||
+			context?.expanded === true ||
+			(context !== undefined &&
+				toolExecutionExpandedById.get(context.toolCallId) === true) ||
+			context?.isError === true ||
+			(context !== undefined && isToolPending(context))
+		);
+	}
 	return !isRecord(args);
 }
 
@@ -2067,6 +2325,151 @@ function contextModePendingDetails(request: ContextModeMcpRequest): string {
 		: `searching ${plural(queryCount, "query", "queries")}`;
 }
 
+function isSubagentSteerArgs(args: unknown): args is Record<string, unknown> {
+	return isRecord(args) && argString(args, "action", "") === "steer";
+}
+
+function renderCompletedSubagentSteerCall(
+	args: Record<string, unknown>,
+	theme: Theme,
+	context: ToolRenderContextLike,
+	title: string,
+): Text {
+	const target =
+		argValueLabel(args, "id") ?? argValueLabel(args, "runId") ?? "…";
+	const header = genericToolCall(
+		title,
+		joinBodyParts(theme, ["steer", target]),
+		theme,
+	);
+	const message = argString(args, "message", "");
+	if (contentLines(message).length === 0)
+		return setText(context.lastComponent, header);
+
+	const expanded =
+		context.expanded === true ||
+		toolExecutionExpandedById.get(context.toolCallId) === true;
+	const messageLines = expanded
+		? contentLines(message)
+		: [compactOneLine(message, 90)];
+	return setText(
+		context.lastComponent,
+		`${header}\n${messageLines
+			.map((line) => muted(theme, `${DETAIL_INDENT}│ ${line}`))
+			.join("\n")}`,
+	);
+}
+
+function deliveredSubagentSteerRequestId(
+	result: AgentToolResult<unknown>,
+): string | undefined {
+	if (!isRecord(result.details) || !isRecord(result.details.steering))
+		return undefined;
+	if (detailString(result.details.steering, "state") !== "delivered")
+		return undefined;
+	return detailString(result.details.steering, "requestId");
+}
+
+function renderDeliveredSubagentSteerResult(
+	toolName: string,
+	result: AgentToolResult<unknown>,
+	options: ToolRenderOptions,
+	theme: Theme,
+	context: ToolRenderContextLike,
+): Text | undefined {
+	if (
+		toolName.toLowerCase() !== "subagent" ||
+		!isSubagentSteerArgs(context.args) ||
+		options.isPartial ||
+		context.isError
+	)
+		return undefined;
+	const requestId = deliveredSubagentSteerRequestId(result);
+	if (!requestId) return undefined;
+	return setText(
+		context.lastComponent,
+		options.expanded
+			? muted(theme, `${DETAIL_INDENT}│ request: ${requestId}`)
+			: "",
+	);
+}
+
+function subagentSupervisorReplyArgs(
+	args: unknown,
+): Record<string, unknown> | undefined {
+	if (!isRecord(args) || argString(args, "action", "") !== "reply")
+		return undefined;
+	return argValueLabel(args, "replyTo") ? args : undefined;
+}
+
+function toolCallDisplayTitle(
+	toolName: string,
+	args: unknown,
+	fallback: string,
+): string {
+	if (toolName.toLowerCase() !== "subagent_supervisor") return fallback;
+	switch (argValueLabel(args, "action")) {
+		case "status":
+			return "Supervisor Status";
+		case "pending":
+		case "list":
+			return "Supervisor Requests";
+		case "reply":
+			return "Supervisor Reply";
+		default:
+			return "Supervisor";
+	}
+}
+
+function renderCompletedSubagentSupervisorReplyCall(
+	args: Record<string, unknown>,
+	theme: Theme,
+	context: ToolRenderContextLike,
+	title: string,
+): Text {
+	const replyTo = argValueLabel(args, "replyTo")!;
+	const header = genericToolCall(
+		title,
+		joinBodyParts(theme, ["reply", replyTo]),
+		theme,
+	);
+	const message = argString(args, "message", "");
+	if (contentLines(message).length === 0)
+		return setText(context.lastComponent, header);
+
+	const expanded =
+		context.expanded === true ||
+		toolExecutionExpandedById.get(context.toolCallId) === true;
+	const messageLines = expanded
+		? contentLines(message)
+		: [compactOneLine(message, 90)];
+	return setText(
+		context.lastComponent,
+		`${header}\n${messageLines
+			.map((line) => muted(theme, `${DETAIL_INDENT}│ ${line}`))
+			.join("\n")}`,
+	);
+}
+
+function renderDeliveredSubagentSupervisorReplyResult(
+	toolName: string,
+	result: AgentToolResult<unknown>,
+	options: ToolRenderOptions,
+	context: ToolRenderContextLike,
+): Text | undefined {
+	if (
+		toolName.toLowerCase() !== "subagent_supervisor" ||
+		!subagentSupervisorReplyArgs(context.args) ||
+		options.isPartial ||
+		context.isError
+	)
+		return undefined;
+	const replyTo = detailString(result.details, "replyTo");
+	if (!replyTo || replyTo !== argValueLabel(context.args, "replyTo"))
+		return undefined;
+	return setText(context.lastComponent, "");
+}
+
 function wrappedToolCall(
 	toolName: string,
 	args: unknown,
@@ -2074,6 +2477,59 @@ function wrappedToolCall(
 	context: ToolRenderContextLike,
 	title: string,
 ): Text {
+	const displayTitle = toolCallDisplayTitle(toolName, args, title);
+	if (toolName === "read") {
+		return setText(context.lastComponent, formatReadCall(args, theme));
+	}
+	if (toolName === "replace") {
+		return setText(context.lastComponent, formatReplaceCall(args, theme));
+	}
+	if (toolName === "grep") {
+		return setText(
+			context.lastComponent,
+			formatGrepCall(args, theme, isToolPending(context)),
+		);
+	}
+	if (toolName === "find") {
+		return setText(
+			context.lastComponent,
+			formatFindCall(args, theme, isToolPending(context)),
+		);
+	}
+	if (toolName === "web_search") {
+		const rendered = formatWebSearchCall(
+			args,
+			theme,
+			isToolPending(context),
+		);
+		if (rendered) return setText(context.lastComponent, rendered);
+	}
+	if (
+		toolName.toLowerCase() === "subagent" &&
+		isSubagentSteerArgs(args) &&
+		!isToolPending(context)
+	)
+		return renderCompletedSubagentSteerCall(
+			args,
+			theme,
+			context,
+			displayTitle,
+		);
+
+	const supervisorReply = subagentSupervisorReplyArgs(args);
+	if (
+		toolName.toLowerCase() === "subagent_supervisor" &&
+		supervisorReply &&
+		!isToolPending(context) &&
+		!context.isError
+	)
+		return renderCompletedSubagentSupervisorReplyCall(
+			supervisorReply,
+			theme,
+			context,
+			displayTitle,
+		);
+
 	const contextModeRequest =
 		toolName === "mcp" ? contextModeMcpRequest(args) : undefined;
 	if (contextModeRequest) {
@@ -2092,10 +2548,16 @@ function wrappedToolCall(
 	const body =
 		toolName === "Agent"
 			? agentToolCallBody(args, theme)
-			: webToolCallBody(toolName, args, theme);
+			: webToolCallBody(
+					toolName,
+					args,
+					theme,
+					context.expanded === true ||
+						toolExecutionExpandedById.get(context.toolCallId) === true,
+				);
 	return setText(
 		context.lastComponent,
-		genericToolCall(title, body, theme, isToolPending(context)),
+		genericToolCall(displayTitle, body, theme, isToolPending(context)),
 	);
 }
 
@@ -2141,19 +2603,81 @@ function subagentChainStepLabel(step: unknown): string {
 	).join(" + ")}]`;
 }
 
-function webToolCallBody(name: string, args: unknown, theme: Theme): string {
+function compactListArgument(
+	values: string[],
+	itemNoun: string,
+	expanded: boolean,
+): string | undefined {
+	if (values.length === 0) return undefined;
+	if (expanded) return values.join(" · ");
+	const remaining = values.length - 1;
+	return `${compactOneLine(values[0] ?? "", 90)}${
+		remaining > 0 ? ` · +${plural(remaining, itemNoun)}` : ""
+	}`;
+}
+
+function formatWebSearchCall(
+	args: unknown,
+	theme: Theme,
+	pending = false,
+): string | undefined {
+	const queries = argStringArray(args, "queries");
+	if (queries.length === 0) return undefined;
+	const marker = pending ? "◦" : "●";
+	const lines = queries.map((query, index) => {
+		const branch = index === queries.length - 1 ? "└" : "├";
+		return `${RESULT_INDENT}${muted(theme, `${branch} `)}${pathText(
+			theme,
+			compactOneLine(query, 110),
+		)}`;
+	});
+	return `${theme.fg("accent", marker)} ${label(theme, "Web Search")}\n${lines.join("\n")}`;
+}
+
+function meaningfulCodeLines(code: string): string[] {
+	return contentLines(code).filter((line) => line.trim().length > 0);
+}
+
+function compactCodeArgument(
+	code: string,
+	itemNoun = "code line",
+): string | undefined {
+	const lines = meaningfulCodeLines(code);
+	if (lines.length === 0) return undefined;
+	const remaining = lines.length - 1;
+	return `${compactOneLine(lines[0] ?? "", 90)}${
+		remaining > 0 ? ` · +${plural(remaining, itemNoun)}` : ""
+	}`;
+}
+
+function webToolCallBody(
+	name: string,
+	args: unknown,
+	theme: Theme,
+	expanded = false,
+): string {
 	switch (name) {
+		case "create_goal": {
+			const objective = compactOneLine(argValueLabel(args, "objective") ?? "…", 90);
+			return `${pathText(theme, objective)}${
+				isRecord(args) && args.mode === "sisyphus"
+					? muted(theme, " · sisyphus")
+					: ""
+			}`;
+		}
 		case "web_search": {
 			const queries = argStringArray(args, "queries");
 			const query = argValueLabel(args, "query");
 			return pathText(
 				theme,
-				compactOneLine(
-					queries.length > 0 ? `${queries.length} queries` : (query ?? "…"),
-					90,
-				),
+				compactListArgument(queries, "query", expanded) ?? query ?? "…",
 			);
 		}
+		case "source_check":
+			return pathText(
+				theme,
+				compactOneLine(argValueLabel(args, "claim") ?? "…", 110),
+			);
 		case "code_search":
 			return pathText(
 				theme,
@@ -2162,7 +2686,8 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
 		case "fetch_content": {
 			const urls = argStringArray(args, "urls");
 			const url = argValueLabel(args, "url");
-			const target = urls.length > 0 ? `${urls.length} urls` : (url ?? "…");
+			const target =
+				compactListArgument(urls, "URL", expanded) ?? url ?? "…";
 			const extras = [
 				argValueLabel(args, "timestamp"),
 				argValueLabel(args, "frames")
@@ -2171,8 +2696,84 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
 			]
 				.filter(Boolean)
 				.join(" · ");
-			return `${pathText(theme, compactOneLine(target, 90))}${extras ? muted(theme, ` · ${extras}`) : ""}`;
+			return `${pathText(
+				theme,
+				expanded ? target : compactOneLine(target, 90),
+			)}${extras ? muted(theme, ` · ${extras}`) : ""}`;
 		}
+		case "ctx_execute": {
+			const language = argValueLabel(args, "language") ?? "code";
+			const code = argString(args, "code", "");
+			const summary = joinBodyParts(theme, [
+				pathText(theme, language),
+				compactCodeArgument(code),
+			]);
+			return expanded && code
+				? `${summary}${previewBlock(code, theme, true, EXPANDED_PREVIEW_LINES)}`
+				: summary;
+		}
+		case "ctx_execute_file": {
+			const filePath = argValueLabel(args, "path") ?? "…";
+			const language = argValueLabel(args, "language") ?? "code";
+			const code = argString(args, "code", "");
+			const summary = joinBodyParts(theme, [
+				pathText(theme, filePath),
+				language,
+				compactCodeArgument(code),
+			]);
+			return expanded && code
+				? `${summary}${previewBlock(code, theme, true, EXPANDED_PREVIEW_LINES)}`
+				: summary;
+		}
+		case "ctx_batch_execute": {
+			const commands = isRecord(args) ? recordArray(args, "commands") : [];
+			const queries = argStringArray(args, "queries");
+			const commandLabels = commands
+				.map((command) => {
+					if (!isRecord(command)) return undefined;
+					const value = detailString(command, "command");
+					if (!value) return undefined;
+					const commandLabel = detailString(command, "label");
+					return commandLabel ? `${commandLabel}: ${value}` : value;
+				})
+				.filter((value): value is string => value !== undefined);
+			return joinBodyParts(theme, [
+				pathText(
+					theme,
+					compactListArgument(commandLabels, "command", expanded) ?? "…",
+				),
+				queries.length > 0 ? plural(queries.length, "query") : undefined,
+			]);
+		}
+		case "session_search":
+			return joinBodyParts(theme, [
+				pathText(
+					theme,
+					compactOneLine(argValueLabel(args, "query") ?? "…", 80),
+				),
+				argValueLabel(args, "project")
+					? pathText(
+							theme,
+							compactOneLine(argValueLabel(args, "project") ?? "…", 60),
+						)
+					: undefined,
+				argValueLabel(args, "limit")
+					? `limit ${argValueLabel(args, "limit")}`
+					: undefined,
+			]);
+		case "memory_search": {
+			const query =
+				argValueLabel(args, "query") ??
+				argValueLabel(args, "grep") ??
+				argValueLabel(args, "rg") ??
+				"…";
+			return joinBodyParts(theme, [
+				pathText(theme, compactOneLine(query, 80)),
+				argValueLabel(args, "scope"),
+			]);
+		}
+		case "ctx_stats":
+			return pathText(theme, "stats");
 		case "get_search_content": {
 			const responseId = argValueLabel(args, "responseId") ?? "…";
 			const selector =
@@ -2187,6 +2788,9 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
 			return `${pathText(theme, compactOneLine(responseId, 40))}${selector ? muted(theme, ` · ${compactOneLine(selector, 60)}`) : ""}`;
 		}
 		case "mcp":
+			if (!isRecord(args) || Object.keys(args).length === 0) {
+				return pathText(theme, "status");
+			}
 			return joinBodyParts(theme, [
 				argValueLabel(args, "tool")
 					? pathText(
@@ -2234,15 +2838,29 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
 					: undefined,
 			]);
 		}
+		case "subagent_supervisor":
+			return joinBodyParts(theme, [
+				argValueLabel(args, "action"),
+				argValueLabel(args, "replyTo") ?? argValueLabel(args, "id"),
+				argValueLabel(args, "message")
+					? compactOneLine(argValueLabel(args, "message") ?? "", 90)
+					: undefined,
+			]);
 		case "subagent": {
 			if (!isRecord(args)) return muted(theme, "…");
 			const action = argValueLabel(args, "action");
-			if (action)
+			if (action) {
+				const childIndex = argNumber(args, "index");
 				return joinBodyParts(theme, [
 					action,
 					argValueLabel(args, "agent") ?? argValueLabel(args, "chainName"),
 					argValueLabel(args, "id"),
+					childIndex === undefined
+						? undefined
+						: `child #${Math.floor(childIndex) + 1} (index ${Math.floor(childIndex)})`,
+					argValueLabel(args, "view"),
 				]);
+			}
 			const chain = recordArray(args, "chain");
 			if (chain.length > 0)
 				return joinBodyParts(theme, [
@@ -2347,12 +2965,32 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
 				compactPathList(args, theme),
 				argValueLabel(args, "severity"),
 			]);
+		case "lens_diagnostic_mark": {
+			const filePath = argValueLabel(args, "filePath") ?? "…";
+			const line = argValueLabel(args, "line");
+			return joinBodyParts(theme, [
+				pathText(theme, `${filePath}${line ? `:${line}` : ""}`),
+				argValueLabel(args, "disposition"),
+			]);
+		}
+		case "pi_lens_activate_tools":
+			return pathText(theme, argStringArray(args, "tools").join(", ") || "…");
 		case "symbol_search":
 			return joinBodyParts(theme, [
 				pathText(
 					theme,
 					compactOneLine(argValueLabel(args, "query") ?? "…", 70),
 				),
+				argValueLabel(args, "limit")
+					? `limit ${argValueLabel(args, "limit")}`
+					: undefined,
+			]);
+		case "project_report":
+			return joinBodyParts(theme, [
+				argValueLabel(args, "focus")
+					? compactOneLine(argValueLabel(args, "focus") ?? "", 60)
+					: undefined,
+				argValueLabel(args, "view"),
 				argValueLabel(args, "limit")
 					? `limit ${argValueLabel(args, "limit")}`
 					: undefined,
@@ -2426,6 +3064,14 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
 					: undefined,
 				argValueLabel(args, "reason"),
 			]);
+		case "tool_result_delegate": {
+			const sourceId = argValueLabel(args, "sourceId");
+			const task = argValueLabel(args, "task");
+			return joinBodyParts(theme, [
+				sourceId?.trim() ? pathText(theme, sourceId) : undefined,
+				task?.trim() ? compactOneLine(task, 90) : undefined,
+			]);
+		}
 		case "tool_result_list":
 		case "tool_result_diagnostics":
 			return joinBodyParts(theme, [
@@ -2467,14 +3113,30 @@ function webToolCallBody(name: string, args: unknown, theme: Theme): string {
 
 function webToolTitle(name: string): string {
 	switch (name) {
+		case "create_goal":
+			return "Create Goal";
 		case "web_search":
 			return "Web Search";
+		case "source_check":
+			return "Source Check";
 		case "code_search":
 			return "Code Search";
 		case "fetch_content":
 			return "Fetch";
+		case "ctx_execute":
+			return "Execute";
+		case "ctx_execute_file":
+			return "Execute File";
+		case "ctx_batch_execute":
+			return "Batch Execute";
 		case "get_search_content":
 			return "Get Content";
+		case "session_search":
+			return "Session Search";
+		case "memory_search":
+			return "Memory Search";
+		case "ctx_stats":
+			return "Context Stats";
 		case "mcp":
 			return "MCP";
 		case "intercom":
@@ -2483,6 +3145,8 @@ function webToolTitle(name: string): string {
 			return "Contact Supervisor";
 		case "subagent":
 			return "Subagent";
+		case "subagent_supervisor":
+			return "Supervisor";
 		case "todo":
 			return "Todo";
 		case "ask_user":
@@ -2502,8 +3166,14 @@ function webToolTitle(name: string): string {
 			return "AST Dump";
 		case "lens_diagnostics":
 			return "Lens Diagnostics";
+		case "lens_diagnostic_mark":
+			return "Mark Diagnostic";
+		case "pi_lens_activate_tools":
+			return "Activate Pi Lens Tools";
 		case "symbol_search":
 			return "Symbol Search";
+		case "project_report":
+			return "Project Report";
 		case "module_report":
 			return "Module Report";
 		case "read_symbol":
@@ -2520,6 +3190,8 @@ function webToolTitle(name: string): string {
 			return "Tool Result Get";
 		case "tool_result_search":
 			return "Tool Result Search";
+		case "tool_result_delegate":
+			return "Tool Result Delegate";
 		case "tool_result_list":
 			return "Tool Result List";
 		case "tool_result_diagnostics":
@@ -2561,6 +3233,735 @@ function detailBoolean(details: unknown, name: string): boolean | undefined {
 	if (!isRecord(details)) return undefined;
 	const value = details[name];
 	return typeof value === "boolean" ? value : undefined;
+}
+
+function hasRoutineWrappedWebResult(toolName: string, details: unknown): boolean {
+	if (!isRecord(details) || details.error !== undefined) return false;
+
+	if (toolName === "fetch_content") {
+		const urlCount = detailNumber(details, "urlCount");
+		return (
+			detailString(details, "responseId") !== undefined &&
+			urlCount !== undefined &&
+			urlCount > 0 &&
+			detailNumber(details, "successful") === urlCount &&
+			(detailNumber(details, "totalChars") ?? 0) > 0 &&
+			detailBoolean(details, "truncated") !== true
+		);
+	}
+
+	if (toolName === "web_search") {
+		const queryCount = detailNumber(details, "queryCount");
+		return (
+			queryCount !== undefined &&
+			queryCount > 0 &&
+			detailNumber(details, "successfulQueries") === queryCount &&
+			(detailNumber(details, "totalResults") ?? 0) > 0 &&
+			detailBoolean(details, "cancelled") !== true &&
+			details.fetchUrls === undefined
+		);
+	}
+
+	if (toolName !== "get_search_content") return false;
+
+	const matchCount = detailNumber(details, "matchCount");
+	if (matchCount !== undefined) {
+		return (
+			matchCount > 0 && (detailNumber(details, "returnedMatches") ?? 0) > 0
+		);
+	}
+
+	if (
+		detailString(details, "type") === "research" &&
+		detailString(details, "responseId") !== undefined
+	) {
+		return (
+			(detailNumber(details, "returnedChars") ?? 0) > 0 &&
+			detailBoolean(details, "truncated") === false &&
+			details.nextOffset === null
+		);
+	}
+
+	if (detailString(details, "query") !== undefined) {
+		return (detailNumber(details, "resultCount") ?? 0) > 0;
+	}
+
+	if (
+		detailString(details, "url") !== undefined &&
+		(detailNumber(details, "contentLength") ?? 0) > 0
+	) {
+		return (
+			(detailNumber(details, "returnedChars") ?? 0) > 0 &&
+			detailBoolean(details, "truncated") === false &&
+			details.nextOffset === null
+		);
+	}
+
+	return false;
+}
+
+type CompletenessFieldKind = "count" | "list" | "flag";
+
+function detailCompletenessFieldHasIssue(
+	details: Record<string, unknown>,
+	name: string,
+	kind: CompletenessFieldKind,
+): boolean {
+	if (!Object.prototype.hasOwnProperty.call(details, name)) return false;
+	const value = details[name];
+	if (kind === "count") {
+		return (
+			typeof value !== "number" || !Number.isFinite(value) || value !== 0
+		);
+	}
+	if (kind === "list") return !Array.isArray(value) || value.length > 0;
+	return typeof value !== "boolean" || value;
+}
+
+function lspOutcomeDetailsAreComplete(details: Record<string, unknown>): boolean {
+	const counts = details.outcomeCounts;
+	if (counts !== undefined) {
+		if (!isRecord(counts)) return false;
+		for (const name of ["inconclusive", "unavailable", "unsupported", "failed"]) {
+			const count = counts[name];
+			if (typeof count !== "number" || !Number.isFinite(count)) return false;
+			if (count > 0) return false;
+		}
+	}
+
+	const outcomes = details.outcomes;
+	if (outcomes !== undefined) {
+		if (!Array.isArray(outcomes)) return false;
+		for (const outcome of outcomes) {
+			if (!isRecord(outcome)) return false;
+			const name = outcome.outcome;
+			if (name !== "clean" && name !== "findings") return false;
+		}
+	}
+	return true;
+}
+
+function toolResultDiagnosticsDetailsAreComplete(
+	details: Record<string, unknown>,
+): boolean {
+	const numericFields = [
+		"sourceCount",
+		"indexLineCount",
+		"invalidIndexLineCount",
+		"ftsMismatchCount",
+		"totalBytes",
+		"returnedBytes",
+		"outputByteLimit",
+	] as const;
+	const footprint = details.footprint;
+	const quota = details.quota;
+	const issues = details.issues;
+	const recentSourceIds = details.recentSourceIds;
+	const hasFiniteNumbers = (
+		record: Record<string, unknown>,
+		fields: readonly string[],
+	): boolean =>
+		fields.every((field) => {
+			const value = record[field];
+			return typeof value === "number" && Number.isFinite(value);
+		});
+	if (
+		(details.scope !== "store" && details.scope !== "visible") ||
+		typeof details.healthy !== "boolean" ||
+		typeof details.scopeKeyUnavailable !== "boolean" ||
+		(details.ftsStatus !== "missing" &&
+			details.ftsStatus !== "healthy" &&
+			details.ftsStatus !== "mismatch" &&
+			details.ftsStatus !== "unavailable") ||
+		!hasFiniteNumbers(details, numericFields) ||
+		details.outputTruncated !== false ||
+		!isRecord(footprint) ||
+		(footprint.scope !== "store" && footprint.scope !== "visible") ||
+		!hasFiniteNumbers(footprint, [
+			"sourceBytes",
+			"detailsBytes",
+			"occurrenceBytes",
+			"indexBytes",
+			"ftsBytes",
+			"totalBytes",
+		]) ||
+		!isRecord(quota) ||
+		(quota.usageScope !== "store" && quota.usageScope !== "visible") ||
+		!hasFiniteNumbers(quota, ["currentSources", "currentStoredBytes"]) ||
+		(quota.maxSources !== undefined &&
+			(typeof quota.maxSources !== "number" ||
+				!Number.isFinite(quota.maxSources))) ||
+		(quota.maxStoredBytes !== undefined &&
+			(typeof quota.maxStoredBytes !== "number" ||
+				!Number.isFinite(quota.maxStoredBytes))) ||
+		typeof quota.sourceLimitExceeded !== "boolean" ||
+		typeof quota.storedBytesLimitExceeded !== "boolean" ||
+		!Array.isArray(issues) ||
+		!issues.every(
+			(issue) =>
+				isRecord(issue) &&
+				(issue.code === "invalid_index_lines" ||
+					issue.code === "duplicate_source_id" ||
+					issue.code === "missing_source_file" ||
+					issue.code === "missing_details_file" ||
+					issue.code === "source_hash_mismatch" ||
+					issue.code === "details_hash_mismatch" ||
+					issue.code === "orphan_source_file" ||
+					issue.code === "orphan_details_file" ||
+					issue.code === "pending_transaction" ||
+					issue.code === "invalid_journal" ||
+					issue.code === "scope_key_unavailable" ||
+					issue.code === "fts_mismatch" ||
+					issue.code === "fts_unavailable") &&
+				typeof issue.count === "number" &&
+				Number.isFinite(issue.count) &&
+				(issue.sourceIds === undefined ||
+					(Array.isArray(issue.sourceIds) &&
+						issue.sourceIds.every(
+							(sourceId) => typeof sourceId === "string",
+						))),
+		) ||
+		!Array.isArray(recentSourceIds) ||
+		!recentSourceIds.every((sourceId) => typeof sourceId === "string")
+	) {
+		return false;
+	}
+	return true;
+}
+
+function sourceCheckConciseResult(
+	details: unknown,
+	output: string,
+	theme: Theme,
+): string | undefined {
+	const artifact = isRecord(details) && isRecord(details.artifact)
+		? details.artifact
+		: undefined;
+	const claim = artifact
+		? recordArray(artifact, "claims").find(isRecord)
+		: undefined;
+	let status = claim ? detailString(claim, "status") : undefined;
+	let confidence = claim ? detailNumber(claim, "confidence") : undefined;
+	let sourceCount = isRecord(details)
+		? detailNumber(details, "sourceCount")
+		: undefined;
+
+	if (!status) {
+		const match = output.match(
+			/\*\*Status:\*\*\s+([^\s(]+)\s+\(confidence\s+([0-9.]+)\)/i,
+		);
+		status = match?.[1];
+		const parsed = Number(match?.[2]);
+		if (Number.isFinite(parsed)) confidence = parsed;
+	}
+	if (sourceCount === undefined) {
+		sourceCount = output.match(/^\d+\.\s+\[[^\]]+\]/gm)?.length;
+	}
+	if (!status) return undefined;
+	return treeLine(
+		theme,
+		"Checked",
+		[
+			status,
+			confidence !== undefined
+				? `${Math.round(confidence * 100)}% confidence`
+				: undefined,
+			sourceCount !== undefined ? plural(sourceCount, "source") : undefined,
+		]
+			.filter((value): value is string => value !== undefined)
+			.join(" · "),
+	);
+}
+
+function sessionSearchPreviewLines(output: string): string[] {
+	return contentLines(output)
+		.map((line) => line.trim())
+		.filter((line) => /^###\s+\d+\.\s+\S/.test(line))
+		.map((line) => line.replace(/^###\s+/, ""));
+}
+
+function memorySearchConciseResult(
+	details: unknown,
+	output: string,
+	theme: Theme,
+): string | undefined {
+	const unavailable = output.match(
+		/^Memory directory not found for scope:\s*(\S+)\s*$/m,
+	);
+	if (unavailable?.[1]) {
+		return treeLine(
+			theme,
+			"Unavailable",
+			`${unavailable[1]} memory directory missing`,
+		);
+	}
+	const count = detailNumber(details, "count");
+	if (count === undefined) return undefined;
+	const scope = detailString(details, "scope");
+	return treeLine(
+		theme,
+		"Found",
+		[plural(count, "memory", "memories"), scope]
+			.filter(Boolean)
+			.join(" · "),
+	);
+}
+
+function ctxStatsConciseResult(output: string, theme: Theme): string {
+	const firstLine = contentLines(output).find((line) => line.trim().length > 0);
+	return treeLine(
+		theme,
+		firstLine ? "Stats" : "Returned",
+		firstLine
+			? compactOneLine(firstLine, 120)
+			: plural(countLines(output), "line"),
+	);
+}
+
+function semanticConciseResult(
+	toolName: string,
+	details: unknown,
+	args: unknown,
+	theme: Theme,
+	title: string,
+): string | undefined {
+	if (toolName === "intercom") {
+		if (!isRecord(args) || args.action !== "list" || !isRecord(details)) {
+			return undefined;
+		}
+		return Array.isArray(details.pending) && details.error === undefined
+			? ""
+			: undefined;
+	}
+	if (!isRecord(details) || details.error !== undefined) return undefined;
+
+	if (toolName === "session_search") {
+		const count = detailNumber(details, "resultCount");
+		const indexed = detailNumber(details, "indexSize");
+		if (count === undefined || indexed === undefined) return undefined;
+		return treeLine(
+			theme,
+			"Found",
+			`${plural(count, "session")} · ${indexed} indexed`,
+		);
+	}
+
+	if (toolName === "mcp" && detailString(details, "mode") === "status") {
+		const servers = recordArray(details, "servers");
+		const connected = detailNumber(details, "connectedCount");
+		const totalTools = detailNumber(details, "totalTools");
+		if (connected === undefined || totalTools === undefined) return undefined;
+		return treeLine(
+			theme,
+			"MCP",
+			`${connected}/${servers.length} connected · ${totalTools} cached tools`,
+		);
+	}
+
+	if (toolName === "module_report") {
+		if (detailBoolean(details, "available") !== true) return undefined;
+		const parts = [
+			detailNumber(details, "symbols") !== undefined
+				? plural(detailNumber(details, "symbols")!, "symbol")
+				: undefined,
+			detailNumber(details, "exports") !== undefined
+				? plural(detailNumber(details, "exports")!, "export")
+				: undefined,
+			detailNumber(details, "callbacks") !== undefined
+				? plural(detailNumber(details, "callbacks")!, "callback")
+				: undefined,
+		].filter((value): value is string => value !== undefined);
+		return treeLine(theme, "Report", parts.join(" · ") || "Available");
+	}
+
+	if (toolName === "read_symbol" || toolName === "read_enclosing") {
+		if (
+			detailBoolean(details, "found") !== true ||
+			detailBoolean(details, "readRecorded") !== true
+		) {
+			return undefined;
+		}
+		const startLine = detailNumber(details, "startLine");
+		const endLine = detailNumber(details, "endLine");
+		const lineCount =
+			startLine !== undefined && endLine !== undefined
+				? Math.max(0, endLine - startLine + 1)
+				: undefined;
+		const identity = [
+			detailString(details, "kind"),
+			detailString(details, "name"),
+		]
+			.filter((value): value is string => value !== undefined)
+			.join(" ");
+		return treeLine(
+			theme,
+			"Read",
+			[
+				lineCount !== undefined ? plural(lineCount, "line") : undefined,
+				identity || undefined,
+			]
+				.filter(Boolean)
+				.join(" · ") || "Complete",
+		);
+	}
+
+	if (toolName === "fetch_content") {
+		const urlCount = detailNumber(details, "urlCount");
+		const successful = detailNumber(details, "successful");
+		const totalChars = detailNumber(details, "totalChars");
+		if (
+			urlCount === undefined ||
+			successful === undefined ||
+			totalChars === undefined
+		)
+			return undefined;
+		const failed = Math.max(0, urlCount - successful);
+		return treeLine(
+			theme,
+			"Fetched",
+			[
+				`${successful}/${urlCount} URLs`,
+				plural(totalChars, "character"),
+				failed > 0 ? `${failed} failed` : undefined,
+				detailBoolean(details, "truncated") ? "truncated" : undefined,
+			]
+				.filter((value): value is string => value !== undefined)
+				.join(" · "),
+		);
+	}
+
+	if (toolName === "web_search") {
+		const queryCount = detailNumber(details, "queryCount");
+		const successful = detailNumber(details, "successfulQueries");
+		const totalResults = detailNumber(details, "totalResults");
+		if (
+			queryCount === undefined ||
+			successful === undefined ||
+			totalResults === undefined
+		)
+			return undefined;
+		const failed = Math.max(0, queryCount - successful);
+		return treeLine(
+			theme,
+			"Found",
+			[
+				plural(totalResults, "result"),
+				`${successful}/${queryCount} queries`,
+				failed > 0 ? `${failed} failed` : undefined,
+				detailBoolean(details, "cancelled") ? "cancelled" : undefined,
+			]
+				.filter((value): value is string => value !== undefined)
+				.join(" · "),
+		);
+	}
+
+	if (toolName === "subagent_supervisor") {
+		const action = argValueLabel(args, "action");
+		if (action === "status") {
+			const pending = detailNumber(details, "pending");
+			return detailBoolean(details, "active") === true && pending !== undefined
+				? treeLine(theme, "Supervisor", `Active · ${plural(pending, "pending request")}`)
+				: undefined;
+		}
+		if (action === "pending" || action === "list") {
+			const pending = recordArray(details, "pending").length;
+			return treeLine(
+				theme,
+				"Supervisor",
+				pending === 0 ? "No pending requests" : plural(pending, "pending request"),
+			);
+		}
+	}
+
+	if (toolName === "project_report") {
+		const available = detailBoolean(details, "available");
+		if (available === false) {
+			return treeLine(theme, "Unavailable", "review graph building");
+		}
+		if (available !== true) return undefined;
+		const hubs = detailNumber(details, "hubs");
+		const entryPoints = detailNumber(details, "entryPoints");
+		const parts = [
+			hubs !== undefined ? plural(hubs, "hub") : undefined,
+			entryPoints !== undefined
+				? plural(entryPoints, "entry point")
+				: undefined,
+		].filter((value): value is string => value !== undefined);
+		return treeLine(theme, "Report", parts.join(" · ") || "Available");
+	}
+
+	if (toolName === "lens_diagnostic_mark") {
+		const disposition = detailString(details, "disposition");
+		return (
+			(disposition === "false-positive" ||
+				disposition === "suppress" ||
+				disposition === "defer" ||
+				disposition === "flagged") &&
+			detailNumber(details, "line") !== undefined
+		)
+			? ""
+			: undefined;
+	}
+
+	if (toolName === "pi_lens_activate_tools") {
+		const matches = details.matches;
+		const added = details.added;
+		return Array.isArray(matches) &&
+			matches.length > 0 &&
+			matches.every(
+				(value) => typeof value === "string" && value.length > 0,
+			) &&
+			Array.isArray(added) &&
+			added.length === matches.length &&
+			added.every(
+				(value, index) =>
+					typeof value === "string" && value === matches[index],
+			)
+			? ""
+			: undefined;
+	}
+
+	if (toolName === "tool_result_delegate") {
+		const runId = detailString(details, "runId");
+		return details.kind === "tool_result_delegation" &&
+			details.status === "started" &&
+			runId?.trim()
+			? treeLine(theme, title, `Async · ${runId}`)
+			: undefined;
+	}
+
+	if (toolName === "lsp_diagnostics") {
+		const total = detailNumber(details, "totalDiagnostics");
+		const files =
+			detailNumber(details, "filesChecked") ??
+			detailNumber(details, "filesScanned") ??
+			(detailString(details, "filePath") !== undefined ||
+			detailString(details, "mode") === "file"
+				? 1
+				: undefined);
+		if (
+			total === undefined ||
+			files === undefined ||
+			detailBoolean(details, "truncated") !== false ||
+			detailCompletenessFieldHasIssue(details, "capped", "flag") ||
+			detailCompletenessFieldHasIssue(details, "unconfirmed", "flag") ||
+			detailCompletenessFieldHasIssue(details, "timedOut", "flag") ||
+			detailCompletenessFieldHasIssue(details, "unconfirmedFiles", "count") ||
+			detailCompletenessFieldHasIssue(details, "timedOutFiles", "count") ||
+			detailCompletenessFieldHasIssue(details, "incompleteFiles", "count") ||
+			detailCompletenessFieldHasIssue(details, "fileErrors", "list") ||
+			detailCompletenessFieldHasIssue(details, "lspHealthWarnings", "list") ||
+			details.unavailable !== undefined ||
+			!lspOutcomeDetailsAreComplete(details)
+		) {
+			return undefined;
+		}
+		const severity = detailString(details, "severity");
+		const unit =
+			severity === "error"
+				? "error"
+				: severity === "warning"
+					? "warning"
+					: "diagnostic";
+		return treeLine(
+			theme,
+			title,
+			`${plural(total, unit)} · ${plural(files, "file")}`,
+		);
+	}
+
+	if (toolName === "lsp_navigation") {
+		return detailString(details, "failureKind") === "success" &&
+			(detailNumber(details, "resultCount") ?? 0) > 0 &&
+			isRecord(args) &&
+			!detailCompletenessFieldHasIssue(args, "apply", "flag")
+			? ""
+			: undefined;
+	}
+
+	if (toolName === "lens_diagnostics") {
+		const mode = detailString(details, "mode");
+		const files =
+			detailNumber(details, "filesChecked") ??
+			detailNumber(details, "filesScanned");
+		const stale = detailNumber(details, "staleDropped");
+		if (
+			(mode !== "delta" && mode !== "all" && mode !== "full") ||
+			files === undefined ||
+			stale === undefined ||
+			detailCompletenessFieldHasIssue(details, "partial", "flag") ||
+			detailCompletenessFieldHasIssue(details, "aborted", "flag") ||
+			detailCompletenessFieldHasIssue(details, "unconfirmed", "flag") ||
+			detailCompletenessFieldHasIssue(details, "truncated", "flag") ||
+			detailCompletenessFieldHasIssue(details, "totalBlocking", "count") ||
+			detailCompletenessFieldHasIssue(details, "totalErrors", "count") ||
+			detailCompletenessFieldHasIssue(details, "totalWarnings", "count") ||
+			detailCompletenessFieldHasIssue(details, "filesWithIssues", "count") ||
+			detailCompletenessFieldHasIssue(
+				details,
+				"lspFilesUnconfirmed",
+				"count",
+			) ||
+			detailCompletenessFieldHasIssue(
+				details,
+				"unconfirmedLspFiles",
+				"list",
+			) ||
+			detailCompletenessFieldHasIssue(details, "coldRunners", "list") ||
+			detailCompletenessFieldHasIssue(details, "failedAnalyzers", "list") ||
+			detailCompletenessFieldHasIssue(details, "analyzersAborted", "flag") ||
+			detailCompletenessFieldHasIssue(details, "analyzersUnsafeRoot", "flag") ||
+			detailCompletenessFieldHasIssue(
+				details,
+				"projectWalkUnsafeRoot",
+				"flag",
+			) ||
+			detailCompletenessFieldHasIssue(
+				details,
+				"projectScanTruncated",
+				"flag",
+			)
+		) {
+			return undefined;
+		}
+		const issues =
+			(detailNumber(details, "totalBlocking") ?? 0) +
+			(detailNumber(details, "totalErrors") ?? 0) +
+			(detailNumber(details, "totalWarnings") ?? 0) +
+			(detailNumber(details, "filesWithIssues") ?? 0);
+		if (issues > 0) return undefined;
+		const carriedOverFiles = detailNumber(details, "carriedOverFiles") ?? 0;
+		if (carriedOverFiles > 0) {
+			return treeLine(
+				theme,
+				title,
+				`${mode} · no new warnings · ${plural(carriedOverFiles, "carried file")}`,
+			);
+		}
+		if (files === 0) {
+			return treeLine(
+				theme,
+				title,
+				`No files diagnosed${stale > 0 ? ` · ${stale} stale` : ""}`,
+			);
+		}
+		return files > 0 && stale === 0 ? "" : undefined;
+	}
+
+	if (toolName === "tool_result_outline") {
+		const sourceId = detailString(details, "sourceId");
+		const keywordHits = detailNumber(details, "keywordHitCount");
+		const omitted = detailNumber(details, "omittedMiddleLineCount");
+		if (
+			!sourceId ||
+			keywordHits === undefined ||
+			omitted === undefined ||
+			details.outputTruncated !== false
+		) {
+			return undefined;
+		}
+		return treeLine(
+			theme,
+			"Outline",
+			[
+				compactOneLine(sourceId, 28),
+				plural(keywordHits, "keyword hit"),
+				`${omitted} omitted`,
+			].join(" · "),
+		);
+	}
+
+	if (toolName === "tool_result_list") {
+		const count = detailNumber(details, "count");
+		return count !== undefined && details.outputTruncated === false
+			? treeLine(theme, "Found", plural(count, "source"))
+			: undefined;
+	}
+
+	if (toolName === "tool_result_diagnostics") {
+		if (!toolResultDiagnosticsDetailsAreComplete(details)) return undefined;
+		const sourceCount = details.sourceCount as number;
+		const ftsMismatchCount = details.ftsMismatchCount as number;
+		const issues = details.issues as unknown[];
+		const scopeKeyUnavailable = details.scopeKeyUnavailable === true;
+		if (details.healthy) {
+			const quota = details.quota as Record<string, unknown>;
+			if (
+				details.ftsStatus !== "healthy" ||
+				(details.invalidIndexLineCount as number) !== 0 ||
+				ftsMismatchCount !== 0 ||
+				scopeKeyUnavailable ||
+				issues.length > 0 ||
+				quota.sourceLimitExceeded !== false ||
+				quota.storedBytesLimitExceeded !== false
+			) {
+				return undefined;
+			}
+			return treeLine(
+				theme,
+				title,
+				`Healthy · ${plural(sourceCount, "source")}`,
+			);
+		}
+		if (
+			ftsMismatchCount <= 0 &&
+			issues.length === 0 &&
+			!scopeKeyUnavailable
+		) {
+			return undefined;
+		}
+		const parts = ["Issues detected", plural(sourceCount, "source")];
+		if (ftsMismatchCount > 0) {
+			parts.push(`FTS mismatch ${ftsMismatchCount}`);
+		} else if (issues.length > 0) {
+			parts.push(plural(issues.length, "issue type"));
+		}
+		if (scopeKeyUnavailable) parts.push("scope key unavailable");
+		return treeLine(theme, title, parts.join(" · "));
+	}
+
+	if (toolName === "symbol_search") {
+		const coverage = details.coverage;
+		const count = detailNumber(details, "count");
+		return detailBoolean(details, "available") === true &&
+			count !== undefined &&
+			isRecord(coverage) &&
+			coverage.truncated === false
+			? treeLine(theme, "Found", plural(count, "file"))
+			: undefined;
+	}
+
+	if (toolName === "ast_grep_search") {
+		return (detailNumber(details, "matchCount") ?? 0) > 0 &&
+			detailBoolean(details, "truncated") === false &&
+			detailBoolean(details, "hasMore") === false &&
+			!detailCompletenessFieldHasIssue(details, "validateOnly", "flag")
+			? ""
+			: undefined;
+	}
+
+	return undefined;
+}
+
+function expandedLspNavigationBlock(output: string, theme: Theme): string {
+	const [jsonLine = "", ...trailingLines] = output.split("\n");
+	let value: unknown;
+	try {
+		value = JSON.parse(jsonLine);
+	} catch {
+		return previewBlock(output, theme, true, EXPANDED_PREVIEW_LINES);
+	}
+	const lines = [
+		...contentLines(JSON.stringify(value, null, 2)),
+		...(trailingLines.length > 0 ? ["", ...trailingLines] : []),
+	].flatMap((line) => {
+		const wrapped = wrapTextWithAnsi(line, 108);
+		return wrapped.length > 0 ? wrapped : [""];
+	});
+	if (lines.length === 0) return "";
+	return `\n${lines
+		.map((line) => muted(theme, `${DETAIL_INDENT}│ ${line}`))
+		.join("\n")}`;
 }
 
 function recordArray(value: Record<string, unknown>, name: string): unknown[] {
@@ -2614,12 +4015,20 @@ function pendingToolLabel(
 			return "Navigating";
 		case "ast_grep_replace":
 			return "Checking";
+		case "project_report":
+			return "Inspecting Project";
+		case "lens_diagnostic_mark":
+			return "Marking Diagnostic";
+		case "pi_lens_activate_tools":
+			return "Activating Pi Lens Tools";
 		case "tool_result_outline":
 			return "Outlining Tool Result";
 		case "tool_result_get":
 			return "Reading Tool Result";
 		case "tool_result_search":
 			return "Searching Tool Result";
+		case "tool_result_delegate":
+			return "Delegating Tool Result";
 		case "tool_result_list":
 			return "Listing Tool Results";
 		case "tool_result_diagnostics":
@@ -2824,6 +4233,51 @@ function subagentLaunchTarget(
 		return steps > 0 ? `chain with ${plural(steps, "step")}` : "chain";
 	}
 	return argValueLabel(args, "agent") ?? "agent";
+}
+
+function parseSubagentManagementDetails(
+	details: unknown,
+): SubagentManagementDetails | undefined {
+	if (!isRecord(details) || !isRecord(details.management)) return undefined;
+	const management = details.management;
+	const view = detailString(management, "view");
+	const totalRuns = detailNumber(management, "totalRuns");
+	if (
+		(view !== "fleet" && view !== "status" && view !== "transcript") ||
+		totalRuns === undefined
+	)
+		return undefined;
+	const runs = recordArray(management, "runs")
+		.map((run): SubagentManagementRun | undefined => {
+			if (!isRecord(run)) return undefined;
+			const id = detailString(run, "id");
+			if (!id) return undefined;
+			const children = recordArray(run, "children")
+				.map((child): SubagentManagementChild | undefined => {
+					if (!isRecord(child)) return undefined;
+					const index = detailNumber(child, "index");
+					const agent = detailString(child, "agent");
+					if (index === undefined || !agent) return undefined;
+					return {
+						index,
+						agent,
+						label: detailString(child, "label"),
+						state: detailString(child, "state"),
+						activity: detailString(child, "activity"),
+					};
+				})
+				.filter(
+					(child): child is SubagentManagementChild => child !== undefined,
+				);
+			return {
+				id,
+				mode: detailString(run, "mode"),
+				state: detailString(run, "state"),
+				children,
+			};
+		})
+		.filter((run): run is SubagentManagementRun => run !== undefined);
+	return { view, totalRuns, runs };
 }
 
 function parseSubagentDetails(details: unknown): SubagentDetails | undefined {
@@ -3534,6 +4988,92 @@ function renderSubagentLargeSummary(
 	return lines;
 }
 
+function renderSubagentManagementResult(
+	management: SubagentManagementDetails,
+	result: AgentToolResult<unknown>,
+	options: ToolRenderOptions,
+	theme: Theme,
+	context: ToolRenderContextLike,
+): Text {
+	if (management.totalRuns === 0) {
+		const summary = treeLine(theme, "Status", "No active runs");
+		const evidence = options.expanded
+			? previewBlock(
+					extractToolText(result),
+					theme,
+					true,
+					EXPANDED_PREVIEW_LINES,
+				)
+			: "";
+		return setText(context.lastComponent, `${summary}${evidence}`);
+	}
+	const children = management.runs.flatMap((run) =>
+		run.children.map((child) => ({ run, child })),
+	);
+	const stateCounts = new Map<string, number>();
+	for (const { child } of children) {
+		const state = child.state ?? "unknown";
+		stateCounts.set(state, (stateCounts.get(state) ?? 0) + 1);
+	}
+	const stateSummary = [...stateCounts.entries()]
+		.sort(([left], [right]) => left.localeCompare(right))
+		.map(([state, count]) => `${count} ${state}`)
+		.join(" · ");
+	const lines = [
+		treeLine(
+			theme,
+			"Status",
+			[
+				plural(management.totalRuns, "run"),
+				plural(children.length, "child", "children"),
+				stateSummary || undefined,
+			]
+				.filter((value): value is string => value !== undefined)
+				.join(" · "),
+		),
+	];
+	const important = children.filter(({ child }) =>
+		["running", "queued", "failed", "paused", "detached"].includes(
+			child.state ?? "",
+		),
+	);
+	const visible = options.expanded
+		? children
+		: children.length <= 8
+			? children
+			: important.slice(0, 6);
+	for (const { run, child } of visible) {
+		const runPrefix = management.runs.length > 1 ? `${shortRunId(run.id)} · ` : "";
+		lines.push(
+			muted(
+				theme,
+				`${DETAIL_INDENT}│ ${runPrefix}#${Math.floor(child.index) + 1} ${child.label ?? child.agent}${child.label ? ` (${child.agent})` : ""}${child.state ? ` · ${child.state}` : ""}${child.activity ? ` · ${compactOneLine(child.activity, 70)}` : ""}`,
+			),
+		);
+	}
+	if (!options.expanded && visible.length < children.length) {
+		lines.push(
+			muted(
+				theme,
+				`${DETAIL_INDENT}│ … ${plural(children.length - visible.length, "more child", "more children")}`,
+			),
+		);
+	}
+	if (options.expanded) {
+		lines.push(
+			...previewBlock(
+				extractToolText(result),
+				theme,
+				true,
+				EXPANDED_PREVIEW_LINES,
+			)
+				.split("\n")
+				.filter(Boolean),
+		);
+	}
+	return setText(context.lastComponent, lines.join("\n"));
+}
+
 function renderSubagentToolResult(
 	result: AgentToolResult<unknown>,
 	options: ToolRenderOptions,
@@ -3545,6 +5085,17 @@ function renderSubagentToolResult(
 	if (launchDetails) {
 		const summary = `${subagentLaunchTarget(launchDetails, context.args)} in background · run ${shortRunId(launchDetails.runId)}`;
 		return setText(context.lastComponent, treeLine(theme, "Launched", summary));
+	}
+
+	const management = parseSubagentManagementDetails(result.details);
+	if (management && !context.isError && !options.isPartial) {
+		return renderSubagentManagementResult(
+			management,
+			result,
+			options,
+			theme,
+			context,
+		);
 	}
 
 	const details = parseSubagentDetails(result.details);
@@ -3702,6 +5253,27 @@ function toolPreviewBlock(
 				expanded,
 				EXPANDED_PREVIEW_LINES,
 			);
+		case "lsp_diagnostics":
+		case "lens_diagnostics":
+			return previewLinesBlock(
+				contentLines(output),
+				theme,
+				expanded,
+				EXPANDED_PREVIEW_LINES,
+				120,
+				3,
+			);
+		case "session_search":
+			return expanded
+				? previewBlock(output, theme, true, EXPANDED_PREVIEW_LINES)
+				: previewLinesBlock(
+						sessionSearchPreviewLines(output),
+						theme,
+						false,
+						EXPANDED_PREVIEW_LINES,
+						120,
+						3,
+					);
 		case "tool_result_get":
 		case "tool_result_export_details":
 		case "tool_result_export":
@@ -3730,7 +5302,7 @@ function resultDetailSummary(
 		case "subagent_list":
 			return (
 				subagentListSummary(output) ??
-				(lines > 0 ? plural(lines, "agent") : "done")
+				(lines > 0 ? plural(lines, "output line") : "done")
 			);
 		case "subagent_done":
 			return (
@@ -3786,15 +5358,23 @@ function resultDetailSummary(
 			const mode = detailString(details, "mode");
 			const blocking = detailNumber(details, "totalBlocking") ?? 0;
 			const errors = detailNumber(details, "totalErrors") ?? 0;
-			const warnings = detailNumber(details, "totalWarnings") ?? 0;
+			const warnings =
+				detailNumber(details, "totalWarnings") ??
+				detailNumber(details, "warnings") ??
+				0;
 			const files =
 				detailNumber(details, "filesWithIssues") ??
 				detailNumber(details, "filesChecked");
+			const carriedOverFiles = detailNumber(details, "carriedOverFiles") ?? 0;
 			if (blocking + errors + warnings === 0)
 				return [
 					mode,
-					"clean",
-					files !== undefined ? plural(files, "file") : undefined,
+					carriedOverFiles > 0 ? "no new warnings" : "clean",
+					carriedOverFiles > 0
+						? plural(carriedOverFiles, "carried file")
+						: files !== undefined
+							? plural(files, "file")
+							: undefined,
 				]
 					.filter(Boolean)
 					.join(" · ");
@@ -3837,15 +5417,27 @@ function resultDetailSummary(
 		case "lsp_diagnostics": {
 			const mode = detailString(details, "mode");
 			const totalDiagnostics = detailNumber(details, "totalDiagnostics");
+			const severity = detailString(details, "severity");
+			const unit =
+				severity === "error"
+					? "error"
+					: severity === "warning"
+						? "warning"
+						: "diagnostic";
 			const filesChecked = detailNumber(details, "filesChecked");
 			const filesScanned = detailNumber(details, "filesScanned");
+			const fileCount =
+				filesChecked ??
+				filesScanned ??
+				(detailString(details, "filePath") !== undefined || mode === "file"
+					? 1
+					: undefined);
 			const parts = [
 				mode,
 				totalDiagnostics !== undefined
-					? plural(totalDiagnostics, "diagnostic")
+					? plural(totalDiagnostics, unit)
 					: undefined,
-				filesChecked !== undefined ? plural(filesChecked, "file") : undefined,
-				filesScanned !== undefined ? plural(filesScanned, "file") : undefined,
+				fileCount !== undefined ? plural(fileCount, "file") : undefined,
 			].filter(Boolean);
 			return parts.length > 0 ? parts.join(" · ") : "done";
 		}
@@ -3907,7 +5499,8 @@ function resultDetailSummary(
 		}
 		case "tool_result_diagnostics": {
 			const sourceCount = detailNumber(details, "sourceCount");
-			const bytes = detailNumber(details, "totalStoredBytes");
+			const footprint = isRecord(details) ? details.footprint : undefined;
+			const bytes = detailNumber(footprint, "totalBytes");
 			const parts = [
 				sourceCount !== undefined ? plural(sourceCount, "source") : undefined,
 				bytes !== undefined ? `${bytes} bytes` : undefined,
@@ -4084,6 +5677,23 @@ function wrappedToolResult(
 	context: ToolRenderContextLike,
 	title: string,
 ): Text {
+	const deliveredSteer = renderDeliveredSubagentSteerResult(
+		toolName,
+		result,
+		options,
+		theme,
+		context,
+	);
+	if (deliveredSteer) return deliveredSteer;
+
+	const deliveredSupervisorReply = renderDeliveredSubagentSupervisorReplyResult(
+		toolName,
+		result,
+		options,
+		context,
+	);
+	if (deliveredSupervisorReply) return deliveredSupervisorReply;
+
 	const contextModeRequest =
 		toolName === "mcp" ? contextModeMcpRequest(context.args) : undefined;
 	if (contextModeRequest) {
@@ -4112,11 +5722,137 @@ function wrappedToolResult(
 			virtualizerFailureBlock(title, failure, theme, context.isError),
 		);
 	}
+	if (
+		!options.expanded &&
+		toolName === "module_report" &&
+		(detailString(result.details, "staleness") === "unavailable" ||
+			(detailBoolean(result.details, "available") === false &&
+				!context.isError))
+	) {
+		const reportPath = argString(context.args, "path", "module");
+		return setText(
+			context.lastComponent,
+			`${muted(theme, `${RESULT_INDENT}└ `)}${label(
+				theme,
+				"Unavailable",
+			)}${muted(theme, ` · ${compactPathTail(reportPath, 60)}`)}`,
+		);
+	}
 	if (context.isError) {
 		return setText(
 			context.lastComponent,
 			errorLine(theme, firstTextLine(result)),
 		);
+	}
+	if (!options.expanded && DIRECT_CONTEXT_TOOL_RENDERERS.has(toolName)) {
+		const stored = storedVirtualizerResult(output, result.details);
+		const lineCount = stored?.lineCount ?? countLines(output);
+		const qualifiers = [
+			stored ? "stored" : undefined,
+			detailBoolean(result.details, "truncated") ? "truncated" : undefined,
+		]
+			.filter((value): value is string => value !== undefined)
+			.join(" · ");
+		return setText(
+			context.lastComponent,
+			treeLine(
+				theme,
+				"Output",
+				`${plural(lineCount, "line")}${qualifiers ? ` · ${qualifiers}` : ""}`,
+			),
+		);
+	}
+
+	if (
+		!options.expanded &&
+		toolName === "create_goal" &&
+		hasStructuredCreateGoalSuccess(result, context.toolCallId)
+	) {
+		return setText(
+			context.lastComponent,
+			treeLine(theme, "Goal", "running · auto-continue on"),
+		);
+	}
+
+	if (!options.expanded) {
+		if (toolName === "source_check") {
+			const concise = sourceCheckConciseResult(
+				result.details,
+				output,
+				theme,
+			);
+			return setText(
+				context.lastComponent,
+				concise ?? treeLine(theme, "Checked", "Complete"),
+			);
+		}
+		if (toolName === "memory_search") {
+			const concise = memorySearchConciseResult(result.details, output, theme);
+			if (concise !== undefined) {
+				return setText(context.lastComponent, concise);
+			}
+		}
+		if (toolName === "ctx_stats") {
+			return setText(context.lastComponent, ctxStatsConciseResult(output, theme));
+		}
+		const semantic = semanticConciseResult(
+			toolName,
+			result.details,
+			context.args,
+			theme,
+			title,
+		);
+		if (semantic !== undefined) {
+			return setText(
+				context.lastComponent,
+				`${semantic}${
+					toolName === "session_search" ||
+					toolName === "lens_diagnostics" ||
+					toolName === "lsp_diagnostics"
+						? toolPreviewBlock(toolName, output, theme, false)
+						: ""
+				}`,
+			);
+		}
+		if (hasRoutineWrappedWebResult(toolName, result.details)) {
+			return setText(context.lastComponent, "");
+		}
+		if (
+			(toolName === "read_symbol" || toolName === "read_enclosing") &&
+			detailBoolean(result.details, "found") === true &&
+			detailBoolean(result.details, "readRecorded") === true
+		) {
+			return setText(context.lastComponent, "");
+		}
+		if (
+			toolName === "module_report" &&
+			detailBoolean(result.details, "available") === true
+		) {
+			return setText(context.lastComponent, "");
+		}
+		if (
+			toolName === "tool_result_get" &&
+			detailString(result.details, "sourceId") !== undefined &&
+			detailNumber(result.details, "startLine") !== undefined &&
+			detailNumber(result.details, "endLine") !== undefined &&
+			detailNumber(result.details, "lineCount") !== undefined
+		) {
+			return setText(context.lastComponent, "");
+		}
+	}
+	if (!options.expanded && toolName === "tool_result_search") {
+		const matchCount = detailNumber(result.details, "matchCount");
+		if (matchCount !== undefined) {
+			return setText(
+				context.lastComponent,
+				matchCount === 0
+					? `${muted(theme, `${RESULT_INDENT}└ `)}${label(
+							theme,
+							plural(matchCount, "match", "matches"),
+						)}`
+					: "",
+			);
+		}
 	}
 
 	const stored = storedVirtualizerResult(output, result.details);
@@ -4127,10 +5863,12 @@ function wrappedToolResult(
 			? `${plural(stored.lineCount ?? countLines(output), "line")} · stored`
 			: resultDetailSummary(toolName, result, output),
 	);
-	return setText(
-		context.lastComponent,
-		`${summary}${stored ? virtualizerStoredPreviewBlock(stored, theme) : toolPreviewBlock(toolName, output, theme, options.expanded)}`,
-	);
+	const detail = stored
+		? virtualizerStoredPreviewBlock(stored, theme)
+		: toolName === "lsp_navigation" && options.expanded
+			? expandedLspNavigationBlock(output, theme)
+			: toolPreviewBlock(toolName, output, theme, options.expanded);
+	return setText(context.lastComponent, `${summary}${detail}`);
 }
 
 function genericToolResult(
@@ -4265,9 +6003,9 @@ function lineCountFromOutput(value: string, emptyMessages: string[]): number {
 function formatReadCall(args: unknown, theme: Theme, pending = false): string {
 	const path = argString(args, "path");
 	// Collapse skill reads into a compact display
-	const skillMatch = path?.match(/\/skills\/([^/]+)\/SKILL\.md$/);
-	if (skillMatch) {
-		return callLine(theme, "Skill", pathText(theme, skillMatch[1]), pending);
+	const skillName = skillNameFromReadPath(path);
+	if (skillName) {
+		return `${EDITOR_RULE_ACCENT}\x1b[1m[SKILL]\x1b[22m${ANSI_FG_RESET} ${skillName}`;
 	}
 	const offset = argNumber(args, "offset");
 	const limit = argNumber(args, "limit");
@@ -4281,6 +6019,72 @@ function formatReadCall(args: unknown, theme: Theme, pending = false): string {
 		);
 	}
 	return callLine(theme, "Read", body, pending);
+}
+
+function formatReplaceCall(
+	args: unknown,
+	theme: Theme,
+	pending = false,
+): string {
+	const filePath = argString(args, "path");
+	const removeFrom = argValueLabel(args, "remove_from");
+	const removeTo = argValueLabel(args, "remove_to");
+	const scope =
+		removeFrom && removeTo
+			? removeFrom === removeTo
+				? `anchor ${removeFrom}`
+				: `anchors ${removeFrom}–${removeTo}`
+			: undefined;
+	return callLine(
+		theme,
+		"Replace",
+		joinBodyParts(theme, [pathText(theme, filePath), scope, "1 block"]),
+		pending,
+	);
+}
+
+function structuredDiffCounts(diff: string): {
+	added: number;
+	removed: number;
+} {
+	let added = 0;
+	let removed = 0;
+	for (const line of contentLines(diff)) {
+		if (line.startsWith("+++") || line.startsWith("---")) continue;
+		if (line.startsWith("+")) added += 1;
+		else if (line.startsWith("-")) removed += 1;
+	}
+	return { added, removed };
+}
+
+function structuredReplaceDetails(value: unknown): {
+	classification?: string;
+	diff?: string;
+	blocks?: number;
+	added?: number;
+	removed?: number;
+	warnings?: number;
+} | undefined {
+	const details = isRecord(value) && isRecord(value.details) ? value.details : value;
+	if (!isRecord(details)) return undefined;
+	const metrics = isRecord(details.metrics) ? details.metrics : undefined;
+	const classification = detailString(metrics, "classification");
+	const diff = detailString(details, "diff");
+	if (classification !== "applied" && classification !== "noop" && !diff)
+		return undefined;
+	const diffCounts = diff ? structuredDiffCounts(diff) : undefined;
+	return {
+		classification,
+		diff,
+		blocks: detailNumber(metrics, "edits_attempted"),
+		added: detailNumber(metrics, "added_lines") ?? diffCounts?.added,
+		removed: detailNumber(metrics, "removed_lines") ?? diffCounts?.removed,
+		warnings: detailNumber(metrics, "warnings"),
+	};
+}
+
+function hasStructuredReplaceResult(result: unknown): boolean {
+	return structuredReplaceDetails(result) !== undefined;
 }
 
 function formatGrepCall(args: unknown, theme: Theme, pending = false): string {
@@ -4633,17 +6437,26 @@ function bashOutputPreviewBlock(
 			);
 }
 
-function formatBashCall(args: unknown, theme: Theme, pending = false): string {
+function formatBashCall(
+	args: unknown,
+	theme: Theme,
+	pending = false,
+	expanded = false,
+): string {
 	const command = argString(args, "command", "");
 	const lines = contentLines(command);
+	const meaningful = lines.filter((line) => line.trim().length > 0);
 	if (lines.length > 1) {
-		return callBlock(
-			theme,
-			"Bash",
-			pathText(theme, `${lines.length}-line script`),
-			lines,
-			pending,
-		);
+		const firstCommand = compactOneLine(meaningful[0] ?? lines[0] ?? "", 100);
+		const remaining = Math.max(0, meaningful.length - 1);
+		const title = `${pathText(theme, firstCommand)}${
+			remaining > 0
+				? muted(theme, ` · +${plural(remaining, "command line")}`)
+				: ""
+		}`;
+		return expanded
+			? callBlock(theme, "Bash", title, lines, pending)
+			: callLine(theme, "Bash", title, pending);
 	}
 	return callLine(
 		theme,
@@ -4708,30 +6521,60 @@ function renderReadResult(
 		stored?.lineCount ??
 		countLines(output);
 	const suffix = `${details?.truncation?.truncated ? " · truncated" : ""}${stored ? " · stored" : ""}`;
-	const skillMatch = filePath.match(/\/skills\/([^/]+)\/SKILL\.md$/);
-	if (skillMatch) {
+	if (skillNameFromReadPath(filePath)) {
+		return setText(context.lastComponent, "");
+	}
+
+	return setText(
+		context.lastComponent,
+		treeLine(theme, "Loaded", `${plural(lineCount, "line")}${suffix}`),
+	);
+}
+
+function renderReplaceResult(
+	result: AgentToolResult<unknown>,
+	options: ToolRenderOptions,
+	theme: Theme,
+	context: ToolRenderContextLike,
+): Text {
+	if (options.isPartial || options.expanded || context.isError) {
+		return setText(context.lastComponent, "");
+	}
+	const details = structuredReplaceDetails(result);
+	if (!details) return setText(context.lastComponent, "");
+	const blocks = details.blocks ?? 1;
+	const warningCount = details.warnings ?? 0;
+	if (details.classification === "noop") {
 		return setText(
 			context.lastComponent,
 			treeLine(
 				theme,
-				"Skill read",
-				`${skillMatch[1]} · ${plural(lineCount, "line")}${suffix}`,
+				"No changes",
+				`${plural(blocks, "block")}${warningCount > 0 ? ` · ${plural(warningCount, "warning")}` : ""}`,
 			),
 		);
 	}
-
+	const counts = [
+		details.added !== undefined ? `+${details.added}` : undefined,
+		details.removed !== undefined ? `−${details.removed}` : undefined,
+	]
+		.filter((value): value is string => value !== undefined)
+		.join(" ");
 	const summary = treeLine(
 		theme,
-		"Read",
-		`${plural(lineCount, "line")}${suffix}`,
+		"Updated",
+		[
+			plural(blocks, "block"),
+			counts ? `${counts} lines` : undefined,
+			warningCount > 0 ? plural(warningCount, "warning") : undefined,
+		]
+			.filter((value): value is string => value !== undefined)
+			.join(" · "),
 	);
-	const expanded =
-		options.expanded ||
-		toolExecutionExpandedById.get(context.toolCallId) === true;
-	return setText(
-		context.lastComponent,
-		`${summary}${stored ? virtualizerStoredPreviewBlock(stored, theme) : previewBlock(output, theme, expanded, EXPANDED_PREVIEW_LINES, 120, READ_PREVIEW_LINES)}`,
-	);
+	const evidence = details.diff
+		? previewLinesBlock(contentLines(details.diff), theme, false, 5, 120, 5)
+		: "";
+	return setText(context.lastComponent, `${summary}${evidence}`);
 }
 
 function renderGrepResult(
@@ -4763,15 +6606,23 @@ function renderGrepResult(
 	const stored = storedVirtualizerResult(output, details);
 	const outputLineCount =
 		stored?.lineCount ?? lineCountFromOutput(output, ["No matches found"]);
-	const matchCount = detailNumber(details, "matchCount");
+	const suggestionOutput = output
+		.trimStart()
+		.startsWith("[0 exact matches. Maybe you meant this?]");
+	const matchCount =
+		detailNumber(details, "matchCount") ??
+		detailNumber(details, "totalMatched");
 	const contextLines = argNumber(context.args, "context");
 	const extra = [
-		matchCount !== undefined
-			? plural(matchCount, "match", "matches")
-			: undefined,
-		matchCount !== undefined && outputLineCount !== matchCount
+		suggestionOutput
+			? "0 exact matches"
+			: matchCount !== undefined
+				? plural(matchCount, "match", "matches")
+				: undefined,
+		suggestionOutput ? "suggestions available" : undefined,
+		!suggestionOutput && matchCount !== undefined && outputLineCount !== matchCount
 			? plural(outputLineCount, "output line")
-			: matchCount === undefined
+			: !suggestionOutput && matchCount === undefined
 				? plural(outputLineCount, "output line")
 				: undefined,
 		contextLines !== undefined ? `context ${contextLines}` : undefined,
@@ -4898,9 +6749,10 @@ function renderLsResult(
 			extra ? ` · ${extra}` : ""
 		}`,
 	);
+	if (!options.expanded) return setText(context.lastComponent, summary);
 	return setText(
 		context.lastComponent,
-		`${summary}${stored ? virtualizerStoredPreviewBlock(stored, theme) : previewBlock(output, theme, options.expanded, 20)}`,
+		`${summary}${stored ? virtualizerStoredPreviewBlock(stored, theme) : previewBlock(output, theme, true, 20)}`,
 	);
 }
 
@@ -4929,7 +6781,7 @@ function renderBashResult(
 		)}${muted(
 			theme,
 			hasOutput
-				? ` · ${plural(lineCount, "line")}${stored ? " · stored" : ""}`
+				? ` · ${plural(lineCount, "output line")}${stored ? " · stored" : ""}`
 				: " ...",
 		)}`;
 		return setText(
@@ -4939,22 +6791,19 @@ function renderBashResult(
 	}
 
 	const exitCode = detailNumber(result.details, "exitCode");
-	const status = context.isError
-		? theme.fg("error", "Failed")
-		: label(theme, "Done");
-	const details = context.isError
-		? [
-				exitCode !== undefined ? `exit ${exitCode}` : undefined,
-				plural(lineCount, "line"),
-				stored ? "stored" : undefined,
-			]
-				.filter(Boolean)
-				.join(" · ")
-		: `${plural(lineCount, "line")}${stored ? " · stored" : ""}`;
-	const summary = `${muted(theme, `${RESULT_INDENT}└ `)}${status}${muted(
-		theme,
-		` · ${details}`,
-	)}`;
+	const details = [
+		context.isError && exitCode !== undefined ? `exit ${exitCode}` : undefined,
+		plural(lineCount, "output line"),
+		stored ? "stored" : undefined,
+	]
+		.filter(Boolean)
+		.join(" · ");
+	const summary = context.isError
+		? `${muted(theme, `${RESULT_INDENT}└ `)}${theme.fg("error", "Failed")}${muted(theme, ` · ${details}`)}`
+		: `${muted(theme, `${RESULT_INDENT}└ `)}${label(theme, details)}`;
+	if (!context.isError && !options.expanded) {
+		return setText(context.lastComponent, summary);
+	}
 	return setText(
 		context.lastComponent,
 		`${summary}${bashOutputPreviewBlock(output, result.details, theme, options.expanded)}`,
@@ -5244,6 +7093,8 @@ function renderWriteResult(
 		);
 	}
 
+	if (!options.expanded) return setText(context.lastComponent, "");
+
 	const content = argString(context.args, "content", "", true);
 	const snapshot = writeSnapshots.get(context.toolCallId);
 	const path = argString(context.args, "path", snapshot?.absolutePath ?? "…");
@@ -5303,7 +7154,14 @@ function registerClaudeToolRenderers(pi: ExtensionAPI): void {
 		renderCall: (args, theme, context) =>
 			setText(
 				context.lastComponent,
-				formatBashCall(args, theme, isToolPending(context)),
+				formatBashCall(
+					args,
+					theme,
+					isToolPending(context),
+					context.isError ||
+						context.expanded === true ||
+						toolExecutionExpandedById.get(context.toolCallId) === true,
+				),
 			),
 		renderResult: renderBashResult,
 	});
@@ -5491,6 +7349,14 @@ const SUBAGENT_CONTROL_NOTICE_TYPES = [
 	"subagent-control",
 	"subagent-control-notice",
 ];
+const SUBAGENT_NOTIFY_MESSAGE_TYPE = "subagent-notify";
+const SUBAGENT_STEERING_MESSAGE_TYPE = "subagent_steering_notice";
+const SUBAGENT_WATCHDOG_MESSAGE_TYPE = "subagent_watchdog_warning";
+const SUBAGENT_SUPERVISOR_MESSAGE_TYPE = "subagent_supervisor_request";
+
+type InjectedEventTone = "success" | "info" | "warning" | "error";
+type InjectedEventRenderOptions = { expanded: boolean };
+type InjectedEventDetail = { label: string; value: string | undefined };
 
 function subagentControlIntercomVisibleText(
 	sender: string,
@@ -5534,98 +7400,326 @@ function emptyComponent(): Component {
 	};
 }
 
-function compactSubagentResultMessage(text: string): string | undefined {
-	if (!/^Run:/m.test(text) || !/^Status:/m.test(text)) return undefined;
-	const run = text.match(/^Run:\s*(.+)$/m)?.[1]?.trim();
-	const status = text.match(/^Status:\s*(.+)$/m)?.[1]?.trim();
-	const route = text.match(/^Route:\s*(.+)$/m)?.[1]?.trim();
-	const children = text.match(/^Children:\s*(.+)$/m)?.[1]?.trim();
-	const childMatches = [
-		...text.matchAll(
-			/^(\d+\.\s+.+?)\nSummary:\s*\n([\s\S]*?)(?=\n\n\d+\.\s+|\n\n?$)/gm,
-		),
-	];
-	const childLines = childMatches.slice(0, 4).map((match) => {
-		const child = compactOneLine(match[1] ?? "", 100);
-		const summary = compactOneLine(
-			(match[2] ?? "").split("\n", 1)[0] ?? "",
-			100,
-		);
-		return summary ? `${child} · ${summary}` : child;
-	});
-	if (childMatches.length > childLines.length) {
-		childLines.push(
-			`… ${plural(childMatches.length - childLines.length, "more child", "more children")}`,
-		);
+function injectedEventMarker(
+	theme: Theme,
+	tone: InjectedEventTone,
+): string {
+	switch (tone) {
+		case "success":
+			return theme.fg("success", "◆");
+		case "warning":
+			return theme.fg("warning", "◆");
+		case "error":
+			return theme.fg("error", "◆");
+		case "info":
+			return theme.fg("accent", "◆");
 	}
-	return [
-		`subagent result${status ? ` · ${status}` : ""}${children ? ` · ${children}` : ""}`,
-		run ? `run: ${run}` : undefined,
-		route ? `route: ${route}` : undefined,
-		...childLines,
-	]
-		.filter((line): line is string => Boolean(line))
-		.join("\n");
 }
 
-function renderIntercomMessage(
-	message: { content?: unknown; details?: unknown },
-	_options: { expanded: boolean },
+function injectedEventComponent(
 	theme: Theme,
-): Component | undefined {
-	const details = message.details as IntercomMessageDetails | undefined;
-	const from = details?.from;
-	const sender = from?.name || from?.id?.slice(0, 8) || "intercom";
-	const rawText =
-		details?.bodyText ??
-		details?.message?.content?.text ??
-		(typeof message.content === "string" ? message.content : "");
-	const visibleControlText = subagentControlIntercomVisibleText(
-		sender,
-		rawText,
+	options: InjectedEventRenderOptions,
+	title: string,
+	summary: string,
+	tone: InjectedEventTone,
+	details: InjectedEventDetail[] = [],
+): Component {
+	const header = `${injectedEventMarker(theme, tone)} ${label(
+		theme,
+		title,
+	)}${muted(theme, " · ")}${summary}`;
+	const visibleDetails = details.filter(
+		(detail): detail is { label: string; value: string } =>
+			typeof detail.value === "string" && detail.value.trim().length > 0,
 	);
-	if (visibleControlText === "") return emptyComponent();
-	const body =
-		visibleControlText ??
-		(sender === "subagent-result"
-			? (compactSubagentResultMessage(rawText) ?? rawText)
-			: rawText);
 
 	return {
 		invalidate() {},
 		render(width: number): string[] {
-			if (width < 3) return [truncateToWidth(`From ${sender}`, width)];
-			const bodyWidth = Math.max(1, width - 2);
-			const header = ` 📨 From: ${sender} `;
-			const headerText = truncateToWidth(header, bodyWidth, "");
-			const headerPadding = Math.max(0, bodyWidth - visibleWidth(headerText));
-			const lines = [
-				theme.fg("accent", `╭${headerText}${"─".repeat(headerPadding)}╮`),
-			];
-			for (const line of wrapTextWithAnsi(body, bodyWidth)) {
-				const text = truncateToWidth(line, bodyWidth, "");
-				const padding = Math.max(0, bodyWidth - visibleWidth(text));
-				lines.push(theme.fg("accent", `│${text}${" ".repeat(padding)}│`));
-			}
-			if (details?.replyCommand) {
-				lines.push(theme.fg("accent", `│${" ".repeat(bodyWidth)}│`));
-				for (const line of wrapTextWithAnsi(
-					theme.fg("dim", ` ↩ To reply: ${details.replyCommand}`),
-					bodyWidth,
-				)) {
-					const text = truncateToWidth(line, bodyWidth, "");
-					const padding = Math.max(0, bodyWidth - visibleWidth(text));
-					lines.push(theme.fg("accent", `│${text}${" ".repeat(padding)}│`));
+			const lines = [truncateToWidth(header, Math.max(1, width), "")];
+			if (!options.expanded || visibleDetails.length === 0) return lines;
+			const detailWidth = Math.max(1, width - 4);
+			for (let index = 0; index < visibleDetails.length; index++) {
+				const detail = visibleDetails[index]!;
+				const last = index === visibleDetails.length - 1;
+				const firstPrefix = muted(theme, `  ${last ? "└" : "├"} `);
+				const continuationPrefix = muted(theme, last ? "    " : "  │ ");
+				const sourceLines = contentLines(detail.value).filter(
+					(line) => line.trim().length > 0,
+				);
+				const logicalLines = sourceLines.length > 0 ? sourceLines : ["(none)"];
+				let first = true;
+				for (let sourceIndex = 0; sourceIndex < logicalLines.length; sourceIndex++) {
+					const source =
+						sourceIndex === 0
+							? `${detail.label} · ${logicalLines[sourceIndex]}`
+							: logicalLines[sourceIndex]!;
+					const wrapped = wrapTextWithAnsi(source, detailWidth);
+					for (const wrappedLine of wrapped.length > 0 ? wrapped : [""]) {
+						lines.push(
+							`${first ? firstPrefix : continuationPrefix}${truncateToWidth(
+								wrappedLine,
+								detailWidth,
+								"",
+							)}`,
+						);
+						first = false;
+					}
 				}
 			}
-			lines.push(theme.fg("accent", `╰${"─".repeat(bodyWidth)}╯`));
 			return lines;
 		},
 	};
 }
 
-function subagentControlNoticeTitle(_details: unknown): string {
-	return "Subagent monitor";
+type ParsedSubagentNotification = {
+	title: "Subagent" | "Subagents";
+	summary: string;
+	tone: InjectedEventTone;
+	result?: string;
+	session?: string;
+};
+
+function parseSubagentNotification(
+	content: string,
+): ParsedSubagentNotification | undefined {
+	const lines = content.split("\n");
+	const firstLine = lines[0]?.trim() ?? "";
+	const single = firstLine.match(
+		/^(?:Background task|Detached foreground task) (completed|failed|paused): \*\*(.+?)\*\*(?:\s+\([^)]*\))?$/,
+	);
+	if (single) {
+		const status = single[1]!;
+		const agent = single[2]!;
+		const body = lines.slice(1);
+		const sessionLine = body.find((line) =>
+			/^(?:Session|Session file|Session share error):\s+/.test(line.trim()),
+		);
+		const result = body
+			.filter(
+				(line) =>
+					line.trim().length > 0 &&
+					line !== sessionLine,
+			)
+			.join("\n");
+		return {
+			title: "Subagent",
+			summary: `${agent} ${status}`,
+			tone:
+				status === "completed"
+					? "success"
+					: status === "failed"
+						? "error"
+						: "warning",
+			result,
+			session: sessionLine
+				?.trim()
+				.replace(/^(?:Session|Session file|Session share error):\s+/, ""),
+		};
+	}
+
+	const grouped = firstLine.match(/^Background tasks completed \((\d+)\):/);
+	if (!grouped) return undefined;
+	const count = Number(grouped[1]);
+	return {
+		title: "Subagents",
+		summary: `${plural(count, "task")} completed`,
+		tone: "success",
+		result: lines.slice(1).filter((line) => line.trim().length > 0).join("\n"),
+	};
+}
+
+function renderSubagentNotification(
+	message: { content?: unknown },
+	options: InjectedEventRenderOptions,
+	theme: Theme,
+): Component | undefined {
+	const content = textParts(message.content);
+	const parsed = parseSubagentNotification(content);
+	if (!parsed) {
+		return injectedEventComponent(
+			theme,
+			options,
+			"Subagent",
+			"notification",
+			"info",
+			[{ label: "Message", value: content }],
+		);
+	}
+	return injectedEventComponent(
+		theme,
+		options,
+		parsed.title,
+		parsed.summary,
+		parsed.tone,
+		[
+			{ label: "Result", value: parsed.result },
+			{ label: "Session", value: parsed.session },
+		],
+	);
+}
+
+function renderIntercomMessage(
+	message: { content?: unknown; details?: unknown },
+	options: InjectedEventRenderOptions,
+	theme: Theme,
+): Component | undefined {
+	const details = message.details as IntercomMessageDetails | undefined;
+	const from = details?.from;
+	const sender = from?.name || from?.id?.slice(0, 8) || "intercom";
+	if (sender === "subagent-result") return emptyComponent();
+	const rawText =
+		details?.bodyText ??
+		details?.message?.content?.text ??
+		textParts(message.content);
+	const visibleControlText = subagentControlIntercomVisibleText(sender, rawText);
+	if (visibleControlText === "") return emptyComponent();
+	const visibleText = visibleControlText ?? rawText;
+	const preview = contentLines(visibleText).find((line) => line.trim().length > 0);
+	return injectedEventComponent(
+		theme,
+		options,
+		"Intercom",
+		preview
+			? `${compactOneLine(sender, 50)} · ${compactOneLine(preview, 90)}`
+			: `${compactOneLine(sender, 50)} message`,
+		"info",
+		[
+			{ label: "Message", value: visibleText },
+			{ label: "Reply", value: details?.replyCommand },
+		],
+	);
+}
+
+function renderSubagentSteeringNotification(
+	message: { content?: unknown; details?: unknown },
+	options: InjectedEventRenderOptions,
+	theme: Theme,
+): Component {
+	const details = isRecord(message.details) ? message.details : undefined;
+	const state = details ? recordString(details, "state") : undefined;
+	const runId = details ? recordString(details, "runId") : undefined;
+	const requestId = details ? recordString(details, "requestId") : undefined;
+	const steeringMessage = details ? recordString(details, "message") : undefined;
+	const content = textParts(message.content);
+	const normalizedState = state ?? "update";
+	const summary = [
+		`steering ${normalizedState}`,
+		steeringMessage ? compactOneLine(steeringMessage, 90) : undefined,
+		runId ? `run ${shortRunId(runId)}` : undefined,
+		normalizedState === "failed" || normalizedState === "partial"
+			? "inspect status"
+			: undefined,
+	]
+		.filter((part): part is string => Boolean(part))
+		.join(" · ");
+	return injectedEventComponent(
+		theme,
+		options,
+		"Subagent",
+		summary,
+		normalizedState === "failed"
+			? "error"
+			: normalizedState === "recovered"
+				? "success"
+				: normalizedState === "partial"
+					? "warning"
+					: "info",
+		[
+			{ label: "Message", value: content },
+			{ label: "Run", value: runId },
+			{ label: "Request", value: requestId },
+		],
+	);
+}
+
+function renderSubagentWatchdogNotification(
+	message: { content?: unknown; details?: unknown },
+	options: InjectedEventRenderOptions,
+	theme: Theme,
+): Component {
+	const details = isRecord(message.details) ? message.details : undefined;
+	const severity = details ? recordString(details, "severity") : undefined;
+	const summary = details ? recordString(details, "summary") : undefined;
+	const evidence = details ? recordString(details, "evidence") : undefined;
+	const action = details ? recordString(details, "recommendedAction") : undefined;
+	const agent = details ? recordString(details, "agent") : undefined;
+	const runId = details ? recordString(details, "runId") : undefined;
+	const collapsedSummary = [
+		severity ?? "warning",
+		summary ? compactOneLine(summary, 90) : undefined,
+		severity === "blocker" && action
+			? compactOneLine(action, 90)
+			: undefined,
+	]
+		.filter((part): part is string => Boolean(part))
+		.join(" · ");
+	return injectedEventComponent(
+		theme,
+		options,
+		"Watchdog",
+		collapsedSummary,
+		severity === "blocker" ? "error" : "warning",
+		[
+			{ label: "Evidence", value: evidence },
+			{ label: "Action", value: action },
+			{ label: "Agent", value: agent },
+			{ label: "Run", value: runId },
+			{
+				label: "Message",
+				value: details ? undefined : textParts(message.content),
+			},
+		],
+	);
+}
+
+function supervisorReasonSummary(reason: string | undefined): string {
+	switch (reason) {
+		case "need_decision":
+			return "needs decision";
+		case "interview_request":
+			return "requests interview";
+		case "progress_update":
+			return "progress update";
+		default:
+			return "request";
+	}
+}
+
+function renderSubagentSupervisorNotification(
+	message: { content?: unknown; details?: unknown },
+	options: InjectedEventRenderOptions,
+	theme: Theme,
+): Component {
+	const details = isRecord(message.details) ? message.details : undefined;
+	const reason = details ? recordString(details, "reason") : undefined;
+	const agent = details ? recordString(details, "agent") : undefined;
+	const runId = details ? recordString(details, "runId") : undefined;
+	const requestId = details ? recordString(details, "id") : undefined;
+	const summary = details ? recordString(details, "summary") : undefined;
+	const expectsReply = details?.expectsReply === true;
+	const collapsedSummary = [
+		`${agent ? `${agent} ` : ""}${supervisorReasonSummary(reason)}`,
+		summary ? compactOneLine(summary, 100) : undefined,
+		expectsReply && (reason === "need_decision" || reason === "interview_request")
+			? "reply required"
+			: undefined,
+	]
+		.filter((part): part is string => Boolean(part))
+		.join(" · ");
+	return injectedEventComponent(
+		theme,
+		options,
+		"Supervisor",
+		collapsedSummary,
+		reason === "progress_update" ? "info" : "warning",
+		[
+			{ label: "Summary", value: summary },
+			{ label: "Message", value: textParts(message.content) },
+			{ label: "Request", value: requestId },
+			{ label: "Run", value: runId },
+		],
+	);
 }
 
 function recordString(
@@ -5849,16 +7943,48 @@ function isStaleSubagentControlNotice(
 	return branch.some((entry) => isCompletedSubagentRunEntry(entry, runId));
 }
 
-function staleSubagentControlNoticeLine(
-	message: SubagentControlNoticeMessage,
-	width: number,
-	theme: Theme,
+function subagentControlNoticeSummary(
+	event: Record<string, unknown> | undefined,
 ): string {
-	const runId = subagentControlNoticeRunId(message);
-	const text = runId
-		? `stale subagent notice hidden · run ${runId} completed`
-		: "stale subagent notice hidden";
-	return theme.fg("dim", truncateToWidth(text, Math.max(1, width), ""));
+	if (!event) return "monitor notice";
+	const eventType = recordString(event, "type");
+	const agent = recordString(event, "agent");
+	const recentFailure = recordString(event, "recentFailureSummary");
+	const reason = recordString(event, "reason");
+	const message = recordString(event, "message");
+	const elapsedMs = recordNumber(event, "elapsedMs");
+	const currentTool = recordString(event, "currentTool");
+	const runId = recordString(event, "runId");
+	const state =
+		eventType === "active_long_running"
+			? "active but long-running"
+			: eventType === "needs_attention"
+				? "needs attention"
+				: "notice";
+	const signal = recentFailure
+		? compactOneLine(recentFailure, 90)
+		: reason === "tool_failures"
+			? "repeated edit failures"
+			: reason === "completion_guard"
+				? "finished without expected edits"
+				: reason === "idle"
+					? elapsedMs !== undefined
+						? `no activity for ${formatControlDuration(elapsedMs)}`
+						: "no observed activity"
+					: eventType === "active_long_running" && elapsedMs !== undefined
+						? formatControlDuration(elapsedMs)
+						: message
+							? compactOneLine(message, 90)
+							: undefined;
+	return [
+		`${agent ? `${agent} ` : "monitor "}${state}`,
+		signal,
+		currentTool,
+		runId ? `run ${shortRunId(runId)}` : undefined,
+		eventType === "needs_attention" ? "inspect status" : undefined,
+	]
+		.filter((part): part is string => Boolean(part))
+		.join(" · ");
 }
 
 function renderSubagentControlNotice(
@@ -5868,66 +7994,27 @@ function renderSubagentControlNotice(
 ): Component | undefined {
 	const body = subagentControlNoticeBody(message);
 	if (!body.trim()) return undefined;
-	const title = subagentControlNoticeTitle(message.details);
+	const event = subagentControlEvent(message.details);
+	const summary = subagentControlNoticeSummary(event);
+	const component = injectedEventComponent(
+		theme,
+		options,
+		"Subagent",
+		summary,
+		"warning",
+		[{ label: "Details", value: body }],
+	);
 
 	return {
-		invalidate() {},
+		invalidate() {
+			component.invalidate();
+		},
 		render(width: number): string[] {
-			if (isStaleSubagentControlNotice(message, options.getBranch)) {
-				return [staleSubagentControlNoticeLine(message, width, theme)];
-			}
-			if (width < 3) return [truncateToWidth(title, width)];
-			const bodyWidth = Math.max(1, width - 2);
-			const header = ` ⚠ ${title} `;
-			const headerText = truncateToWidth(header, bodyWidth, "");
-			const headerPadding = Math.max(0, bodyWidth - visibleWidth(headerText));
-			const lines = [
-				theme.fg("warning", `╭${headerText}${"─".repeat(headerPadding)}╮`),
-			];
-			for (const line of wrapTextWithAnsi(body, bodyWidth)) {
-				const text = truncateToWidth(line, bodyWidth, "");
-				const padding = Math.max(0, bodyWidth - visibleWidth(text));
-				lines.push(theme.fg("warning", `│${text}${" ".repeat(padding)}│`));
-			}
-			lines.push(theme.fg("warning", `╰${"─".repeat(bodyWidth)}╯`));
-			return lines;
+			if (isStaleSubagentControlNotice(message, options.getBranch)) return [];
+			return component.render(width);
 		},
 	};
 }
-
-export const __claudeUiTestInternals = {
-	allowlistedToolNames: [...EXTENSION_TOOL_WRAPPER_ALLOWLIST],
-	agentToolCallBody,
-	footerLine,
-	footerMetricsLine,
-	formatSessionCacheHit,
-	formatSessionTokenUsage,
-	formatBashCall,
-	formatEditCall,
-	formatFindCall,
-	formatGrepCall,
-	formatLsCall,
-	formatReadCall,
-	formatWriteCall,
-	genericToolCall,
-	genericToolResult,
-	renderBashResult,
-	renderEditResult,
-	renderFindResult,
-	renderGrepResult,
-	renderIntercomMessage,
-	renderLsResult,
-	renderReadResult,
-	renderSubagentControlNotice,
-	renderSubagentToolResult,
-	renderWriteResult,
-	shouldUseOriginalToolCallRenderer,
-	shouldUseOriginalToolRenderer,
-	webToolCallBody,
-	webToolTitle,
-	wrappedToolCall,
-	wrappedToolResult,
-};
 
 export default function (pi: ExtensionAPI) {
 	let activeCtx: ExtensionContext | undefined;
@@ -6045,6 +8132,7 @@ export default function (pi: ExtensionAPI) {
 		);
 
 	patchToolExecutionRenderers();
+	patchSkillInvocationRender();
 	patchAssistantMessageRender();
 	patchUserMessageRender();
 	patchCompactionSummaryRender();
@@ -6052,6 +8140,22 @@ export default function (pi: ExtensionAPI) {
 	registerClaudeToolRenderers(pi);
 	registerContextCommand(pi);
 	pi.registerMessageRenderer("intercom_message", renderIntercomMessage);
+	pi.registerMessageRenderer(
+		SUBAGENT_NOTIFY_MESSAGE_TYPE,
+		renderSubagentNotification,
+	);
+	pi.registerMessageRenderer(
+		SUBAGENT_STEERING_MESSAGE_TYPE,
+		renderSubagentSteeringNotification,
+	);
+	pi.registerMessageRenderer(
+		SUBAGENT_WATCHDOG_MESSAGE_TYPE,
+		renderSubagentWatchdogNotification,
+	);
+	pi.registerMessageRenderer(
+		SUBAGENT_SUPERVISOR_MESSAGE_TYPE,
+		renderSubagentSupervisorNotification,
+	);
 	for (const type of SUBAGENT_CONTROL_NOTICE_TYPES) {
 		pi.registerMessageRenderer(
 			type,
@@ -6067,6 +8171,7 @@ export default function (pi: ExtensionAPI) {
 			writeSnapshots.clear();
 			inlineImageCache.clear();
 			toolExecutionExpandedById.clear();
+			successfulCreateGoalToolCalls.clear();
 			pendingToolCalls.clear();
 			setWorkingState("inactive");
 			if (!safeHasUI(ctx)) return;
@@ -6220,6 +8325,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("tool_execution_start", (event, ctx) => {
+		successfulCreateGoalToolCalls.delete(event.toolCallId);
 		if (!safeHasUI(ctx)) return;
 		pendingToolCalls.add(event.toolCallId);
 		activeCtx = ctx;
@@ -6234,6 +8340,13 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("tool_execution_end", (event, ctx) => {
+		if (event.toolName === "create_goal") {
+			if (isRecord(event.result) && event.result.terminate === true) {
+				successfulCreateGoalToolCalls.add(event.toolCallId);
+			} else {
+				successfulCreateGoalToolCalls.delete(event.toolCallId);
+			}
+		}
 		pendingToolCalls.delete(event.toolCallId);
 		if (!safeHasUI(ctx)) return;
 		activeCtx = ctx;
@@ -6262,6 +8375,7 @@ export default function (pi: ExtensionAPI) {
 		stopStatusAnimation();
 		clearIdleReconcile();
 		toolExecutionExpandedById.clear();
+		successfulCreateGoalToolCalls.clear();
 		for (const dispose of footerDisposers) dispose();
 		footerDisposers.clear();
 		restoreSubagentWidgetPatches();
