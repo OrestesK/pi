@@ -7,6 +7,7 @@ extensions: ~/.config/pi/packages/pi-fff/src/index.ts, ~/.npm-global/lib/node_mo
 model: inherit
 systemPromptMode: append
 inheritProjectContext: true
+inheritGlobalContext: true
 inheritSkills: true
 defaultContext: fork
 completionGuard: false

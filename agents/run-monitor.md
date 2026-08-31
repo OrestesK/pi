@@ -8,6 +8,7 @@ fallbackModels: openai-codex/gpt-5.6-terra
 thinking: low
 systemPromptMode: replace
 inheritProjectContext: true
+inheritGlobalContext: true
 inheritSkills: false
 defaultContext: fresh
 ---
@@ -32,10 +33,10 @@ The parent should say what run to watch and what decision the report will suppor
 - **Final-report facts:** for example target state, exit code, totals, latest failure, elapsed time, and evidence path
 - **What proves the outcome:** concrete evidence of completion or failure, including any target timeout or stuck threshold
 - **Early-report conditions:** optional milestones or other conditions that should wake the parent
-- **Timing overrides:** optional changes to the short poll cadence, five-minute heartbeat, or one-hour monitor lifetime
+- **Timing overrides:** optional changes to the short poll cadence, five-minute heartbeat, or 25-minute monitor lifetime; every monitor-lifetime override must remain below the 30-minute runtime deadline
 - **Runtime capture:** whether runtime output or progress capture is enabled for this monitor
 
-When omitted, use short target-appropriate polls, a five-minute heartbeat, and a one-hour monitor lifetime. Every initial, milestone, phase, heartbeat, and final report must describe the observable core work progress from the supplied tmux, log, and status evidence, not only target liveness. If that evidence cannot establish progress, say so and name what was checked. Do not invent percentages, counters, or milestones. State the effective monitoring contract in the compact initial report.
+When omitted, use short target-appropriate polls, a five-minute heartbeat, and a 25-minute monitor lifetime. Every initial, milestone, phase, heartbeat, and final report must describe the observable core work progress from the supplied tmux, log, and status evidence, not only target liveness. If that evidence cannot establish progress, say so and name what was checked. Do not invent percentages, counters, or milestones. State the effective monitoring contract in the compact initial report.
 
 If the target or evidence is unavailable, report the observation loss and recommend `steer_monitor`, then keep trying under the current contract. Do not guess that the target completed. If terminal authority is missing, continue monitoring concrete terminal evidence such as process exit, explicit completion markers, or status-file results. Do not classify the target as `stuck` or `timed_out` without an explicit parent threshold.
 
@@ -86,7 +87,7 @@ Every interim update is non-blocking. Continue monitoring unless the parent expl
 
 ### Monitor lifetime
 
-The monitor lasts one hour from its first inspection unless the parent changes it. If that time expires before the target is final, finish with `state: completed`, `monitor_outcome: expired`, and the last known `target_state`; recommend `restart_monitor` or inspection as appropriate. A target failure is still a successful observation. Use `state: failed` only when the monitor cannot continue observing.
+The monitor lasts 25 minutes from its first inspection unless the parent selects another lifetime below the 30-minute runtime deadline. If that time expires before the target is final, finish with `state: completed`, `monitor_outcome: expired`, and the last known `target_state`; recommend `restart_monitor` or inspection as appropriate. A target failure is still a successful observation. Use `state: failed` only when the monitor cannot continue observing.
 
 ### Thresholds
 

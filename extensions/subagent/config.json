@@ -9,34 +9,23 @@
       "allowedAgents": ["clone", "context-builder", "oracle", "planner", "researcher", "reviewer", "run-monitor", "scout"]
     }
   },
-  "asyncByDefault": true,
   "forceTopLevelAsync": true,
-  "maxSubagentDepth": 32,
+  "maxSubagentDepth": 2,
+  "maxSubagentSpawnsPerRun": 20000,
   "maxSubagentSpawnsPerSession": 20000,
   "globalConcurrencyLimit": 100,
-  "chain": {
-    "dynamicFanout": {
-      "maxItems": 20000
-    }
-  },
   "scheduledRuns": {
-    "enabled": true,
-    "maxPending": 20000,
-    "maxLatenessMs": 1209600000
+    "enabled": false
+  },
+  "missions": {
+    "enabled": false
   },
   "control": {
-    "enabled": true,
     "needsAttentionAfterMs": 60000,
     "activeNoticeAfterMs": 120000,
-    "failedToolAttemptsBeforeAttention": 3,
-    "notifyOn": ["active_long_running", "needs_attention"],
     "notifyChannels": ["event", "async"]
   },
   "intercomBridge": {
-    "mode": "always"
-  },
-  "parallel": {
-    "maxTasks": 20000,
-    "concurrency": 20
+    "resultDelivery": false
   }
 }

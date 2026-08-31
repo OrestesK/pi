@@ -42,7 +42,7 @@ This is the canonical map of configuration surfaces. The `Kind` column distingui
 
 `pi-memory-md` stores local Markdown memory under `~/.pi/memory/`. This configuration uses the shared `global/core/` scope, keeps automatic memory delivery disabled, and leaves memory available for on-demand search and normal file reads. Packaged memory skills and automatic synchronization hooks are disabled, and every durable-memory mutation requires explicit user authorization. `AGENTS.md` owns the executable retrieval and mutation policy.
 
-Tape remains enabled in Git repositories for automatic lifecycle and model-selected handoff checkpoints. TapeThread is disabled. Tape metadata does not snapshot, restore, or modify code. Project-wide `tape_search`, `tape_read`, and `tape_info` remain unsafe on large session histories because upstream loads full project history before applying its entry limit.
+Tape remains enabled in Git repositories for automatic lifecycle and model-selected handoff checkpoints. TapeThread is disabled. Tape metadata does not snapshot, restore, or modify code. Project-wide `tape_search` and `tape_read` stream session files, filter before bounded newest-result retention, and remain proportional to total corpus bytes in scan time without retaining the full corpus.
 
 `pi-session-search` indexes Pi session records for model-facing search. Memory and historical sessions are discovery evidence; current user instructions and current source remain authoritative.
 

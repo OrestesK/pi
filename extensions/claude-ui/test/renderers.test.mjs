@@ -163,6 +163,41 @@ test("registered tool rendering shows pending identity and a salient argument", 
 	assertFits(component, 32);
 });
 
+test("context search uses concise cards until expanded", () => {
+	const rawCall = "RAW_CTX_SEARCH_CALL";
+	const rawResult = "RAW_CTX_SEARCH_RESULT";
+	const query = "renderer coverage";
+	const definition = rawToolDefinition("ctx_search", {
+		renderCall(args) {
+			return new Text(`${rawCall} ${args.query}`, 0, 0);
+		},
+		renderResult(result) {
+			return new Text(
+				`${rawResult} ${result.content?.[0]?.text ?? ""}`,
+				0,
+				0,
+			);
+		},
+	});
+	const search = toolExecution("ctx_search", { query }, definition);
+	const pending = plain(render(search));
+
+	assert.match(pending, /Context Search/);
+	assert.match(pending, new RegExp(query));
+	assert.doesNotMatch(pending, new RegExp(rawCall));
+
+	finish(search, "first result\nsecond result", undefined);
+	const collapsed = plain(render(search));
+	assert.match(collapsed, /Output.*2 output lines/);
+	assert.doesNotMatch(collapsed, new RegExp(rawResult));
+
+	search.setExpanded(true);
+	const expanded = plain(render(search));
+	assert.match(expanded, new RegExp(rawCall));
+	assert.match(expanded, new RegExp(rawResult));
+	assertFits(search, 40);
+});
+
 test("structured success stays concise while expanded, partial, malformed, and error states remain visible", () => {
 	const payload = "PROJECT_REPORT_RAW_PAYLOAD";
 	const successDetails = {

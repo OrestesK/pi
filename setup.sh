@@ -8,6 +8,7 @@ INSTALL_ROOTS=(
 	"npm"
 	"packages/pi-fff"
 	"packages/pi-lens"
+	"packages/pi-memory-md"
 	"packages/pi-subagents"
 )
 

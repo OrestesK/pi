@@ -8,6 +8,7 @@ fallbackModels: openai-codex/gpt-5.6-terra, openai-codex/gpt-5.5
 thinking: high
 systemPromptMode: replace
 inheritProjectContext: true
+inheritGlobalContext: true
 inheritSkills: false
 defaultContext: fork
 ---

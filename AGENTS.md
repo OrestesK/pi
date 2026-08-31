@@ -52,7 +52,7 @@ Do:
 Do not:
 - invent, duplicate, prolong work only to satisfy requirements
 - wait for optional or non blocking agents to finish
-- set turn, tool, or runtime budgets. Bound the task by its outcome, evidence target, scope and effect boundaries, and stop condition
+- set runtime budgets
 
 Every approved implementation slice is owned by `clone`
 - genuinely independent slices run in parallel
@@ -144,7 +144,7 @@ After launch:
 When a subagent benefits from an MCP server:
 - Require the child to report the MCP tools used when it's done
 
-1. Add `toolExtensions: { add: ["mcp"] }` and `requiresCapabilities: ["mcp"]`
+1. On a direct launch or each applicable `workflowScript` child, add `toolExtensions: { add: ["mcp"] }` and `requiresCapabilities: ["mcp"]`
 2. Name the server, required evidence, allowed effects, and authentication boundary in the task
 3. For read-only work, say directly that the child must not edit or modify files
 
