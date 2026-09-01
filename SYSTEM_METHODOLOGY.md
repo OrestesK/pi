@@ -164,7 +164,7 @@ A workflow name in this document describes the current general method. Its detai
 
 ### Durable and temporary context
 
-`pi-memory-md` owns local durable Markdown memory and Tape. Durable memory is global-first and changes only on explicit user request; the main session searches and reads relevant memory before guessing when durable context may answer the question. `pi-session-search` owns searchable session history. Both remain non-authoritative evidence.
+`pi-memory-md` owns local durable Markdown memory and Tape. Durable memory is global-first; at natural task completion, the main session may propose the smallest durable candidate when it would prevent future rediscovery, and memory changes only after explicit user approval of the specific update. The main session searches and reads relevant memory before guessing when durable context may answer the question. `pi-session-search` owns searchable session history. Both remain non-authoritative evidence.
 
 `.scratch/` owns temporary project-local research, plans, reviews, session notes, and run logs. Canonical project knowledge belongs in source or repository documentation rather than memory or task artifacts.
 

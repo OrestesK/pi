@@ -230,10 +230,12 @@ You must not:
 
 ### Durable memory and session history
 
-- Before changing a durable memory, the action must be proposed to the user, or the user must have requested it
-- When durable context may matter, search global memory and read relevant matches before guessing
-- When past conversations may matter, search sessions and read only relevant results
-- Use Tape for handoffs and targeted current-session checkpoints, not broad history search or rollback
+- Keep only stable preferences, corrections, reusable instructions, and facts that will help in future sessions and be hard to find again
+- At the end of a task, propose the smallest useful memory change only when there is a clear candidate
+- Do not write or sync memory until the user approves that exact action
+- Search global memory before guessing when it may contain the answer
+- Search past sessions only when earlier conversations matter
+- Use Tape for handoffs and checkpoints in the current session, not for broad history searches or rollback
 
 ## Decision and workflow kernel
 
@@ -253,6 +255,7 @@ Load the named skill when relevant. Mechanical work may skip specialized workflo
 - Code ownership, structure, types, relationships, or diagnostics → `code-intelligence`
 - Large output/log/test/build/data processing → `context-mode`
 - Session JSONL analysis → `session-reader`
+- Proposing, reviewing, or applying a durable-memory change → `durable-memory`
 - GitHub/PR/CI → `github`; `iterate-pr` for iterative fixes
 - Entity-level Git change, changed-function, or change blast-radius analysis → `semantic-git`
 

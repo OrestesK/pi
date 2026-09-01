@@ -40,7 +40,7 @@ This is the canonical map of configuration surfaces. The `Kind` column distingui
 
 ## Memory and session search
 
-`pi-memory-md` stores local Markdown memory under `~/.pi/memory/`. This configuration uses the shared `global/core/` scope, keeps automatic memory delivery disabled, and leaves memory available for on-demand search and normal file reads. Packaged memory skills and automatic synchronization hooks are disabled, and every durable-memory mutation requires explicit user authorization. `AGENTS.md` owns the executable retrieval and mutation policy.
+`pi-memory-md` stores local Markdown memory under `~/.pi/memory/`. Once per session, `message-append` delivers a hidden Tape-selected memory index containing paths, descriptions, and tags rather than full bodies; shared `global/core/` is always included, and relevant bodies are searched and read on demand. Its packaged skills are filtered off; the local `durable-memory` skill owns curation and approved writes. `AGENTS.md` owns proactive proposal triggering and requires explicit approval for every specific durable-memory change or synchronization. Automatic synchronization hooks remain disabled.
 
 Tape remains enabled in Git repositories for automatic lifecycle and model-selected handoff checkpoints. TapeThread is disabled. Tape metadata does not snapshot, restore, or modify code. Project-wide `tape_search` and `tape_read` stream session files, filter before bounded newest-result retention, and remain proportional to total corpus bytes in scan time without retaining the full corpus.
 
