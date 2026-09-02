@@ -1857,6 +1857,13 @@ const EXTENSION_TOOL_WRAPPER_ALLOWLIST = new Set([
 	"fetch_content",
 	"get_search_content",
 	"session_search",
+	"session_read",
+	"tape_handoff",
+	"tape_delete",
+	"tape_info",
+	"tape_search",
+	"tape_read",
+	"tape_reset",
 	"memory_search",
 	"ctx_stats",
 	"Agent",
@@ -2774,6 +2781,83 @@ function webToolCallBody(
 					? `limit ${argValueLabel(args, "limit")}`
 					: undefined,
 			]);
+		case "session_read":
+			return joinBodyParts(theme, [
+				pathText(
+					theme,
+					compactOneLine(argValueLabel(args, "session") ?? "…", 80),
+				),
+				argValueLabel(args, "offset")
+					? `offset ${argValueLabel(args, "offset")}`
+					: undefined,
+				argValueLabel(args, "limit")
+					? `limit ${argValueLabel(args, "limit")}`
+					: undefined,
+				argValueLabel(args, "include_tools") === "true"
+					? "with tools"
+					: undefined,
+			]);
+		case "tape_handoff":
+			return joinBodyParts(theme, [
+				pathText(theme, compactOneLine(argValueLabel(args, "name") ?? "…", 60)),
+				argValueLabel(args, "summary")
+					? compactOneLine(argValueLabel(args, "summary") ?? "", 80)
+					: undefined,
+				argValueLabel(args, "purpose"),
+			]);
+		case "tape_delete": {
+			const idCount = argArrayCount(args, "ids");
+			const target =
+				argValueLabel(args, "id") ??
+				(idCount !== undefined ? plural(idCount, "id") : "…");
+			return pathText(theme, compactOneLine(target, 80));
+		}
+		case "tape_info":
+			return pathText(theme, "current tape");
+		case "tape_search": {
+			const kinds = argStringArray(args, "kinds");
+			const target =
+				argValueLabel(args, "scan") ??
+				argValueLabel(args, "anchorName") ??
+				argValueLabel(args, "anchorSummary") ??
+				argValueLabel(args, "anchorPurpose") ??
+				(kinds.length > 0 ? kinds.join(", ") : "all");
+			return joinBodyParts(theme, [
+				pathText(theme, compactOneLine(target, 80)),
+				argValueLabel(args, "anchorType")
+					? `type ${argValueLabel(args, "anchorType")}`
+					: undefined,
+				argValueLabel(args, "limit")
+					? `limit ${argValueLabel(args, "limit")}`
+					: undefined,
+			]);
+		}
+		case "tape_read": {
+			const target =
+				argValueLabel(args, "scan") ??
+				argValueLabel(args, "afterAnchor") ??
+				(argValueLabel(args, "lastAnchor") === "true"
+					? "last anchor"
+					: "recent entries");
+			const contentLimit =
+				isRecord(args) && args.maxContentChars === null
+					? "full content"
+					: argValueLabel(args, "maxContentChars")
+						? `content ${argValueLabel(args, "maxContentChars")}`
+						: undefined;
+			return joinBodyParts(theme, [
+				pathText(theme, compactOneLine(target, 80)),
+				argValueLabel(args, "limit")
+					? `limit ${argValueLabel(args, "limit")}`
+					: undefined,
+				contentLimit,
+			]);
+		}
+		case "tape_reset":
+			return pathText(
+				theme,
+				argValueLabel(args, "archive") === "true" ? "archive and reset" : "reset",
+			);
 		case "memory_search": {
 			const query =
 				argValueLabel(args, "query") ??
@@ -3148,6 +3232,20 @@ function webToolTitle(name: string): string {
 			return "Get Content";
 		case "session_search":
 			return "Session Search";
+		case "session_read":
+			return "Session Read";
+		case "tape_handoff":
+			return "Tape Handoff";
+		case "tape_delete":
+			return "Tape Delete";
+		case "tape_info":
+			return "Tape Info";
+		case "tape_search":
+			return "Tape Search";
+		case "tape_read":
+			return "Tape Read";
+		case "tape_reset":
+			return "Tape Reset";
 		case "memory_search":
 			return "Memory Search";
 		case "ctx_stats":
@@ -5404,6 +5502,13 @@ function toolPreviewBlock(
 						120,
 						3,
 					);
+		case "session_read":
+		case "tape_handoff":
+		case "tape_delete":
+		case "tape_info":
+		case "tape_search":
+		case "tape_read":
+		case "tape_reset":
 		case "tool_result_get":
 		case "tool_result_export_details":
 		case "tool_result_export":
@@ -5589,6 +5694,58 @@ function resultDetailSummary(
 			].filter(Boolean);
 			return parts.length > 0 ? parts.join(" · ") : "done";
 		}
+		case "tape_read": {
+			const count = detailNumber(details, "count");
+			return count !== undefined
+				? plural(count, "entry")
+				: compactOneLine(output, 60);
+		}
+		case "tape_search": {
+			const count = detailNumber(details, "count");
+			if (count === 0) return "0 results";
+			const anchorCount = detailNumber(details, "anchorCount");
+			const entryCount = detailNumber(details, "entryCount");
+			const parts = [
+				anchorCount !== undefined && anchorCount > 0
+					? plural(anchorCount, "anchor")
+					: undefined,
+				entryCount !== undefined && entryCount > 0
+					? plural(entryCount, "entry")
+					: undefined,
+			].filter(Boolean);
+			return parts.length > 0
+				? parts.join(" · ")
+				: count !== undefined
+					? plural(count, "result")
+					: compactOneLine(output, 60);
+		}
+		case "tape_info": {
+			const entries = detailNumber(details, "totalEntries");
+			const anchors = detailNumber(details, "anchorCount");
+			const parts = [
+				entries !== undefined ? plural(entries, "entry") : undefined,
+				anchors !== undefined ? plural(anchors, "anchor") : undefined,
+			].filter(Boolean);
+			return parts.length > 0 ? parts.join(" · ") : compactOneLine(output, 60);
+		}
+		case "tape_handoff": {
+			if (detailBoolean(details, "disabled") === true)
+				return compactOneLine(output, 60);
+			const name = detailString(details, "name");
+			return name ? `created · ${name}` : compactOneLine(output, 60);
+		}
+		case "tape_delete": {
+			const deleted = detailBoolean(details, "deleted");
+			if (deleted !== true) return compactOneLine(output, 60);
+			const count = detailNumber(details, "deletedCount");
+			return count !== undefined
+				? `${plural(count, "anchor")} deleted`
+				: "deleted";
+		}
+		case "tape_reset":
+			return detailBoolean(details, "archived") !== undefined
+				? "reset"
+				: compactOneLine(output, 60);
 		case "tool_result_outline": {
 			const sourceId = detailString(details, "sourceId");
 			const keywordHits = detailNumber(details, "keywordHitCount");

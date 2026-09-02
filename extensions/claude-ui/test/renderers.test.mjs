@@ -429,6 +429,164 @@ test("virtualized receipts distinguish stored content from storage failure", () 
 	assert.match(failedText, /1800 lines withheld/);
 });
 
+test("session and tape context tools use concise Claude rows", () => {
+	const sessionReceipt = [
+		"[tool-result-virtualizer] Large session_read result stored locally",
+		"Source: tr_session",
+		"Capture: event.content; size: 33.0 KiB, 321 lines; sha256: abc",
+		"Preview only — not complete evidence.",
+	].join("\n");
+	const sessionRead = finish(
+		toolExecution("session_read", {
+			session: "01a05dde-ead2-720c-a83b-91b410abf3e3",
+			limit: 20,
+		}),
+		sessionReceipt,
+		{
+			toolResultVirtualizer: {
+				sourceId: "tr_session",
+				toolName: "session_read",
+				lineCount: 321,
+				contentReplaced: true,
+			},
+		},
+	);
+	const sessionText = plain(render(sessionRead));
+	assert.match(sessionText, /Session Read.*01a05dde/);
+	assert.match(sessionText, /└ Session Read.*321 lines.*stored/);
+	assert.match(sessionText, /tr_session/);
+	assert.doesNotMatch(sessionText, /Preview only/);
+	assertFits(sessionRead, 40);
+
+	const legacyDefinition = (name) =>
+		rawToolDefinition(name, {
+			renderShell: "default",
+			renderCall() {
+				return new Text(`LEGACY_${name}_CALL`, 0, 0);
+			},
+			renderResult() {
+				return new Text(`LEGACY_${name}_RESULT`, 0, 0);
+			},
+		});
+	const tapeReceipt = [
+		"[tool-result-virtualizer] Large tape_read result stored locally",
+		"Source: tr_tape",
+		"Capture: event.content; size: 9.0 KiB, 52 lines; sha256: def",
+		"Preview only — not complete evidence.",
+	].join("\n");
+	const storedTape = finish(
+		toolExecution(
+			"tape_read",
+			{ scan: "source_of_truth", limit: 30 },
+			legacyDefinition("tape_read"),
+		),
+		tapeReceipt,
+		{
+			toolResultVirtualizer: {
+				sourceId: "tr_tape",
+				toolName: "tape_read",
+				lineCount: 52,
+				contentReplaced: true,
+			},
+		},
+	);
+	const storedTapeText = plain(render(storedTape));
+	assert.match(storedTapeText, /└ Tape Read.*52 lines.*stored/);
+	assert.match(storedTapeText, /tr_tape/);
+	assert.doesNotMatch(storedTapeText, /LEGACY_|Preview only/);
+	assertFits(storedTape, 40);
+
+	const cases = [
+		{
+			name: "tape_handoff",
+			title: "Tape Handoff",
+			args: { name: "task/begin", summary: "Start renderer work" },
+			details: { name: "task/begin" },
+			summary: /└ Tape Handoff.*created.*task\/begin/,
+		},
+		{
+			name: "tape_delete",
+			title: "Tape Delete",
+			args: { ids: ["anchor-1", "anchor-2"] },
+			details: { deleted: true, deletedCount: 2 },
+			summary: /└ Tape Delete.*2 anchors deleted/,
+		},
+		{
+			name: "tape_info",
+			title: "Tape Info",
+			args: {},
+			details: { totalEntries: 44, anchorCount: 3 },
+			summary: /└ Tape Info.*44 entries.*3 anchors/,
+		},
+		{
+			name: "tape_search",
+			title: "Tape Search",
+			args: { scan: "renderer", limit: 10 },
+			details: { count: 5, anchorCount: 2, entryCount: 3 },
+			summary: /└ Tape Search.*2 anchors.*3 entries/,
+		},
+		{
+			name: "tape_read",
+			title: "Tape Read",
+			args: { scan: "source_of_truth", limit: 30, maxContentChars: 2500 },
+			details: { count: 30 },
+			summary: /└ Tape Read.*30 entries/,
+			call: /Tape Read.*source_of_truth.*limit 30.*content 2500/,
+		},
+		{
+			name: "tape_reset",
+			title: "Tape Reset",
+			args: {},
+			details: { archived: false },
+			summary: /└ Tape Reset.*reset/,
+		},
+	];
+
+	for (const entry of cases) {
+		const rawOutput = `RAW_${entry.name}_OUTPUT`;
+		const component = finish(
+			toolExecution(entry.name, entry.args, legacyDefinition(entry.name)),
+			rawOutput,
+			entry.details,
+		);
+		const concise = plain(render(component));
+		assert.match(concise, new RegExp(entry.title));
+		assert.match(concise, entry.summary);
+		if (entry.call) assert.match(concise, entry.call);
+		assert.doesNotMatch(concise, /LEGACY_/);
+		assert.doesNotMatch(concise, new RegExp(rawOutput));
+		assertFits(component, 40);
+
+		component.setExpanded(true);
+		const expanded = plain(render(component));
+		assert.match(expanded, new RegExp(rawOutput));
+		assert.doesNotMatch(expanded, /LEGACY_/);
+	}
+
+	const unavailable = finish(
+		toolExecution("tape_reset", {}, legacyDefinition("tape_reset")),
+		"Tape is not enabled for the current settings.",
+		{},
+	);
+	const unavailableText = plain(render(unavailable));
+	assert.match(unavailableText, /└ Tape Reset.*Tape is not enabled/);
+	assert.doesNotMatch(unavailableText, /LEGACY_/);
+
+	const fullContent = finish(
+		toolExecution(
+			"tape_read",
+			{ scan: "wtf do you", limit: 20, maxContentChars: null },
+			legacyDefinition("tape_read"),
+		),
+		"RAW_FULL_TAPE_OUTPUT",
+		{ count: 3 },
+	);
+	const fullContentText = plain(render(fullContent));
+	assert.match(fullContentText, /Tape Read.*wtf do you.*limit 20.*full content/);
+	assert.match(fullContentText, /└ Tape Read.*3 entries/);
+	assert.doesNotMatch(fullContentText, /LEGACY_|RAW_FULL_TAPE_OUTPUT/);
+});
+
 test("web and fetch calls keep salient identity, semantic outcomes, and complete expanded payloads", () => {
 	const searchPayload = Array.from(
 		{ length: 25 },
