@@ -27,8 +27,8 @@
   "editorPaddingX": 0,
   "outputPad": 0,
   "retry": {
-    "maxRetries": 3,
-    "baseDelayMs": 2000
+    "maxRetries": 10,
+    "baseDelayMs": 3000
   },
   "lastChangelogVersion": "0.84.1",
   "transport": "auto",
@@ -55,7 +55,7 @@
   ],
   "packages": [
     "extensions/claude-ui",
-    "npm:pi-hashline-edit-pro@2.5.3",
+    "packages/pi-hashline-edit-pro",
     {
       "source": "git:github.com/nicobailon/pi-intercom@e234a4446e2b3f9c13a1ec3151ae2169315c810f",
       "skills": []

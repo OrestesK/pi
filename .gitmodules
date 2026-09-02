@@ -10,3 +10,7 @@
 	path = packages/pi-lens
 	url = https://github.com/OrestesK/pi-lens.git
 	branch = ok/disable-lens-default
+[submodule "packages/pi-hashline-edit-pro"]
+	path = packages/pi-hashline-edit-pro
+	url = https://github.com/OrestesK/pi-hashline-edit-pro.git
+	branch = ok/local
