@@ -45,13 +45,19 @@ If the directory, target placement, absolute target, or containment is missing o
 
 ## Write the memory
 
-Make the body standalone, specific, compact, and complete. Preserve exact names, commands, dates, conditions, applicability, and scope. Omit chat chronology, temporary state, and unrelated detail.
+Make the body standalone, compact, and complete. Start with the shortest useful working model: what it is, how it behaves, and what it means in practice.
+
+For a system or workflow, show the main flow or map before details. Keep connected facts together under short Markdown headings. Use direct, plain language and literal names as retrieval cues. Explain necessary jargon once.
+
+Include defaults, real exceptions, intended direction, and dated current topology only when they matter to future work. Distinguish intended direction from current reality. Preserve exact names, commands, dates, conditions, applicability, and scope when they matter.
+
+Do not turn memory into condensed technical documentation. Omit chat chronology, temporary research, implementation trivia, source indexes, and procedures already owned by repository documentation, skills, source, tests, ADRs, or runbooks.
 
 Use the shape that fits the content:
 
 - **Preference:** preference, applicability, and exceptions.
 - **Decision:** context, decision, rationale, consequences, and current status.
-- **Procedure or runbook:** use condition, prerequisites, steps, expected result, and recheck trigger.
+- **Procedure or runbook:** only when no canonical repository owner exists and the procedure is a durable, costly-to-rediscover need; include the use condition, prerequisites, steps, expected result, and recheck trigger.
 - **Project fact:** fact, scope, source, and freshness condition.
 
 ## Use tags deliberately
@@ -67,12 +73,11 @@ Use this default frontmatter:
 description: "Human-readable description"
 tags:
   - "tag"
-created: "YYYY-MM-DD"
 updated: "YYYY-MM-DD"
 ---
 ```
 
-Add `source`, `verified`, `review_after`, `status`, `supersedes`, or `superseded_by` only when useful. The file path is the memory identity; Git provides ordinary revision history.
+Add no other frontmatter by default. Add a field only for a concrete need the user approved. Put material source, uncertainty, applicability, and qualification naturally in the body. The file path is the memory identity; Git provides ordinary revision history.
 
 ## Place the file
 

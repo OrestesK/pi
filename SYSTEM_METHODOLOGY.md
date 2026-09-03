@@ -81,7 +81,7 @@ Use plain, natural language. Lead with the answer, explain what changes in pract
 
 ### 1. Classify and frame the task
 
-`AGENTS.md` owns the global definitions of trivial, nontrivial, material, useful, and protected work.
+`AGENTS.md` owns active task classification, workflow routing, and protected-action rules.
 
 - Trivial and unambiguous work stays with the parent
 - Nontrivial or material implementation, refactor, migration, or service work enters `manager-workflow`
@@ -96,8 +96,7 @@ Before mutation, the parent makes the observable outcome, non-goals, owners, pro
 The agent reads the relevant source before editing and uses the workflow that owns the evidence it needs.
 
 - `brainstorming` turns ambiguous product, behavior, UI, API, or architecture intent into a concrete design; it researches first and asks one material decision at a time
-- `code-intelligence` owns semantic evidence about code structure, symbols, types, references, call paths, and diagnostics
-- `learn-codebase` owns first-session repository orientation
+- Repository orientation starts with `README.md`; `code-intelligence` owns semantic evidence about code structure, symbols, types, references, call paths, and diagnostics
 - `context-mode` owns processing for large logs, commands, documents, API results, and datasets
 - Current version-matched documentation and the local integration are checked when external behavior matters
 
@@ -111,19 +110,19 @@ These mechanisms return evidence to the active workflow. They do not create comp
 
 ### 4. Execute without idle coordination
 
-After approval, `delegation` owns role selection, topology, packets, parallelism, tool routing, and waiting behavior. The Pi Subagents runtime executes that routing.
+After approval, the main agent owns role selection, topology, packets, parallelism, tool routing, waiting, and active write allocation. The Pi Subagents runtime executes the launches.
 
-Every nontrivial implementation slice belongs to `clone`. The parent owns task selection, user communication, decisions, write allocation, fan-in, integration, and the final conclusion. Concurrent writers receive disjoint active write sets. A clone may coordinate read-only specialists for its bounded slice, but it may not launch another clone or expand its write set.
+The parent keeps mechanical work. It assigns fully specified, dependency-ready implementation leaves with fixed scope and write allocation to `worker`, and bounded coherent work that still needs judgment, adaptation, or read-only specialist coordination to `clone`. Concurrent writers receive disjoint file or explicit-region allocations; every file allocated to a clone remains exclusive to that clone. A clone may coordinate read-only specialists, but it may not launch another clone or expand its write allocation.
 
-Independent work runs in parallel. The parent continues useful non-overlapping work and waits only when a child result is a dependency. Child claims are checked against their actual output, effective change, and verification.
+Independent work runs in parallel. The parent continues useful non-overlapping work and waits only when a child result is a dependency. It checks child claims against actual output, the effective change, and fresh proof.
 
 ### 5. Maintain continuity and use Reflection
 
 `.scratch/` holds useful ignored temporary artifacts. Session history, compaction summaries, memory, and scratch artifacts are discovery pointers; current source and later user corrections remain authoritative.
 
-Before an intended yield, the root parent performs the Reflection check owned by `AGENTS.md` and routed by `delegation`. A progress report, stage transition, child event, completed check, or asynchronous launch result does not decide that the parent turn should end; apply the same check after it. Do not poll healthy children, repeat work, invent nits, or create activity only to avoid yielding. Reflection does not replace required task work or formal review.
+Before yielding, the main agent runs the Reflection check in `AGENTS.md`. A progress report, stage transition, child event, completed check, or asynchronous launch result does not end the turn; run Reflection again afterward. Do not poll healthy children, repeat work, invent nits, or create activity only to avoid yielding. Reflection does not replace required task work or formal review.
 
-Yield only when no substantive candidate can be dispatched, no required parent work or permitted maintenance remains, and no child needs meaningful interaction.
+Yield only when no useful work can move now, no required parent work or permitted maintenance remains, and no child needs meaningful interaction.
 
 ### 6. Review and fix
 
@@ -139,9 +138,9 @@ Review findings are classified and validated. Only in-scope required findings ca
 
 ### 7. Verify and report completion
 
-After the last edit and completed review, `verification-before-completion` owns the final evidence gate. It checks only completion categories that can materially affect the claim, binds evidence to the exact current work, and reports `PASS`, `FAIL`, or `INCONCLUSIVE`.
+After the last edit and completed review, the main agent compares fresh evidence captured after the latest relevant edit with every material part of the approved outcome.
 
-The parent inspects the final effective change, readiness-relevant child output, finding disposition, and fresh proof before making the final claim. Unavailable verification is reported as an unavailable boundary, never converted into confidence.
+It inspects the final effective change, relevant child output, finding disposition, and proof before making the final claim. It reports every unavailable verification boundary instead of converting it into confidence and makes only claims the current evidence supports.
 
 ## How the configuration is organized
 
@@ -170,9 +169,13 @@ A workflow name in this document describes the current general method. Its detai
 
 ### Authority between agents
 
-The parent owns the task, communication with me, decisions, active write allocation, integration, and final claims.
+The parent owns the task, communication with me, material decisions, active write allocation, review coordination and finding disposition, integration, and final claims.
 
-`clone` owns one approved bounded nontrivial implementation slice. Read-only specialists and reviewers own only the evidence target assigned to them. They return evidence to the parent and cannot expand scope, approve protected effects, or become decision authority.
+`worker` owns one fully specified, dependency-ready implementation leaf within fixed scope and write allocation. It reports blockers instead of changing the task.
+
+`clone` owns one bounded coherent task inside the approved outcome and makes its local implementation decisions. It may coordinate read-only specialists, but it cannot expand its scope or write allocation or launch another clone.
+
+Read-only specialists and reviewers own only their assigned evidence target. They return evidence to the parent and cannot expand scope, approve protected effects, or become decision authority.
 
 ## Maintaining this document
 

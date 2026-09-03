@@ -48,14 +48,14 @@ When this workflow is active:
 1. **Design/plan:** complete and review the proposal described above, then enter implementation when approved
 2. **Implementation:** complete the approved behavior and focused checks; report the stage, evidence, discoveries, and remaining boundaries; continue automatically into review/fix
 3. **Independent review/fix:** enter review after the implementation batch and follow `review` for method, fanout, finding disposition, and proportionate post-fix follow-up. Complete its required finding gate, report the result visibly, then continue without another approval wait unless a decision changes the approved result, boundaries, or proof, or an approved milestone requires one
-4. **Final verification:** after the last edit and completed review, follow `verification-before-completion`, report `PASS`, `FAIL`, or `INCONCLUSIVE`, then stop and await user direction
+4. **Final evidence:** after the last edit and completed review, complete the global Main fan-in and completion-claim requirements, then report the result and any unavailable boundary
 5. **Protected action:** follow the active global instructions already in context, specifically the authorization policy; do not proceed until the exact action is authorized
 
 An extra milestone is a wait only when the decision-ready proposal names it and the user approves it. A new choice that changes the approved result, boundaries, or proof interrupts the affected stage; individual tasks, children, edits, reviews, and safe checks are not approval checkpoints.
 
 ## Manager-local handoffs
 
-The global `Workflow routing` rules choose which workflow to start. While a manager stage is active, applicable `brainstorming`, `writing-plans`, `behavioral-proof`, `writing-tests`, `systematic-debugging`, `review`, and verification handoffs return here when complete. They do not create another implementation-approval path. Do not start this workflow for mechanical work that needs no proposal or implementation approval.
+The global `Workflow routing` rules choose which workflow to start. While a manager stage is active, applicable `brainstorming`, `writing-plans`, `behavioral-proof`, `writing-tests`, `systematic-debugging`, and `review` handoffs return here when complete. They do not create another implementation-approval path. Do not start this workflow for mechanical work that needs no proposal or implementation approval.
 
 ## Planning
 
@@ -95,7 +95,7 @@ Complete the approved implementation batch, collect applicable evidence, report 
 
 After the approved implementation batch, enter the independent review stage and follow `review` for method, finding disposition, and completion of its required finding gate. The manager owns only this stage transition and the decision to proceed after review.
 
-After the last edit and completed review, load and follow `verification-before-completion`. Follow the active global instructions already in context, specifically the authorization, child-claim verification, changed-file inspection, and artifact policies.
+After the last edit and completed review, follow the active global Main fan-in and completion-claim rules, including the authorization, child-claim verification, changed-file inspection, and artifact policies.
 
 Update a GitHub pull-request description only when the user explicitly requests that exact external mutation. Otherwise provide draft text.
 
