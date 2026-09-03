@@ -5,6 +5,7 @@
     "pi-ask-user": "^0.14.0",
     "pi-goal-x": "^0.27.4",
     "pi-hashline-edit-pro": "2.5.3",
+    "pi-mcp-adapter": "^2.32.1",
     "pi-memory-md": "0.1.38",
     "pi-session-search": "git+https://github.com/OrestesK/pi-session-search.git#fd94efbdda1381b1a15fbeca2e1ea5a423b9b463",
     "pisesh": "0.2.0",
