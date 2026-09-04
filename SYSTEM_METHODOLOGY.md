@@ -22,7 +22,7 @@ Ask me only about material choices that remain unresolved. Resolve facts, owners
 
 I want trivial, clear, contained work to proceed directly with proportionate verification. I do not want subagents or reviewers added to simple work only because it has several mechanical steps
 
-For nontrivial or material work, prepare and review the detailed plan before editing. Then explain the proposed work to me in short, plain language. Tell me what you recommend, what will change, what you assume or still do not know, the main risks and checks, what will not change, and exactly what I am approving. Keep commands and step-by-step execution details in the plan unless I ask for them or they affect my decision. Ask once for approval
+For nontrivial or material work, prepare and review the detailed plan before editing. Then explain the proposed work to me in short, plain language. Tell me what you recommend and why, the relevant facts and evidence, the material pros and cons, what will change, what you assume or still do not know, the main risks and checks, what will not change, and exactly what I am approving. Keep commands and step-by-step execution details in the plan unless I ask for them or they affect my decision. Ask once for approval
 
 After approval, keep working through implementation, review, fixes, and verification. Ask again only when a new material choice, scope change, or protected action appears
 
@@ -36,15 +36,21 @@ I also want the system to be fast. Investigate the smallest useful surface, run 
 
 I want elegant, simple, clean implementation at the real owner. Prefer the smallest coherent solution, not the smallest line count
 
-Follow least diff: do not touch unrelated code, comments, behavior, or artifacts. Necessary refactoring is appropriate when it makes the approved change cleaner or simpler. Do not add speculative abstractions, compatibility paths, fallback behavior, validation, or duplicate policy without a demonstrated consumer or boundary
+Follow least diff: do not touch unrelated code, comments, behavior, or artifacts. Necessary refactoring is appropriate when it makes the approved change cleaner or simpler
+
+Do not add a new abstraction, compatibility path, fallback, recovery, validation, sanitization, security hardening, or duplicate policy unless the approved contract requires it. Preserve raw errors and fail directly by default
 
 Keep each behavior at one canonical owner. Other surfaces should route to that owner instead of restating its detailed rules
+
+Use existing abstractions as designed. Ask before creating or broadening an abstraction, moving responsibility, or choosing between materially different owners or designs
 
 ### Evidence tied to the real claim
 
 I want evidence that can show the implementation is wrong at the boundary being claimed. Use source, types, runtime paths, current documentation, focused checks, integration or live evidence, and tests according to the actual risk. Do not force tests or live probes when no meaningful behavioral boundary exists
 
-I want tests, standalone typechecks, linters, and formatters to run only when I explicitly request that command or category
+I want a writer to add and run the exact focused local test when it directly proves approved changed behavior, is safe to repeat, and has no external effects
+
+I want broader or unrelated tests, standalone typechecks, linters, formatters, external services, credentialed checks, and effectful validation to run only when I explicitly request that command or category
 
 `AGENTS.md` requires ShellCheck for every edited shell script without a separate request. `code-intelligence` defines when targeted LSP diagnostics run
 
@@ -58,11 +64,11 @@ Do not call work done because an agent is confident or one narrow check passed. 
 
 ### Independent review that improves the work
 
-I want nontrivial plans and implementations reviewed independently across the complete risk surface. Review should cover the approved contract, reachable correctness and real boundaries, architecture and consumers, simplicity and local fit, and claim-bound proof
+I want nontrivial plans and implementations reviewed independently across six distinct angles: approved contract and scope, reachable correctness, fail-fast and defensive code, architecture and ownership, simplicity and local fit, and claim-bound tests and proof
 
 Reviewers gather evidence
 
-they do not vote, authorize scope, or replace my decisions. Validate findings before acting on them. Fix supported in-scope findings and re-review in proportion to the effective risk instead of restarting a full review after every small correction
+they do not vote, authorize scope, or replace my decisions. Validate every finding before acting. Only a required contract fix can drive automatic work. Present concrete supported material additions or changes to me as choices. Small concrete observations encountered incidentally may be reported as nonblocking extras but cannot trigger work or require a decision. Reject unsupported or generic suggestions. Re-review only the angles affected by a correction unless the change is broad
 
 ### Active, visible, bounded work
 
@@ -144,14 +150,15 @@ Yield only when no useful work can move now, no required parent work or permitte
 
 ### 6. Review and fix
 
-`manager-workflow` moves the completed implementation into the review/fix stage. `review` owns independent review method and current coverage of five base angles:
+`manager-workflow` moves the completed implementation into the review/fix stage. `review` owns independent review method and current coverage of six base angles:
 1. Contract, user impact, and approved scope
-2. Reachable correctness, producers, and boundaries
-3. Architecture, ownership, integration, and consumers
-4. Simplicity, maintainability, and local fit
-5. Claim-bound proof and validation
+2. Reachable correctness
+3. Fail-fast and defensive code
+4. Architecture, ownership, integration, and consumers
+5. Simplicity, maintainability, and local fit
+6. Claim-bound tests and proof
 
-Review findings are classified and validated. Only in-scope required findings can block readiness or drive automatic fixes. Follow-up review is proportionate to the effective risk of each correction
+Review findings are classified and validated. Only required findings can block readiness or drive automatic fixes. Concrete supported material additions or changes return to me as choices. Small concrete observations encountered incidentally may be reported as nonblocking extras and do not enter fix loops. Unsupported or generic suggestions are rejected. Follow-up review covers only the angles affected by each correction unless the change is broad
 
 ### 7. Verify and report completion
 

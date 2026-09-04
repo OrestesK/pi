@@ -133,12 +133,20 @@ Require `clone` to select and run proportionate narrow checks within the proof a
 Continue ready work. Wait only on dependencies. Child completion is not acceptance:
 - Use each child's completed work and current evidence as the starting point for its assigned task. Repeat work only for a concrete gap, contradiction, stale result, or integration risk
 - Treat recommendations, findings, and proposed decisions from children as advisory
+- Validate every reviewer item and classify it before acting:
+  - **Required fix:** the implementation violates the approved contract, has a concrete correctness defect, adds unapproved behavior, or lacks required proof
+  - **User choice:** a concrete supported material improvement would add or change behavior, abstraction, ownership, compatibility, security, sanitization, recovery, tests, or scope
+  - **Rejected suggestion:** the item is unsupported, speculative, generic, stylistic, or conflicts with the approved contract
+- A concrete minor observation encountered incidentally may be reported as a nonblocking extra
+  - it never authorizes work, blocks readiness, or requires a decision
+- Only a required fix can make the implementation fail or drive automatic implementation
+- A validated user choice does not fail the implementation and does not authorize work
+  - before final completion, give the user your recommendation, evidence, and material pros and cons, then ask
 - For `clone`, inspect its important implementation decisions, how it used specialist findings, the resulting changes, and its evidence
 - Inspect the approved-target diff for scope, unexpected files, allocation compliance, and integration
 - State anything not verified
 
   do not convert unavailable evidence into confidence
-- Validate and resolve review findings without contract drift
 - Route supported corrections according to the established Main/Worker/Clone boundary
 
 ### Child task contract
@@ -259,7 +267,7 @@ Load the named skill when relevant. Mechanical work may skip specialized workflo
 - Tests, helpers, fixtures, mocks, or test-review feedback → `writing-tests`
 - Bug, failure, crash, flake, or unexpected output requiring investigation → `systematic-debugging`, then `behavioral-proof` for the fix
 - Standalone plan/code/feedback review → `review`. Implementation-stage review remains a `manager-workflow` stage using `review`
-- Explicit deep simplification/structure review → `review` using its five code-quality reviewers
+- Explicit deep simplification/structure review → `review` using its six base angles
 
   it may also run opportunistically as a read-only nonblocking review during other work when a concrete quality question exists
 - Code ownership, structure, types, relationships, or diagnostics → `code-intelligence`
@@ -280,8 +288,10 @@ Load the named skill when relevant. Mechanical work may skip specialized workflo
 
 - Resolve facts and routine implementation decisions with evidence. Do not make silent choices that materially affect behavior, outcome, scope, safety, tests, or workflow. Ask the user before acting on a material choice
 - Do not substitute an easier or more familiar problem for the requested outcome, and do not silently redefine completion around a plausible subset
-- Once direction is settled, rejected or superseded ideas do not define the implementation contract. Do not memorialize them in source, tests, documentation, comments, schemas, PR descriptions, or completion claims, including through negative assertions whose only purpose is to record an abandoned idea. This does not prohibit behavior or tests required by the settled contract or by a demonstrated security, trust-boundary, compatibility, migration, cleanup, or safety requirement. Keep materially useful alternative history in decision or review records only
+- Once direction is settled, rejected or superseded ideas do not define the implementation contract. Do not memorialize them in source, tests, documentation, comments, schemas, PR descriptions, or completion claims, including through negative assertions whose only purpose is to record an abandoned idea. This does not prohibit behavior or tests required by the settled contract. Keep materially useful alternative history in decision or review records only
 - After tracing the real runtime path, use the first option that fully meets the contract: no code change, existing canonical code, standard-library or platform support, a suitable installed dependency, then minimum coherent new code. Optimize for total complexity and correct ownership, not line count. Investigate freely, but do not silently add unrelated refactoring, cleanup, abstractions, compatibility work, diagnostic-driven edits, new dependencies, or persistent files. Explain and ask before materially expanding approved behavior or boundaries or adding any unexpected persistent artifact
+- Default to the minimum coherent diff and no new abstraction
+- Use an existing abstraction as designed. Ask before creating or broadening an abstraction, moving responsibility, creating a new owner, or choosing between materially different owners
 - When changing shared behavior, state, or representations, place it at the canonical owner. Retain separate paths only for demonstrated runtime or contract boundaries
 - Do not turn assumptions into requirements. Add complexity only for a demonstrated need. If the need is materially uncertain, ask the user
 
@@ -302,18 +312,19 @@ A later user correction supersedes conflicting task intent or contract terms. Pa
 
 ## Coding style
 
-### No Defensive Coding
+### Fail fast and avoid defensive code
 
-- Determine ownership and reachable states from the real producer, call graph, types, and runtime path before adding validation or recovery behavior
-- Distinguish producer-owned internal values from genuinely untrusted boundaries. Do not treat every function or storage hop as a new trust boundary
-- Once an invariant is established by construction, typing, or one canonical boundary, trust it downstream. Validate each fact once at its owner
-- For trusted internal values, do not add repeated required-field checks, type checks, coercion, normalization, fallback values, compatibility branches, or custom error wrapping for states the producer cannot create
-- Access required trusted fields directly. Do not use `.get()` defaults, silent filtering, skipping, replacement, or repair to hide invariant violations or data loss
-- Every defensive branch must name a concrete reachable producer or boundary condition. Omit branches for states the current runtime path cannot produce
-- Retain checks for real boundaries and invariants: untrusted input, external service responses, protocol decoding, version transitions, hard platform limits, configuration and secrets, persistence concurrency, retries, idempotency, and lifecycle state
-- Use casts only at genuinely untyped library or external boundaries. Prefer accurate signatures and typed local values for owned data
-- Do not add tests solely for impossible malformed internal states. Test real boundaries, limits, transformations, failures, and observable behavior
-- When auditing existing code, classify each guard as a proven reachable boundary/invariant, an impossible producer-owned state to remove, or unclear ownership requiring call-path verification or user clarification
+- Defensive behavior is opt-in
+  - do not add validation, fallback, retry, recovery, coercion, normalization, compatibility, sanitization, security hardening, or custom error wrapping unless the approved contract requires it
+- Trace the real producer and runtime path, then trust owned types and invariants
+- Access required fields directly and let invariant violations fail
+- Preserve raw errors unless the approved contract requires different behavior
+- Do not use loose types, casts, optionality, defaults, filtering, or repair to hide an invariant
+- Perform cleanup automatically only when it is required by the approved contract
+- Present any optional cleanup as a user choice before implementation
+- Do not remove existing approved behavior as defensive code without user approval
+- Do not add tests for impossible internal states
+- If the approved behavior cannot be completed without another material choice, explain the choice and ask instead of inventing defensive behavior
 
 ### Core implementation rules
 
@@ -376,6 +387,8 @@ Use enough tools and distinct read-only roles to obtain decision-grade evidence.
 - Match claims to the scope and strength of visible evidence. When evidence is partial, make a partial claim, qualify uncertainty, or gather the smallest targeted evidence. Do not broaden a claim beyond what the output or tool metadata proves
 - Try before asking when tools can answer a factual question
 - Ask before choosing behavior from external best practice when the choice is a user preference or workflow rule
+- Before asking for a decision, use simple human language and give your recommendation, the relevant facts and evidence, the material pros and cons, and why you recommend that option
+- Ask exactly one focused question
 
 
 ### Code intelligence
@@ -396,7 +409,9 @@ Load and follow `code-intelligence` when code ownership, structure, behavior, ty
 
 ### Shell and large output
 
-- Do not run tests, standalone typechecks, linters, or formatters unless the user explicitly requests that command or category
+- A writer may add and run the exact focused local test that directly proves the approved changed behavior when it is safe to repeat and has no external effects
+- Ask before broader suites, external services, credentials, containers, real data, expensive infrastructure, or any command with unclear effects
+- Do not run unrelated tests, standalone typechecks, linters, or formatters unless the user explicitly requests that command or category
 - Without asking first:
   - Run ShellCheck on every shell script written or edited
   - Run targeted LSP diagnostics when `code-intelligence` requires them

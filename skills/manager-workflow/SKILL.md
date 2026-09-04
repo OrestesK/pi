@@ -38,7 +38,10 @@ A later user correction replaces conflicting terms and makes affected child work
 When you enter this workflow, whenever you enter a manager stage, and after a user correction, give the normal progress update. Name the current stage and approval or decision status. After a correction, also say what was dropped or superseded. Use one update
 do not send an extra status or acknowledgement message. Do not wait unless a decision is needed
 
-Before a child, reviewer, diagnostic, or tool finding changes the plan or active work, state which goal assumption it relies on. State whether it is necessary for the approved outcome or adds scope. Reject unrelated suggestions. Ask before adopting an unclear assumption or added behavior, scope, tests, compatibility work, or cleanup. Do not make rejected or deferred suggestions active work
+Before a child, reviewer, diagnostic, or tool finding changes the plan or active work, apply the global three-way finding classification
+- Only a required fix may enter automatic work
+- Keep a user choice inactive until it is presented with a recommendation, evidence, and material pros and cons, then approved
+- Reject unsupported, speculative, generic, stylistic, conflicting, or unrelated suggestions
 
 ## Stage flow
 
@@ -48,15 +51,19 @@ When this workflow is active:
    report the stage, evidence, discoveries, and remaining boundaries
    continue automatically into review/fix
 3. **Independent review/fix:** Enter review after the implementation batch
+   reviewers whose exact targets were ready may already be running
    Follow `review` for method, fanout, review decisions, and proportionate post-fix follow-up
-   Complete its required finding gate and report the result visibly
-   Continue without another approval wait unless a decision changes the approved result, boundaries, or proof, or an approved milestone requires one
+   Complete its current coverage and required-finding gate and report the result visibly
+   Continue automatically only for required corrections inside the approved contract
+   Present every validated user choice before final evidence and do not implement it without approval
 4. **Final evidence:** After the last edit and completed review, follow the Main integration and completion rules. Then report the result and anything not verified
 5. **Protected action:** follow the active global instructions already in context, specifically the authorization policy
    do not proceed until the exact action is authorized
 
 An extra milestone is a wait only when the decision-ready proposal names it and the user approves it. A new choice that changes the approved result, boundaries, or proof interrupts the affected stage
 individual tasks, children, edits, reviews, and safe checks are not approval checkpoints
+
+A validated user choice is a wait before final completion, not an implementation defect or authorization to make the change
 
 ## Manager-local handoffs
 
@@ -110,7 +117,12 @@ Complete the approved implementation batch, collect applicable evidence, report 
 
 ## Review and completion
 
-After the approved implementation batch, enter the independent review stage. Follow `review` for method, review decisions, and completion of its required finding gate. The manager owns only this stage transition and the decision to proceed after review
+After the approved implementation batch, enter the independent review stage. Follow `review` for method, current coverage, review decisions, and completion of its required-finding gate. The manager owns only this stage transition and the decision to proceed after review
+
+Do not enter final evidence until:
+- every required review angle has current usable coverage
+- every validated required finding is fixed or explicitly deferred by the user
+- every validated user choice has been presented and decided
 
 After the last edit and completed review, follow the Main integration and completion rules in `AGENTS.md`. These include authorization, child-claim verification, changed-file inspection, and artifact policies
 
