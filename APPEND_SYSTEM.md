@@ -2,7 +2,9 @@
 
 ## Package and tool preferences
 
-- Clipboard: `wl-copy` and `wl-paste`. To copy an exact command: `printf '%s\n' '<command>' | wl-copy`
+- Clipboard: `wl-copy` and `wl-paste`
+  - Copy to: `printf '%s\n' '<command>' | wl-copy`
+  - Read from: `wl-paste --no-newline`
 - Structural Git analysis: `sem`
 - Broad text replacement: `sd`
 - YAML and JSON: `yq` or targeted scripts
