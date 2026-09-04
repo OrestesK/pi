@@ -10,7 +10,6 @@ Use the `gh` CLI for all GitHub operations
 ## Read-only inspection
 
 Use these commands to inspect PRs, issues, and CI:
-
 - `gh pr list`, `gh pr view <number>`
 - `gh pr view <number> --json number,url,state,headRefName,headRefOid,baseRefName,baseRefOid`
 - `gh pr checks <number> --json name,bucket,state,workflow,link`
@@ -24,21 +23,20 @@ Use these commands to inspect PRs, issues, and CI:
 ## Keep PR evidence current
 
 For a readiness claim or review that depends on current PR content:
+1. Select the PR. Use the `gh pr view <number> --json` command above to record its number, URL, state, head name/OID, and base name/OID
+2. Use that PR number for every later metadata, diff, check, and review query. Collect evidence for the recorded PR state
+3. Immediately before the final claim or an authorized claim-bearing post, fetch the same identity fields again with that PR number
+4. If the state, head name/OID, or base name/OID changed, do not claim or post. Reassess the PR, discard evidence that depended on its old content, collect the needed evidence again, and repeat this check
+5. Report the final identity as `PR <number> <url>; head <name>@<OID>; base <name>@<OID>`
 
-1. Select the PR. Use the `gh pr view <number> --json` command above to record its number, URL, state, head name/OID, and base name/OID.
-2. Use that PR number for every later metadata, diff, check, and review query. Collect evidence for the recorded PR state.
-3. Immediately before the final claim or an authorized claim-bearing post, fetch the same identity fields again with that PR number.
-4. If the state, head name/OID, or base name/OID changed, do not claim or post. Reassess the PR, discard evidence that depended on its old content, collect the needed evidence again, and repeat this check.
-5. Report the final identity as `PR <number> <url>; head <name>@<OID>; base <name>@<OID>`.
-
-This check confirms freshness; it does not lock the PR. Use it only when the conclusion depends on PR content, not for metadata-only inspection or non-PR reviews.
+This check confirms freshness:
+- it does not lock the PR. Use it only when the conclusion depends on PR content, not for metadata-only inspection or non-PR reviews
 
 ## GitHub mutations and command rules
 
-For every GitHub mutation, the user must request and explicitly approve the exact tool (`gh`), command, action, target, and expected effect. State every relevant credential, data, cost, time, environment, and destructive boundary, then wait. Approval for one mutation does not allow another. The active authorization, external-action, and project rules still control what is allowed.
+For every GitHub mutation, the user must request and explicitly approve the exact tool (`gh`), command, action, target, and expected effect. State every relevant credential, data, cost, time, environment, and destructive boundary, then wait. Approval for one mutation does not allow another. The active authorization, external-action, and project rules still control what is allowed
 
 Mutation categories include:
-
 - creating a PR with `gh pr create --title "..." --body-file /tmp/pr_body.md`
 - editing a PR description/body
 - posting a PR comment
@@ -72,8 +70,7 @@ This format is not deterministc, you can add sections, and also plug in the form
 When the work context mentions a ticket or issue, attach it to the pr and include it in the desciption
 
 For a PR with a large or mixed diff, add guidance that tells reviewers where to start and separates core behavior from generated, mechanical, or formatting-only changes:
-
-- separate core behavior files from generated, mechanical, or formatting-only files;
-- say which files or areas reviewers should read first;
-- call out risky behavior changes, migration/order dependencies, rollout notes, and test coverage;
-- recommend splitting the PR instead of polishing the description when the diff is too large or mixed to review safely.
+- separate core behavior files from generated, mechanical, or formatting-only files
+- say which files or areas reviewers should read first
+- call out risky behavior changes, migration/order dependencies, rollout notes, and test coverage
+- recommend splitting the PR instead of polishing the description when the diff is too large or mixed to review safely

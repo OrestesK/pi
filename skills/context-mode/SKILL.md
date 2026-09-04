@@ -5,10 +5,9 @@ description: Process large command, test, log, API, document, data, browser, or 
 
 # Context Mode
 
-Use Context Mode when an operation can return more than about 20 lines. Also use it when you must process the full input but need only a compact result in the conversation.
+Use Context Mode when an operation can return more than about 20 lines. Also use it when you must process the full input but need only a compact result in the conversation
 
 Good targets include:
-
 - builds, tests, logs, dependency reports, and broad Git output
 - large JSON, API responses, datasets, and documents
 - browser snapshots, console messages, and network requests
@@ -18,8 +17,7 @@ Keep normal Pi tools for small file reads, narrow searches, source navigation, a
 
 ## Choose the path
 
-Use the `context-mode` MCP server through the `mcp` gateway
-
+Use the `context-mode` MCP server through the `mcp` gateway:
 - Use `context_mode_ctx_execute` when a command, fetch, or script can process the data directly in the sandbox
 - Use `context_mode_ctx_execute_file` when the data already exists in a file
 - Use `context_mode_ctx_index` with a file path when the source needs repeated search, then use `context_mode_ctx_search` for focused retrieval

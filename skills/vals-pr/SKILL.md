@@ -1,22 +1,21 @@
 ---
 name: vals-pr
-description: Prepare a pull request for human review, review someone else's pull request, or respond to pull-request feedback.
+description: Prepare a pull request for human review, review someone else's pull request, or respond to pull-request feedback
 ---
 
 # Pull Request Review
 
-Make the pull request easy to understand and review.
+Make the pull request easy to understand and review
 
-The preparation steps below are strong recommendations, not blockers. If the author wants to request review before completing them, explain what is missing and continue.
+The preparation steps below are strong recommendations, not blockers. If the author wants to request review before completing them, explain what is missing and continue
 
-Take feedback seriously. Fix valid issues and push back only with evidence.
+Take feedback seriously. Fix valid issues and push back only with evidence
 
 ## Prepare Your PR for Human Review
 
 ### Run the agent loop
 
 Before involving the author:
-
 1. Inspect the current PR, diff, checks, comments, intent, and repository rules
 2. Run extensive separate fresh reviews from all relevant angles, with at least five reviewers
 3. Address every supported finding and every AI-reviewer comment
@@ -30,12 +29,11 @@ Before involving the author:
    - stacked PRs when clear dependent slices would be easier to review
 6. After meaningful changes, repeat the affected reviews and AI-comment handling, and refresh the suggested tests and checks
 
-Continue until the code and evidence are current. Ask the author earlier only when a real decision or approval is needed.
+Continue until the code and evidence are current. Ask the author earlier only when a real decision or approval is needed
 
 ### Finish with the author
 
 After the agent loop:
-
 1. Have the author read every changed line in the GitHub UI
 2. Have the author write one short section explaining why the change is needed and how it works
    - Check it for accuracy
@@ -47,7 +45,7 @@ After the agent loop:
    - the live-test status
    - the most useful area to inspect
 
-Draft PR-description changes and update GitHub only with the user’s approval.
+Draft PR-description changes and update GitHub only with the user’s approval
 
 ## Review Someone Else's PR
 

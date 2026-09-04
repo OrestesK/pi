@@ -11,7 +11,9 @@ Use semantic tools to understand code structure, behavior, types, relationships,
 
 If a Pi Lens tool you need is unavailable, call `pi_lens_activate_tools` with its name. Use the activated tool on the next model turn
 
-- **Ownership and shape:** `symbol_search`, then `module_report`; read exact bodies with `read_symbol` or `read_enclosing`
+- **Ownership and shape:**
+  - `symbol_search`, then `module_report`
+  - read exact bodies with `read_symbol` or `read_enclosing`
 - **Types and relationships:** `lsp_navigation` for definitions, references, implementations, hover, symbols, rename previews, and call hierarchy
 - **Structural patterns:** Use `ast_grep_search`. For a structural rewrite, use `ast_grep_replace` and dry-run it before applying changes. Use `ast_grep_outline` for syntax-only structure and `ast_grep_dump` when the AST shape is unclear
 - **Diagnostics:** `lsp_diagnostics` for focused language-server checks and `lens_diagnostics` for aggregate edited-file or project findings
@@ -20,7 +22,7 @@ Use every evidence group that can answer a material question. Do not call a grou
 
 ## Read before editing
 
-Before changing an identifiable function, class, method, callback, or symbol, read its actual body with `read_symbol` or `read_enclosing`. For multi-file changes, inspect relevant structure first. Use plain `read` when semantic tools are unavailable or the target is not source code.
+Before changing an identifiable function, class, method, callback, or symbol, read its actual body with `read_symbol` or `read_enclosing`. For multi-file changes, inspect relevant structure first. Use plain `read` when semantic tools are unavailable or the target is not source code
 
 ## Structural search
 

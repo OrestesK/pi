@@ -1,0 +1,36 @@
+{
+  "name": "pi-reflection",
+  "version": "0.1.0",
+  "description": "Backend-neutral asynchronous Reflection lifecycle extension for Pi",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./contracts": "./src/contracts.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.ts",
+    "src/",
+    "agents/",
+    "prompts/",
+    "skills/",
+    "package.json"
+  ],
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm test && npm run typecheck"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  }
+}

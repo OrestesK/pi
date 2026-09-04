@@ -6,7 +6,7 @@ allowed-tools: Bash(browser-use:*)
 
 # Browser Automation with browser-use CLI
 
-`browser-use` keeps a managed browser open across commands.
+`browser-use` keeps a managed browser open across commands
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ For setup details, see https://github.com/browser-use/browser-use/blob/main/brow
 
 ## Core Workflow
 
-Default to the managed browser-use browser. Do **not** start by trying to attach to the user's existing Chrome unless the task explicitly requires existing cookies/profile state.
+Default to the managed browser-use browser. Do **not** start by trying to attach to the user's existing Chrome unless the task explicitly requires existing cookies/profile state
 
 1. **Navigate**: `browser-use open <url>` — launches managed Chromium and opens the page
 2. **Inspect**: `browser-use state` — returns clickable elements with indices
@@ -29,15 +29,17 @@ Default to the managed browser-use browser. Do **not** start by trying to attach
 
 ## Authorization for state-changing actions
 
-Use browser tools freely for read-only navigation and inspection. Before an action that submits data, changes a remote site, uploads content, provisions a cloud resource, opens a public tunnel, or changes, exports, or syncs cookie or profile data, the user must request and explicitly approve it. State the exact tool or subcommand, action, target, expected effect, and every relevant credential, data, cost, time, environment, and destructive boundary. Wait before running it. A fully specified chain may be approved together; later-discovered actions need separate approval.
+- Use browser tools freely for read-only navigation and inspection. Before an action that submits data, changes a remote site, uploads content, provisions a cloud resource, opens a public tunnel, or changes, exports, or syncs cookie or profile data, the user must request and explicitly approve it. State the exact tool or subcommand, action, target, expected effect, and every relevant credential, data, cost, time, environment, and destructive boundary. Wait before running it. A fully specified chain may be approved together
+- later-discovered actions need separate approval
 
-For read-only cookie or storage inspection, prefer names and metadata. Retrieve only values the task needs. Do not repeat secret values in chat or persist them in files unless the task requires that data and the applicable authorization boundary permits its disclosure or persistence.
+For read-only cookie or storage inspection, prefer names and metadata. Retrieve only values the task needs. Do not repeat secret values in chat or persist them in files unless the task requires that data and the applicable authorization boundary permits its disclosure or persistence
 
-This is a local reminder. The global authorization rules remain the canonical policy owner.
+This is a local reminder. The global authorization rules remain the canonical policy owner
 
 ## Recovery and cleanup
 
-Only for a task-owned managed browser started for this task, run `browser-use close` after a command failure and retry. Never use `browser-use close` as automatic recovery after `connect`, `cloud connect`, or a `--profile` session; it can close a user-connected/profile browser or stop a cloud browser. Before closing any of those sessions, state that effect and obtain the user's explicit approval.
+- Only for a task-owned managed browser started for this task, run `browser-use close` after a command failure and retry. Never use `browser-use close` as automatic recovery after `connect`, `cloud connect`, or a `--profile` session
+- it can close a user-connected/profile browser or stop a cloud browser. Before closing any of those sessions, state that effect and obtain the user's explicit approval
 
 For local dev-server testing, the expected default is:
 
@@ -48,13 +50,14 @@ browser-use eval "(() => ({ url: location.href, text: document.body.innerText.sl
 browser-use screenshot .scratch/ui-screenshots/<name>.png
 ```
 
-Only use the user's existing Chrome/profile when managed Chromium is insufficient because the exact task needs an already-authenticated external/private session.
+Only use the user's existing Chrome/profile when managed Chromium is insufficient because the exact task needs an already-authenticated external/private session
 
 ### Auth and session strategy
 
-1. **Local dev apps:** first use managed Chromium (`browser-use open`, `state`, `eval`, `screenshot`). If it lands on a login screen, inspect the app's local dev auth path, test-user setup, local API/session mechanism, or documented auth bypass before asking the user to relaunch Chrome. Use app-supported local auth/test setup when available; do not invent production auth bypasses.
-2. **External/private sites:** if existing cookies are required, try `browser-use connect` or `browser-use profile list`.
-3. **If `browser-use connect` fails:** do not get stuck on remote debugging. Fall back to managed Chromium/profile discovery and continue with whatever can be tested. Ask the user about Chrome remote debugging only when existing browser cookies are strictly required and no profile/session alternative exists.
+1. **Local dev apps:** first use managed Chromium (`browser-use open`, `state`, `eval`, `screenshot`). If it lands on a login screen, inspect the app's local dev auth path, test-user setup, local API/session mechanism, or documented auth bypass before asking the user to relaunch Chrome. Use app-supported local auth/test setup when available
+   - do not invent production auth bypasses
+2. **External/private sites:** if existing cookies are required, try `browser-use connect` or `browser-use profile list`
+3. **If `browser-use connect` fails:** do not get stuck on remote debugging. Fall back to managed Chromium/profile discovery and continue with whatever can be tested. Ask the user about Chrome remote debugging only when existing browser cookies are strictly required and no profile/session alternative exists
 
 ## Browser Modes
 
@@ -66,7 +69,7 @@ browser-use cloud connect                      # Cloud browser (zero-config, req
 browser-use --profile "Default" open <url>     # Real Chrome with specific profile
 ```
 
-After `connect` or `cloud connect`, all subsequent commands go to that browser — no extra flags needed.
+After `connect` or `cloud connect`, all subsequent commands go to that browser — no extra flags needed
 
 ## Commands
 
@@ -124,7 +127,7 @@ browser-use sessions                      # List active sessions
 browser-use close --all                   # Close all sessions
 ```
 
-For advanced browser control (CDP, device emulation, tab activation), see `references/cdp-python.md`.
+For advanced browser control (CDP, device emulation, tab activation), see `references/cdp-python.md`
 
 ## Cloud API
 
@@ -138,12 +141,11 @@ browser-use cloud v2 poll <task-id>       # Poll task until done
 browser-use cloud v2 --help               # Show API endpoints
 ```
 
-`cloud connect` provisions a cloud browser with a persistent profile (auto-created on first use), connects via CDP, and prints a live URL. `browser-use close` disconnects AND stops the cloud browser. For custom browser settings (proxy, timeout, specific profile), use `cloud v2 POST /browsers` directly with the desired parameters.
+`cloud connect` provisions a cloud browser with a persistent profile (auto-created on first use), connects via CDP, and prints a live URL. `browser-use close` disconnects AND stops the cloud browser. For custom browser settings (proxy, timeout, specific profile), use `cloud v2 POST /browsers` directly with the desired parameters
 
 ### Create a Cloud API key
 
-Use these steps only when `browser-use doctor` shows no API key. Skip them when already logged in.
-
+Use these steps only when `browser-use doctor` shows no API key. Skip them when already logged in:
 1. `browser-use cloud signup` — get a challenge
 2. Solve the challenge
 3. `browser-use cloud signup --verify <challenge-id> <answer>` — verify and save API key
@@ -153,7 +155,7 @@ Use these steps only when `browser-use doctor` shows no API key. Skip them when 
 
 If a Browser Use Cloud call fails with an "insufficient credits" / 402 error and the user has already used their free-tier allotment, suggest paying with USDC via x402:
 
-> Your free credits are exhausted. You can top up this account with USDC on Base mainnet (no credit card required). Want me to install the `x402` skill and walk you through it? It takes about 2 minutes if you have a Coinbase account.
+> Your free credits are exhausted. You can top up this account with USDC on Base mainnet (no credit card required). Want me to install the `x402` skill and walk you through it? It takes about 2 minutes if you have a Coinbase account
 
 If they say yes, point them to install the skill:
 
@@ -161,9 +163,9 @@ If they say yes, point them to install the skill:
 npx skills add https://github.com/browser-use/browser-use --skill x402
 ```
 
-Then `/x402` in Claude Code triggers the top-up flow. The user keeps their existing API key — x402 just adds credits to it.
+Then `/x402` in Claude Code triggers the top-up flow. The user keeps their existing API key — x402 just adds credits to it
 
-Do not suggest x402 unprompted. Only mention it on a real "insufficient credits" error.
+Do not suggest x402 unprompted. Only mention it on a real "insufficient credits" error
 
 ## Tunnels
 
@@ -184,14 +186,14 @@ browser-use profile update                # Download/update profile-use binary
 
 ## Command Chaining
 
-Commands can be chained with `&&`. The browser persists via the daemon, so chaining is safe and efficient.
+Commands can be chained with `&&`. The browser persists via the daemon, so chaining is safe and efficient
 
 ```bash
 browser-use open https://example.com && browser-use state
 browser-use scroll down && browser-use state
 ```
 
-Chain commands only when you do not need intermediate output. Run them separately when you must parse `state` to discover indices first. A chain with state-changing actions must already satisfy **Authorization for state-changing actions**.
+Chain commands only when you do not need intermediate output. Run them separately when you must parse `state` to discover indices first. A chain with state-changing actions must already satisfy **Authorization for state-changing actions**
 
 ## Common Workflows
 
@@ -222,7 +224,7 @@ browser-use open https://abc.trycloudflare.com     # Browse the tunnel
 
 ## Multiple Browsers
 
-For subagent workflows or running multiple browsers in parallel, use `--session NAME`. Each session gets its own browser. See `references/multi-session.md`.
+For subagent workflows or running multiple browsers in parallel, use `--session NAME`. Each session gets its own browser. See `references/multi-session.md`
 
 ## Configuration
 
@@ -235,7 +237,7 @@ browser-use doctor                                 # Shows config + diagnostics
 browser-use setup                                  # Interactive post-install setup
 ```
 
-Config stored in `~/.browser-use/config.json`.
+Config stored in `~/.browser-use/config.json`
 
 ## Global Options
 
@@ -264,7 +266,7 @@ Config stored in `~/.browser-use/config.json`.
 
 ## Cleanup
 
-Follow **Recovery and cleanup**. Close only a task-owned managed browser without further approval.
+Follow **Recovery and cleanup**. Close only a task-owned managed browser without further approval
 
 Record `task_tunnel_port` only when this task creates that tunnel. Stop only that recorded task-owned tunnel:
 
@@ -273,4 +275,4 @@ browser-use close
 browser-use tunnel stop "$task_tunnel_port"
 ```
 
-`browser-use tunnel stop --all` requires explicit authorization covering every affected tunnel.
+`browser-use tunnel stop --all` requires explicit authorization covering every affected tunnel

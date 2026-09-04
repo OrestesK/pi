@@ -5,7 +5,7 @@ description: Use for reading or analyzing Pi session JSONL files and session his
 
 # Read Pi Sessions
 
-Parse Pi session JSONL files into readable output. `PI_CODING_AGENT_SESSION_DIR`, when set, is the exact directory containing session files. Otherwise Pi groups sessions by project under `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/sessions`.
+Parse Pi session JSONL files into readable output. `PI_CODING_AGENT_SESSION_DIR`, when set, is the exact directory containing session files. Otherwise Pi groups sessions by project under `${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/sessions`
 
 ## Step 1: Find the Session
 
@@ -35,11 +35,11 @@ Always start with `toc` to get a numbered map of the session:
 uv run "$script_path" "$session_path" --mode toc
 ```
 
-This prints a compact numbered list of every user exchange with timestamps and tools used.
+This prints a compact numbered list of every user exchange with timestamps and tools used
 
 ## Step 3: Read the Conversation
 
-Conversation mode, the default, shows user messages and assistant text. It hides tool calls but shows a `[used: tool1, tool2]` hint.
+Conversation mode, the default, shows user messages and assistant text. It hides tool calls but shows a `[used: tool1, tool2]` hint
 
 ```bash
 # Full conversation (default mode)

@@ -18,11 +18,11 @@ description: Use to draft commit messages and branch names
 ## Types
 
 Use exactly one supported type:
-
 - `feat` — new functionality
 - `fix` — bug fix
 - `docs` — documentation only
-- `style` — formatting only; no behavior change
+- `style` — formatting only
+  - no behavior change
 - `refactor` — code restructuring without a feature or bug fix
 - `perf` — performance improvement
 - `test` — tests only
@@ -61,4 +61,4 @@ BREAKING CHANGE: unsigned API requests are no longer accepted
 
 `ok` is the first and last inital of the curent user
 
-Prefer `ok/<short-topic>`.
+Prefer `ok/<short-topic>`
