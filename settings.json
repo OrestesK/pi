@@ -132,7 +132,7 @@
     },
     "packages/pi-sixel",
     "npm:@carter-mcalister/pi-codex-image-gen@0.2.0",
-    "npm:pisesh@0.2.0",
+    "npm:pisesh@0.3.0",
     "npm:pi-btw@0.4.1",
     "npm:pi-goal-x@0.27.4"
   ],
