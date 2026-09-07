@@ -1,226 +1,171 @@
 # System Methodology
 
-This document explains what I want from this Pi configuration and how its general workflow and ownership model currently work. Agents that explicitly change this configuration must read it before proposing or making changes
+## Purpose and authority
 
-This is not an executable instruction file and it is not a decision history. `AGENTS.md`, skills, agent prompts, settings, extensions, and packages remain the executable owners of behavior
+This document explains what I want from this Pi configuration and the general model used to produce it. Agents that explicitly maintain this configuration must read it before proposing or making changes
 
-Read the document in two ways:
-- **What I want** states my durable intent for the system
-- **How it works** states current behavior verified from the canonical executable owners
+This document owns durable design intent. It does not execute, replace current instructions, or preserve decision history
 
-My current instruction is the authority for what I want. Current source and settings are the authority for what actually runs. If they disagree, surface the conflict instead of silently changing either meaning
+Current user direction is authoritative for desired behavior. Current source, settings, and effective discovery are authoritative for what runs. When they disagree, surface the conflict instead of silently changing either meaning
 
-## What I want
+Use this document as:
+- a design charter for cross-cutting behavior
+- a compact map to the canonical executable owners
+- a maintenance boundary for deciding what belongs here
+
+Use `README.md` for the concrete repository file map. Use session history, Git, and `.scratch/` for evidence and history, not current policy
+
+## Design principles
 
 ### User authority with useful advice
 
-I am the source of truth for behavior. I want the agent to advise me, challenge weak premises, show evidence, and recommend the best option, but not choose a material preference or trade-off for me
+I own material decisions about behavior, scope, architecture, proof, compatibility, security, and protected effects
 
-Ask me only about material choices that remain unresolved. Resolve facts, ownership, current behavior, and routine implementation mechanics with tools. Once I make an informed decision, do not relitigate it unless new evidence changes the decision or a protected boundary appears
+I want the agent to investigate first, challenge weak premises, explain the relevant facts, recommend the best option, give material pros and cons, and then ask one focused question only when a real decision remains
 
-### One clear approval
+Reuse my prior answers and established decisions instead of asking the same question again. Reopen a settled decision only when new evidence changes it or a protected boundary appears
 
-I want trivial, clear, contained work to proceed directly with proportionate verification. I do not want subagents or reviewers added to simple work only because it has several mechanical steps
+Do not turn reviewer, diagnostic, test, historical, or tool output into authority. Validate it against the current source and approved outcome. Only a required defect inside the approved contract may drive automatic correction
 
-For nontrivial or material work, prepare and review the detailed plan before editing. Then explain the proposed work to me in short, plain language. Tell me what you recommend and why, the relevant facts and evidence, the material pros and cons, what will change, what you assume or still do not know, the main risks and checks, what will not change, and exactly what I am approving. Keep commands and step-by-step execution details in the plan unless I ask for them or they affect my decision. Ask once for approval
+A concrete supported material addition is a user choice. A small concrete observation encountered incidentally may be reported as a nonblocking extra. Unsupported, speculative, generic, or conflicting suggestions do not become work
 
-After approval, keep working through implementation, review, fixes, and verification. Ask again only when a new material choice, scope change, or protected action appears
+### Simple, canonical, fail-fast implementation
 
-### Accuracy first, speed through focus and parallelism
+I want the smallest coherent solution at the real owner, not the smallest line count and not the most elaborate design
 
-I want accurate, decision-grade work. Do not weaken investigation, review, or proof only to save time, tool calls, tokens, or assumed cost
+Prefer, in order:
+- no code or configuration change when current behavior already satisfies the contract
+- the existing canonical owner
+- standard platform or installed dependency behavior
+- the minimum coherent new code or policy
 
-I also want the system to be fast. Investigate the smallest useful surface, run independent work in parallel, and do not make the parent wait when it can do useful non-conflicting work. Wait only when an output is a real dependency for the next decision, action, or readiness claim
+Default to no new abstraction, compatibility path, fallback, recovery, normalization, sanitization, hardening, or custom error wrapping unless the approved contract requires it. Preserve raw errors and let owned invariant violations fail directly
 
-### Simple, clean, canonical changes
+Do not remove existing approved behavior under the label of simplification, cleanup, or defensive-code removal. Ask before creating or broadening an abstraction, moving responsibility, or choosing between materially different owners. Perform cleanup automatically only when it is required by the approved contract. Present any optional cleanup as a user choice before implementation
 
-I want elegant, simple, clean implementation at the real owner. Prefer the smallest coherent solution, not the smallest line count
+### Evidence and independent review
 
-Follow least diff: do not touch unrelated code, comments, behavior, or artifacts. Necessary refactoring is appropriate when it makes the approved change cleaner or simpler
+I want evidence that could show the implementation is wrong at the boundary being claimed. Use current source, types, real producers and consumers, runtime paths, version-matched documentation, focused checks, and behavioral tests according to the claim and risk
 
-Do not add a new abstraction, compatibility path, fallback, recovery, validation, sanitization, security hardening, or duplicate policy unless the approved contract requires it. Preserve raw errors and fail directly by default
+A writer may add and run the exact focused local test that directly proves approved changed behavior when it is safe to repeat and has no external effect. Broader, unrelated, credentialed, external, expensive, or effectful validation needs the applicable approval
 
-Keep each behavior at one canonical owner. Other surfaces should route to that owner instead of restating its detailed rules
+Nontrivial plans and changes receive independent coverage of six distinct angles:
+- approved contract, user impact, and scope
+- reachable correctness
+- fail-fast and defensive code
+- architecture, ownership, integration, and consumers
+- simplicity, maintainability, and local fit
+- claim-bound tests and proof
 
-Use existing abstractions as designed. Ask before creating or broadening an abstraction, moving responsibility, or choosing between materially different owners or designs
+Each reviewer owns one supplied angle and returns evidence, not a final system decision. The parent validates and synthesizes the findings. A contained correction invalidates only affected coverage. A broad correction receives proportionate fresh coverage
 
-### Evidence tied to the real claim
+Comparative agent, prompt, workflow, model, or skill evaluation is opt-in. It produces evidence and a recommendation, never automatic promotion or configuration mutation. When I ask to compare wording, behavior, or aggressiveness, show me concrete alternatives rather than substituting an autonomous model-versus-model experiment
 
-I want evidence that can show the implementation is wrong at the boundary being claimed. Use source, types, runtime paths, current documentation, focused checks, integration or live evidence, and tests according to the actual risk. Do not force tests or live probes when no meaningful behavioral boundary exists
+### Focused parallel work
 
-I want a writer to add and run the exact focused local test when it directly proves approved changed behavior, is safe to repeat, and has no external effects
+I want all useful independent work to move in parallel. Do not reduce useful work merely to reduce concurrency, and do not make the parent wait when non-conflicting work can continue
 
-I want broader or unrelated tests, standalone typechecks, linters, formatters, external services, credentialed checks, and effectful validation to run only when I explicitly request that command or category
+Parallelism must remain bounded by real ownership and dependencies. Main owns coordination, integration, user decisions, and final claims. Worker executes fully specified dependency-ready leaves. Clone owns one bounded coherent task that still needs implementation judgment. Read-only specialists and reviewers answer their assigned question without becoming writers or decision authorities
 
-`AGENTS.md` requires ShellCheck for every edited shell script without a separate request. `code-intelligence` defines when targeted LSP diagnostics run
+Child completion is evidence, not acceptance. The parent inspects the effective result and proof in proportion to the child role and the risk
 
-those diagnostics also need no separate request
+### Explicit protected effects
 
-When preparing or reviewing a pull request, suggest relevant commands from the opt-in categories instead of running them
+Genuine read-only investigation may proceed without approval. Mutation with external, destructive, deployment, disclosure, credential, Git, or otherwise protected effects requires the exact authorization owned by `AGENTS.md`
 
-Treat tools, tests, reviewers, benchmarks, memories, and historical sessions as evidence, not authority. Re-verify important historical claims against current source or fresh evidence
+Treat unclear effects as mutation until verified. Authorization for one effect does not silently authorize another
 
-Do not call work done because an agent is confident or one narrow check passed. Completion claims must use fresh evidence captured after the latest relevant edit and must state anything not verified
+### Direct communication and configuration prose
 
-### Independent review that improves the work
+Use direct, concise, human-to-human language. Lead with the shortest correct working model, then add detail only when it changes understanding, a decision, or safe execution
 
-I want nontrivial plans and implementations reviewed independently across six distinct angles: approved contract and scope, reachable correctness, fail-fast and defensive code, architecture and ownership, simplicity and local fit, and claim-bound tests and proof
+First-party configuration prose should be simple, structured, and written to the agent. The exact maintenance conventions are owned by `.agents/skills/runtime-maintenance/SKILL.md`
 
-Reviewers gather evidence
+Progress reports name the objective, material evidence or change, current risk or decision, and next action. They do not narrate every tool call
 
-they do not vote, authorize scope, or replace my decisions. Validate every finding before acting. Only a required contract fix can drive automatic work. Present concrete supported material additions or changes to me as choices. Small concrete observations encountered incidentally may be reported as nonblocking extras but cannot trigger work or require a decision. Reject unsupported or generic suggestions. Re-review only the angles affected by a correction unless the change is broad
+## General lifecycle
 
-### Active, visible, bounded work
+### 1. Resolve the task and intent
 
-I want meaningful progress updates at approval boundaries, material work stages, discoveries, blockers, and completion—not narration of every tool call
+The parent establishes the observable outcome, non-goals, current behavior, real owner, proof need, approval boundary, and stop conditions. It uses tools for facts and returns only unresolved material choices to me
 
-I want useful answers as soon as they are supported, without stopping worthwhile deeper work or losing relevant subagent findings
+Trivial contained work proceeds directly. Ambiguous or material design work enters the fitting design workflow before implementation
 
-Before yielding, look for concrete useful work such as a missing risk, stronger evidence, a simpler path, or necessary task-state maintenance. Dispatch substantive Reflection work to the fitting read-only specialist. Do not poll healthy children, repeat work, invent nits, or create activity only to avoid yielding
+### 2. Prepare and approve the change
 
-Keep continuity proportional. Use ignored `.scratch/` artifacts only when deeper temporary research, plans, reviews, logs, or session state are useful. Do not create tracked progress files unless the project requires them
+`manager-workflow` owns the proposal, approval, implementation, review, and completion stages for nontrivial implementation work. `brainstorming` resolves open design choices. `writing-plans` records architecture or execution detail when it is useful
 
-### Autonomous reads, explicit protected effects
+The complete proposal is reviewed before implementation. I receive the recommendation, evidence, material trade-offs, changed and unchanged behavior, risks, checks, and exact approval boundary
 
-I want genuine read-only work to run without approval, including authenticated or private reads. Treat unclear effects as mutation until verified
+### 3. Implement through the canonical owner
 
-Mutations, destructive actions, disclosure or export, deployment, and other protected effects require the exact authorization defined by the active policy. State the target, action, expected effect, and relevant boundary before asking. Authorization for one effect does not silently authorize another
+After approval, Main selects direct work, Worker, or Clone from the judgment and dependency boundary, allocates non-overlapping writes, and keeps independent work moving
 
-### Direct communication
+Detailed routing, packets, coordination, and tool rules remain in `AGENTS.md` and the effective role prompts. Runtime packages execute launches and enforce only the behavior they actually own
 
-Use plain, natural language. Lead with the answer, explain what changes in practice, and add detail only when it affects understanding or a decision. Be concise, precise, and direct. Do not add praise, filler, bureaucratic language, or unsupported certainty
+### 4. Review and correct
 
-## How the general lifecycle works
+`review` owns independent coverage, angle definitions, finding groups, and proportionate follow-up. `manager-workflow` owns the transition into review and the final gate
 
-### 1. Classify and frame the task
+### 5. Verify and report
 
-`AGENTS.md` owns active task classification, workflow routing, and protected-action rules:
-- Trivial and unambiguous work stays with the parent
-- Nontrivial or material implementation, refactor, migration, or service work enters `manager-workflow`
-- Standalone nontrivial review enters `review`
+After the last edit and completed review, Main compares fresh evidence with every material part of the approved outcome, inspects the total effective change, and states unavailable boundaries
 
-  unexpected failures enter `systematic-debugging` and then `behavioral-proof`
-- A material unresolved preference returns to me as one focused question
-- Facts and routine mechanics are investigated instead of delegated back to me
+A completion claim must follow the current evidence. Agent confidence, stale output, launch receipts, or one narrow check are not proof
 
-Before mutation, the parent makes the observable outcome, non-goals, owners, proof, approval boundary, and stop conditions explicit
+## Ownership model
 
-### 2. Discover the current state and resolve intent
+### Intent and project policy
 
-The agent reads the relevant source before editing and uses the workflow that owns the evidence it needs:
-- `brainstorming` turns ambiguous product, behavior, UI, API, or architecture intent into a concrete design
+- `SYSTEM_METHODOLOGY.md` owns this durable design intent and compact general model
+- `AGENTS.md` owns always-loaded project policy, global invariants, workflow routing, authorization, parent authority, progress, continuity, and implementation rules
+- `APPEND_SYSTEM.md` owns the host toolchain and language overlay
+- `README.md` owns the concrete repository map and operational setup overview
 
-  it researches first and asks one material decision at a time
-- Repository orientation starts with `README.md`. `code-intelligence` owns semantic evidence about code structure, symbols, types, references, call paths, and diagnostics
-- `context-mode` owns processing for large logs, commands, documents, API results, and datasets
-- Current version-matched documentation and the local integration are checked when external behavior matters
+### Workflows and roles
 
-These mechanisms return evidence to the active workflow. They do not create competing approval or implementation flows
+- `skills/` owns progressively disclosed workflow and domain procedures
+- `.agents/skills/` owns project-scoped maintenance workflows
+- `agents/` owns role-specific child prompts
+- `manager-workflow` owns the material implementation lifecycle
+- `review` owns review method and coverage
+- `behavioral-proof` owns evidence selection
+- `writing-tests` owns test quality and placement
 
-### 3. Explain the plan and ask for approval
+A workflow or role named here remains governed by its current canonical file. This document does not restate its detailed procedure
 
-`manager-workflow` owns this stage. It prepares and reviews the detailed plan, then gives me a short explanation I can review. The explanation contains the choices and facts that affect my decision, not the full execution plan. It then asks once for implementation approval
-
-`behavioral-proof` selects the smallest evidence strategy that could disprove the changed claim. A separate technical specification or durable plan is added only when the architecture or continuity need justifies it
-
-it does not create a second approval path
-
-### 4. Execute without idle coordination
-
-After approval, the main agent chooses roles, prepares child packets, and decides which children run and in what order. It manages parallel work, tool routing, dependencies, and write allocations. The Pi Subagents runtime executes the launches
-
-The parent implements directly only when an edit is the immediate dependency barrier. Otherwise, it dispatches the work. A `worker` receives one fully specified, dependency-ready implementation leaf with no material decisions remaining. A `clone` receives one clearly scoped task that still needs judgment, adaptation, or help from read-only specialists
-
-Concurrent writers receive nonoverlapping file or explicit-region allocations. A file assigned to a `clone` remains exclusive until released. A `clone` cannot launch another `clone` or expand its scope or allocation
-Independent work runs in parallel. The parent continues useful non-overlapping work. It waits only when a child result is a dependency. It checks child claims against actual output, the effective change, and fresh proof
-
-### 5. Maintain continuity and use Reflection
-
-`.scratch/` holds useful ignored temporary artifacts. Session history, compaction summaries, memory, and scratch artifacts are discovery pointers
-
-current source and later user corrections remain authoritative
-
-Before yielding, the main agent runs the Reflection check in `AGENTS.md`. A progress report, stage transition, child event, completed check, or asynchronous launch result does not end the turn. Run Reflection again afterward
-
-Do not poll healthy children, repeat work, invent nits, or create activity only to avoid yielding
-
-Reflection does not replace required task work or formal review
-
-Yield only when no useful work can move now, no required parent work or permitted maintenance remains, and no child needs meaningful interaction
-
-### 6. Review and fix
-
-`manager-workflow` moves the completed implementation into the review/fix stage. `review` owns independent review method and current coverage of six base angles:
-1. Contract, user impact, and approved scope
-2. Reachable correctness
-3. Fail-fast and defensive code
-4. Architecture, ownership, integration, and consumers
-5. Simplicity, maintainability, and local fit
-6. Claim-bound tests and proof
-
-Review findings are classified and validated. Only required findings can block readiness or drive automatic fixes. Concrete supported material additions or changes return to me as choices. Small concrete observations encountered incidentally may be reported as nonblocking extras and do not enter fix loops. Unsupported or generic suggestions are rejected. Follow-up review covers only the angles affected by each correction unless the change is broad
-
-### 7. Verify and report completion
-
-After the last edit and completed review, the main agent compares fresh post-edit evidence with every required part of the approved outcome
-
-It inspects the final effective change, relevant child output, review decisions, and proof before making the final claim. It states anything not verified and makes only claims the current evidence supports
-
-## How the configuration is organized
-
-### Intent, policy, and environment
-
-- `SYSTEM_METHODOLOGY.md` owns this high-level design intent and current general-flow explanation for config maintainers
-
-  it does not execute
-- `AGENTS.md` owns always-loaded behavior, global invariants, authorization boundaries, workflow routing, parent authority, Reflection, progress, continuity, and implementation rules
-- `APPEND_SYSTEM.md` owns host toolchain and language preferences added to the system prompt
-- `README.md` owns the repository map and operational setup overview
-
-### Activation and runtime implementation
+### Runtime implementation
 
 - `settings.json` owns model selection, package activation, and resource wiring
-- `skills/` owns progressively disclosed workflows and domain guidance
-- `.agents/skills/` contains project-scoped maintenance workflows discovered only in this repository
-- `agents/` owns role-specific child prompts
+- `models.json`, `mcp.json`, keybindings, and themes own their named runtime configuration
+- `extensions/` and `packages/` own runtime implementation and packaged fallbacks
+- effective discovery and precedence decide which resource runs
 
-  an effective root role can replace a packaged role with the same name
-- `extensions/` and `packages/` own runtime implementations and packaged fallbacks
+Prompt policy directs model behavior. It does not imply host enforcement that the runtime does not implement
 
-A workflow name in this document describes the current general method. Its detailed procedure remains in its skill, agent, setting, extension, or package owner
+### Continuity and history
 
-### Durable and temporary context
+- current conversation and visible progress own active task state
+- `.scratch/` owns useful temporary research, plans, reviews, logs, and session continuity
+- session history and Tape provide bounded discovery evidence
+- Git preserves source history
+- approved durable memory stores cross-session context that has no better repository owner
 
-`pi-memory-md` owns local durable Markdown memory and Tape. Durable memory is global-first
-
-at natural task completion, the main session may propose the smallest durable candidate when it would prevent future rediscovery, and memory changes only after explicit user approval of the specific update. The main session searches and reads relevant memory before guessing when durable context may answer the question. `pi-session-search` owns searchable session history. Both remain non-authoritative evidence
-
-`.scratch/` owns temporary project-local research, plans, reviews, session notes, and run logs. Canonical project knowledge belongs in source or repository documentation rather than memory or task artifacts
-
-### Authority between agents
-
-The parent owns the task, communication with me, material decisions, active write allocation, review coordination and decisions, integration, and final claims
-
-`worker` owns one fully specified implementation task whose dependencies are ready, within fixed scope and write allocation. It reports blockers instead of changing the task
-
-A `clone` owns one clearly scoped task within the approved outcome when it still needs judgment. It may coordinate read-only specialists, but it cannot expand its scope or write allocation or launch another `clone`
-
-Read-only specialists and reviewers own only their assigned question or fact. They return evidence to the parent and cannot expand scope, approve protected effects, or become decision authority
+Do not copy repository documentation, raw chat chronology, temporary decisions, or per-change provenance into durable memory or this methodology
 
 ## Maintaining this document
 
-Read this document before changing the Pi configuration. Then verify every relevant current fact against its canonical executable owner
+Before changing this configuration, read this document and verify every relevant current fact against its canonical executable owner
 
 Update this document when:
-- behavioral reach changes a cross-cutting principle or the normal system lifecycle
-- global ownership architecture changes
-- a named general-flow mechanism is renamed, replaced, moved, or materially changes its stable contract
+- a cross-cutting design principle changes
+- the normal lifecycle changes materially
+- global ownership changes
+- a named general mechanism becomes inaccurate
 
 Do not update this document for:
-- behavior confined to one specialized skill, agent, package, extension, integration, command, or UI component
-- routine implementation detail, package pins, model versions, or generated inventories
-- ordinary task decisions, debugging findings, session state, or per-change provenance
+- behavior confined to one specialized skill, agent, package, extension, command, or UI component
+- routine implementation details, model versions, package pins, or generated inventories
+- temporary task decisions, exact prior approvals, debugging findings, rejected alternatives, or session chronology
 
-Behavioral reach, not file count or implementation effort, decides whether an update belongs here
-
-Keep the document current, concise, and free of historical entries. Use direct user intent for what I want and current canonical source for how the system works. If they conflict materially, ask instead of documenting the conflict as accepted behavior
+Keep the document current, concise, and free of historical entries. Preserve enough rationale to prevent a repeatedly rejected behavior from being reintroduced, but do not turn rationale into a decision ledger

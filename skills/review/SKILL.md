@@ -224,7 +224,7 @@ Do not fetch or mutate Git to resolve a target. Ordinary working-tree review is 
   - do not call irrelevant groups mechanically
 - Inspect available test evidence when it materially improves review confidence
 - Cite file paths and line numbers for findings
-- Categorize findings as a required fix, user choice, or outside-angle pointer
+- Categorize reported items as a required fix, user choice, outside-angle pointer, or nonblocking extra
 - Follow the active global instructions already in context, specifically the artifact permission and override policy in the `.scratch/ workspace` section. Return findings inline unless an explicit output path or wrapper capture is provided
   - use `.scratch/reviews/` for allowed review artifacts. Do not use shell writes to create them
 

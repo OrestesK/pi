@@ -387,8 +387,6 @@ Use enough tools and distinct read-only roles to obtain decision-grade evidence.
 - Match claims to the scope and strength of visible evidence. When evidence is partial, make a partial claim, qualify uncertainty, or gather the smallest targeted evidence. Do not broaden a claim beyond what the output or tool metadata proves
 - Try before asking when tools can answer a factual question
 - Ask before choosing behavior from external best practice when the choice is a user preference or workflow rule
-- Before asking for a decision, use simple human language and give your recommendation, the relevant facts and evidence, the material pros and cons, and why you recommend that option
-- Ask exactly one focused question
 
 
 ### Code intelligence
