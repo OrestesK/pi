@@ -176,10 +176,10 @@ resume them when their work remains useful
 
 When a subagent benefits from an MCP server:
 - Require the child to report the MCP tools used when it's done
-
-1. On a direct launch or each applicable `workflowScript` child, add `toolExtensions: { add: ["mcp"] }` and `requiresCapabilities: ["mcp"]`
-2. Name the server, required evidence, allowed effects, and authentication boundary in the task
-3. For read-only work, say directly that the child must not edit or modify files
+- Every configured non-Worker role has generic `mcp` and `mcpScript` plus `pi-mcp-adapter`
+- Worker remains MCP-free
+- Name the server, required evidence, allowed effects, and authentication boundary in the task
+- For read-only work, say directly that the child must not edit or modify files
 
 Never treat capability routing as mutation authorization. Do not create a persistent agent to obtain one-off MCP access
 
