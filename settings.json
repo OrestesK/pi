@@ -30,7 +30,7 @@
     "maxRetries": 10,
     "baseDelayMs": 3000
   },
-  "lastChangelogVersion": "0.84.1",
+  "lastChangelogVersion": "0.85.1",
   "transport": "auto",
   "compaction": {
     "enabled": true,
