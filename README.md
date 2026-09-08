@@ -7,7 +7,7 @@ Personal configuration for the Pi coding agent.
 
 ## File map
 
-This is the canonical map of configuration surfaces. The `Kind` column distinguishes executable instructions and runtime config from non-executable references.
+This is an orientation map of configuration surfaces. The linked files and effective resource discovery are authoritative. The `Kind` column distinguishes executable instructions and runtime config from non-executable references.
 
 | Path | Kind | Purpose |
 | --- | --- | --- |
@@ -17,68 +17,60 @@ This is the canonical map of configuration surfaces. The `Kind` column distingui
 | [`settings.json`](settings.json) | Runtime config | Models, packages, UI, and compaction |
 | [`models.json`](models.json) | Runtime config | Custom model definitions |
 | [`mcp.json`](mcp.json) | Runtime config | MCP server registry |
-| [`permissions.json`](permissions.json) | Inactive artifact | Not consumed by Pi 0.80.6 or the loaded extensions |
 | [`keybindings.json`](keybindings.json) | Runtime config | Terminal keybindings |
-| [`agents/`](agents/) | Executable prompts | Local subagent roles; same-name files override packaged builtins |
+| [`agents/`](agents/) | Executable prompts | Local subagent roles. Same-name files override packaged builtins |
 | [`skills/`](skills/) | Executable workflows | On-demand workflows and domain guidance |
 | [`.agents/skills/`](.agents/skills/) | Project workflows | `skill-authoring` is project-scoped, narrowly allowlisted, and tracked. Other project-local skills remain ignored |
 | [`extensions/`](extensions/) | Runtime code/config | Commands, UI helpers, and guardrails |
-| [`mcp-servers/`](mcp-servers/) | Runtime code | Local MCP implementations |
 | [`themes/`](themes/) | Runtime config | TUI themes |
 | [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md) | Provenance | Copied, adapted, and influential sources |
 
 ## Runtime at a glance
 
 - The main model and enabled packages are configured in [`settings.json`](settings.json).
-- `pi-memory-md` provides explicit local Markdown memory and Tape; `pi-session-search` provides model-facing session search.
-- MCP servers are registered in [`mcp.json`](mcp.json); most load lazily.
+- `pi-memory-md` provides explicit local Markdown memory and Tape, while `pi-session-search` provides model-facing session search.
+- MCP servers are registered in [`mcp.json`](mcp.json) and load lazily.
 - Local role prompts in [`agents/`](agents/) override packaged roles with the same name.
 - Skills expose short descriptions and load their full instructions only when needed.
 - Extensions under [`extensions/`](extensions/) are auto-discovered.
-- Safety combines prompt policy with configured guardrails. `permissions.json` is
-  retained as an inactive artifact and does not control Pi 0.80.6 permissions.
+- Safety combines prompt policy with configured guardrails. Pi has no built-in sandbox.
 
 ## Memory and session search
 
-`pi-memory-md` stores local Markdown memory under `~/.pi/memory/`. Once per session, `message-append` delivers a hidden Tape-selected memory index containing paths, descriptions, and tags rather than full bodies; shared `global/core/` is always included, and relevant bodies are searched and read on demand. Its packaged skills are filtered off; the local `durable-memory` skill owns curation and approved writes. `AGENTS.md` owns proactive proposal triggering and requires explicit approval for every specific durable-memory change or synchronization. Automatic synchronization hooks remain disabled.
+`pi-memory-md` stores local Markdown memory under `~/.pi/memory/` and provides Tape. The local `durable-memory` skill owns curation, and `AGENTS.md` requires explicit approval for each memory write or synchronization. Automatic synchronization hooks are disabled.
 
-Tape remains enabled in Git repositories for automatic lifecycle and model-selected handoff checkpoints. TapeThread is disabled. Tape metadata does not snapshot, restore, or modify code. Project-wide `tape_search` and `tape_read` stream session files, filter before bounded newest-result retention, and remain proportional to total corpus bytes in scan time without retaining the full corpus.
-
-`pi-session-search` indexes Pi session records for model-facing search. Memory and historical sessions are discovery evidence; current user instructions and current source remain authoritative.
-
-The previous `~/.pi/memory-md/` data remains on disk as an inactive artifact. It is not migrated or deleted automatically.
+`pi-session-search` provides model-facing session search. Memory and historical sessions are discovery evidence. Current user instructions and current source remain authoritative.
 
 ## MCP servers
 
 | Server | Mode | Purpose |
 | --- | --- | --- |
-| `context7` | lazy | Library and framework documentation |
-| `context-mode` | lazy | Large-output analysis and indexing |
-| `sentry` | lazy remote OAuth | Sentry issue, trace, release, and project debugging |
-| `descope` | lazy remote OAuth | Descope identity management |
-| `notion` | lazy remote OAuth | Notion access |
-| `google_docs` | lazy local OAuth | Google Docs and Drive-capable operations |
-| `slack` | lazy remote OAuth | Slack access through Slack's official hosted MCP server |
-| `retool` | lazy remote | Retool apps, resources, and organization access through the MCP proxy |
-| `excalidraw-local` | lazy local | Excalidraw diagrams |
+| `context-mode` | lazy local | Large-output analysis and indexing |
+| `context7` | lazy remote | Library and framework documentation |
+| `descope` | lazy remote | Descope identity management |
 | `docent` | lazy local | Agent-run analysis and reports |
+| `excalidraw-local` | lazy local | Excalidraw diagrams |
+| `figma` | lazy remote | Figma design access |
+| `google_docs` | lazy local | Google Docs and Drive-capable operations |
+| `notion` | lazy remote | Notion access |
+| `retool` | lazy remote | Retool apps, resources, and organization access |
+| `sentry` | lazy remote | Sentry issue, trace, release, and project debugging |
+| `slack` | lazy remote | Slack search and collaboration |
 
-OAuth environment and token files are ignored. External/private MCP access and mutations are governed by [`AGENTS.md`](AGENTS.md).
-
-The official Slack MCP entry requests every scope currently advertised by Slack's OAuth metadata: `search:read.public`, `search:read.private`, `search:read.mpim`, `search:read.im`, `search:read.files`, `search:read.users`, `chat:write`, `channels:history`, `groups:history`, `mpim:history`, `im:history`, `canvases:read`, `canvases:write`, `users:read`, `users:read.email`, `reactions:write`, `reactions:read`, `emoji:read`, `files:read`, `channels:write`, `groups:write`, `im:write`, `mpim:write`, `channels:read`, `groups:read`, and `mpim:read`. Tracked config contains the public Slack app client ID and fixed PKCE callback, but no client secret or token. Authentication remains incomplete until OAuth is completed.
+[`mcp.json`](mcp.json) is authoritative for endpoints, transports, lifecycle, and authentication settings. Credential and onboarding files are ignored. External/private MCP access and mutations are governed by [`AGENTS.md`](AGENTS.md).
 
 ## Setup
 
 Required:
 
 - Git and Bash
-- Pi coding agent (tested with 0.80.6)
+- Pi coding agent
 - Node.js 22.19 or later with npm
 - `ast-grep` on `PATH`
 
 Optional integrations use additional commands:
 
-- `pnpm` for the local Excalidraw MCP server
+- `pnpm` for local Node-based MCP servers
 - `uv` for Docent
 - `chafa` and a SIXEL-capable terminal for image previews
 - `wl-paste` for Wayland clipboard images
@@ -91,9 +83,9 @@ export PI_CODING_AGENT_DIR="$HOME/.config/pi"
 ~/.config/pi/setup.sh
 ```
 
-Persist `PI_CODING_AGENT_DIR` in your shell startup file before opening Pi. Run `setup.sh` from a normal terminal outside Pi, then restart Pi; dependency installation replaces local package trees that an active process may have loaded. The script requires the variable to resolve to its own checkout and does not create or modify `~/.pi/agent`.
+Persist `PI_CODING_AGENT_DIR` in your shell startup file before opening Pi. Run `setup.sh` from a normal terminal outside Pi, then restart Pi because dependency installation replaces local package trees that an active process may have loaded. The script requires the variable to resolve to its own checkout and does not create or modify `~/.pi/agent`.
 
-The script repairs an ordinary non-recursive clone, synchronizes submodule URLs, installs the locked runtime dependencies for Pi Lens and `pi-subagents`, then runs each checked-in `profiles/*/setup.sh` hook. It never installs system tools, global npm packages, credentials, OAuth state, or optional integrations.
+The script repairs an ordinary non-recursive clone, synchronizes submodule URLs, installs each locked package root listed in `setup.sh`, builds Pi Lens, and runs any `profiles/*/setup.sh` hooks. It never installs system tools, global npm packages, credentials, OAuth state, or optional integrations.
 
 ## Untracked runtime data
 
