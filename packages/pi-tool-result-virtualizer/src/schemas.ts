@@ -10,12 +10,11 @@ export const REASON_PARAM: JsonSchema = {
 const DISCOVERY_SCOPE_PROPERTIES: Record<string, JsonSchema> = {
 	includeGlobal: {
 		type: "boolean",
-		description: "Include every project scope; parent-only; default false.",
+		description: "Include every project scope; default false.",
 	},
 	includeLegacy: {
 		type: "boolean",
-		description:
-			"Include legacy sources without verified project provenance; parent-only; default false.",
+		description: "Include legacy sources without verified project provenance; default false.",
 	},
 };
 

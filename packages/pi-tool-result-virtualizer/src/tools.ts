@@ -11,11 +11,6 @@ import {
 	formatSearchMatches,
 	PROTECTED_TOOL_OUTPUT_BYTE_LIMIT,
 } from "./formatting.ts";
-import {
-	RESULT_ANALYST_RUNTIME_NAME,
-	type GrantOperation,
-	type RunBoundGrantRegistry,
-} from "./grants.ts";
 import { formatSourceOutline } from "./outline.ts";
 import {
 	boundedIntegerParam,
@@ -60,32 +55,9 @@ async function accessForTool(
 	};
 }
 
-async function grantExactSourceAccess(
-	access: StoreAccessContext,
-	grants: RunBoundGrantRegistry,
-	operation: GrantOperation,
-	sourceIds: string[],
-): Promise<StoreAccessContext> {
-	if (access.actor !== "subagent") return access;
-	if (
-		sourceIds.length > 0 &&
-		access.subagentAgentName !== RESULT_ANALYST_RUNTIME_NAME
-	)
-		return access;
-	await grants.reserve({
-		runId: access.subagentRunId ?? "",
-		agentName: access.subagentAgentName ?? "",
-		operation,
-		sourceIds,
-		outputBytes: PROTECTED_TOOL_OUTPUT_BYTE_LIMIT,
-	});
-	return { ...access, grantedSourceIds: new Set(sourceIds) };
-}
-
 export function buildToolResultTools(
 	store: ToolResultStore,
 	resolveAccess: StoreAccessResolver,
-	grants: RunBoundGrantRegistry,
 	delegation?: ResultDelegationService,
 ): ToolDefinitionLike[] {
 	return [
@@ -101,14 +73,8 @@ export function buildToolResultTools(
 			],
 			parameters: OUTLINE_PARAMS,
 			async execute(_toolCallId, params, _signal, _onUpdate, context) {
-				const baseAccess = await accessForTool(params, context, resolveAccess);
+				const access = await accessForTool(params, context, resolveAccess);
 				const sourceId = sourceIdParam(params);
-				const access = await grantExactSourceAccess(
-					baseAccess,
-					grants,
-					"outline",
-					[sourceId],
-				);
 				const headLines = boundedIntegerParam(params, "headLines", 5, 0, 20);
 				const tailLines = boundedIntegerParam(params, "tailLines", 5, 0, 20);
 				const keywordLimit = boundedIntegerParam(
@@ -160,11 +126,8 @@ export function buildToolResultTools(
 			],
 			parameters: GET_PARAMS,
 			async execute(_toolCallId, params, _signal, _onUpdate, context) {
-				const baseAccess = await accessForTool(params, context, resolveAccess);
+				const access = await accessForTool(params, context, resolveAccess);
 				const sourceId = sourceIdParam(params);
-				const access = await grantExactSourceAccess(baseAccess, grants, "get", [
-					sourceId,
-				]);
 				const lineOptions: { lineStart?: number; lineLimit?: number } = {};
 				const lineStart = optionalNumberParam(params, "lineStart");
 				const lineLimit = optionalNumberParam(params, "lineLimit");
@@ -209,18 +172,12 @@ export function buildToolResultTools(
 			],
 			parameters: SEARCH_PARAMS,
 			async execute(_toolCallId, params, _signal, _onUpdate, context) {
-				const baseAccess = await accessForTool(params, context, resolveAccess);
+				const access = await accessForTool(params, context, resolveAccess);
 				const query = stringParam(params, "query");
 				const sourceId = optionalSourceIdParam(params);
 				const sourceIds = optionalSourceIdsParam(params);
 				if (sourceId !== undefined && sourceIds !== undefined)
 					throw new Error("sourceId and sourceIds may not both be provided");
-				const access = await grantExactSourceAccess(
-					baseAccess,
-					grants,
-					"search",
-					sourceId === undefined ? (sourceIds ?? []) : [sourceId],
-				);
 				const searchOptions: SearchOptions = { access };
 				const lineStart = optionalNumberParam(params, "lineStart");
 				const lineLimit = optionalNumberParam(params, "lineLimit");

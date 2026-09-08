@@ -23,14 +23,9 @@ export async function resolveStoreAccess(
 	env: NodeJS.ProcessEnv = process.env,
 ): Promise<StoreAccessContext> {
 	const provenance = await resolver.resolve(context, env);
-	const subagentRunId = nonEmpty(env.PI_SUBAGENT_RUN_ID);
-	const agentName = nonEmpty(env.PI_SUBAGENT_CHILD_AGENT);
 	const access: StoreAccessContext = {
 		actor: isSubagentProcess(env) ? "subagent" : "parent",
 	};
 	if (provenance.projectId) access.projectId = provenance.projectId;
-	if (provenance.sessionId) access.sessionId = provenance.sessionId;
-	if (subagentRunId) access.subagentRunId = subagentRunId;
-	if (agentName) access.subagentAgentName = agentName;
 	return access;
 }

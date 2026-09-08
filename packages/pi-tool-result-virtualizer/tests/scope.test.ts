@@ -12,11 +12,14 @@ const parentA: StoreAccessContext = { actor: "parent", projectId: PROJECT_A };
 const childA: StoreAccessContext = {
 	actor: "subagent",
 	projectId: PROJECT_A,
-	sessionId: "child-session",
-	subagentRunId: "run-a",
 };
+const forgedChildA = {
+	...childA,
+	subagentRunId: "forged-run",
+	subagentAgentName: "forged-agent",
+} as StoreAccessContext;
 
-test("broad discovery is project scoped while unscoped rows require exact ids", async () => {
+test("broad discovery is project scoped equally for parents and children", async () => {
 	const root = await mkdtemp(join(tmpdir(), "pi-trv-scope-discovery-"));
 	const store = new ToolResultStore(root);
 	const projectA = await store.storeSource({
@@ -113,19 +116,78 @@ test("broad discovery is project scoped while unscoped rows require exact ids", 
 		[projectB.sourceId, projectA.sourceId],
 	);
 	assert.deepEqual(
-		await store.listSources(20, { ...childA, includeGlobal: true }),
-		[],
+		(await store.listSources(20, childA)).map((entry) => entry.sourceId),
+		[projectA.sourceId],
 	);
 	assert.deepEqual(
-		await store.search("needle", {
-			limit: 20,
-			access: { ...childA, includeGlobal: true },
-		}),
-		[],
+		(
+			await store.listSources(20, {
+				...childA,
+				includeGlobal: true,
+			})
+		).map((entry) => entry.sourceId),
+		[projectB.sourceId, projectA.sourceId],
+	);
+	assert.deepEqual(
+		(
+			await store.listSources(20, {
+				...childA,
+				includeLegacy: true,
+			})
+		).map((entry) => entry.sourceId),
+		[legacy.sourceId, projectA.sourceId],
+	);
+	assert.deepEqual(
+		(
+			await store.listSources(20, {
+				...childA,
+				includeGlobal: true,
+				includeLegacy: true,
+			})
+		).map((entry) => entry.sourceId),
+		[legacy.sourceId, projectB.sourceId, projectA.sourceId],
+	);
+	assert.equal(
+		(
+			await store.listSources(20, {
+				...childA,
+				includeGlobal: true,
+				includeLegacy: true,
+			})
+		).some((entry) => entry.sourceId === unscoped.sourceId),
+		false,
+	);
+	assert.deepEqual(
+		(await store.search("needle", { limit: 20, access: childA })).map(
+			(match) => match.sourceId,
+		),
+		[projectA.sourceId],
+	);
+	assert.deepEqual(
+		(
+			await store.search("needle", {
+				limit: 20,
+				access: { ...childA, includeGlobal: true },
+			})
+		).map((match) => match.sourceId),
+		[projectB.sourceId, projectA.sourceId],
+	);
+	assert.deepEqual(
+		(
+			await store.search("needle", {
+				limit: 20,
+				access: {
+					...childA,
+					includeGlobal: true,
+					includeLegacy: true,
+				},
+			})
+		).map((match) => match.sourceId),
+		[legacy.sourceId, projectB.sourceId, projectA.sourceId],
 	);
 });
 
-test("parent exact ids are possession capabilities while subagents require grants", async () => {
+test("exact ids are possession capabilities for parents and children", async () => {
 	const root = await mkdtemp(join(tmpdir(), "pi-trv-scope-exact-"));
 	const store = new ToolResultStore(root);
 	const projectA = await store.storeSource({
@@ -164,45 +226,27 @@ test("parent exact ids are possession capabilities while subagents require grant
 		captureStatus: "event.content",
 	});
 
-	assert.equal(
-		(await store.readSource(projectA.sourceId, parentA)).metadata.sourceId,
-		projectA.sourceId,
-	);
-	assert.deepEqual(
-		(
-			await store.search("project", {
-				sourceIds: [projectA.sourceId, projectB.sourceId],
-				access: parentA,
-			})
-		).map((match) => match.sourceId),
-		[projectA.sourceId, projectB.sourceId],
-	);
-	await assert.rejects(
-		store.search("project", {
-			sourceIds: [projectA.sourceId],
-			access: childA,
-		}),
-		/source not found/i,
-	);
-	assert.equal(
-		(await store.readSource(unscoped.sourceId, parentA)).metadata.sourceId,
-		unscoped.sourceId,
-	);
-	assert.equal(
-		(await store.readSource(projectB.sourceId, parentA)).metadata.sourceId,
-		projectB.sourceId,
-	);
-	assert.equal(
-		(await store.readSource(legacy.sourceId, parentA)).metadata.sourceId,
-		legacy.sourceId,
-	);
-	await assert.rejects(
-		store.readSource(projectA.sourceId, childA),
-		/source not found/i,
-	);
-	assert.equal(
-		(await store.readSource(projectA.sourceId, { actor: "parent" })).metadata
-			.sourceId,
-		projectA.sourceId,
-	);
+	const exactSources = [
+		[projectA, "project-a"],
+		[projectB, "project-b"],
+		[unscoped, "unscoped"],
+		[legacy, "legacy"],
+	] as const;
+	for (const access of [parentA, childA, forgedChildA]) {
+		for (const [source, query] of exactSources) {
+			assert.equal(
+				(await store.readSource(source.sourceId, access)).metadata.sourceId,
+				source.sourceId,
+			);
+			assert.deepEqual(
+				(
+					await store.search(query, {
+						sourceId: source.sourceId,
+						access,
+					})
+				).map((match) => match.sourceId),
+				[source.sourceId],
+			);
+		}
+	}
 });

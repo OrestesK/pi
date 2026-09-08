@@ -287,7 +287,6 @@ export class StoreCatalog {
 		accessContext: StoreAccessContext,
 	): StoredSourceMetadata[] {
 		if (accessContext.actor === "system") return entries;
-		if (accessContext.actor === "subagent") return [];
 		return entries.filter((entry) => {
 			if (entry.scope === "project")
 				return (
@@ -301,41 +300,17 @@ export class StoreCatalog {
 
 	async findSource(
 		sourceId: string,
-		accessContext: StoreAccessContext,
+		_accessContext: StoreAccessContext,
 	): Promise<StoredSourceMetadata> {
 		const entries = await this.readIndex();
 		for (let index = entries.length - 1; index >= 0; index -= 1) {
 			const entry = entries[index];
-			if (
-				entry?.sourceId === sourceId &&
-				this.hasExactAccess(entry, accessContext)
-			)
+			if (entry?.sourceId === sourceId)
 				return entry;
 		}
 		throw new Error(
 			`Unknown tool-result source (source not found or unavailable): ${sourceId}`,
 		);
-	}
-
-	private hasExactAccess(
-		entry: StoredSourceMetadata,
-		accessContext: StoreAccessContext,
-	): boolean {
-		if (accessContext.actor === "system") return true;
-		if (accessContext.actor === "subagent") {
-			const sameRunOwner =
-				entry.subagentRunId !== undefined &&
-				entry.subagentRunId.length > 0 &&
-				entry.agentName !== undefined &&
-				entry.agentName.length > 0 &&
-				entry.subagentRunId === accessContext.subagentRunId &&
-				entry.agentName === accessContext.subagentAgentName;
-			return (
-				sameRunOwner ||
-				accessContext.grantedSourceIds?.has(entry.sourceId) === true
-			);
-		}
-		return true;
 	}
 }
 

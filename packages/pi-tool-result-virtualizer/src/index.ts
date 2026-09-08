@@ -6,7 +6,6 @@ import { defaultStoreRoot, resolveStoreLimits } from "./config.ts";
 import { compactProviderContextMessages } from "./context.ts";
 import { ResultDelegationService } from "./delegation.ts";
 import type { ExtensionApiLike } from "./extension-types.ts";
-import { RunBoundGrantRegistry } from "./grants.ts";
 import { ProvenanceResolver } from "./provenance.ts";
 import { ToolResultStore } from "./store.ts";
 import { SubagentRpcClient } from "./subagent-rpc-client.ts";
@@ -30,13 +29,11 @@ export default function piToolResultVirtualizer(pi: ExtensionApiLike) {
 		limits: resolveStoreLimits(),
 	});
 	const provenanceResolver = new ProvenanceResolver(storeRoot);
-	const grants = new RunBoundGrantRegistry(storeRoot);
 	const telemetry = createTelemetrySink(storeRoot);
 	const rpc = new SubagentRpcClient(pi.events);
 	const delegation = new ResultDelegationService({
 		store,
 		resolveAccess: (context) => resolveStoreAccess(provenanceResolver, context),
-		grants,
 		rpc,
 		packageRoot: dirname(dirname(fileURLToPath(import.meta.url))),
 	});
@@ -44,7 +41,6 @@ export default function piToolResultVirtualizer(pi: ExtensionApiLike) {
 	for (const tool of buildToolResultTools(
 		store,
 		(context) => resolveStoreAccess(provenanceResolver, context),
-		grants,
 		delegation,
 	)) {
 		pi.registerTool(instrumentToolDefinition(tool, telemetry));

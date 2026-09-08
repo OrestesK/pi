@@ -103,10 +103,6 @@ export type SearchMatch = {
 export type StoreAccessContext = {
 	actor: "system" | "parent" | "subagent";
 	projectId?: string;
-	sessionId?: string;
-	subagentRunId?: string;
-	subagentAgentName?: string;
-	grantedSourceIds?: ReadonlySet<string>;
 	includeGlobal?: boolean;
 	includeLegacy?: boolean;
 };

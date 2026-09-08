@@ -5,12 +5,6 @@ import type {
 	TextContent,
 	ToolExecutionContextLike,
 } from "./extension-types.ts";
-import { PROTECTED_TOOL_OUTPUT_BYTE_LIMIT } from "./formatting.ts";
-import {
-	RESULT_ANALYST_RUNTIME_NAME,
-	type PrepareGrantInput,
-	type RunBoundGrantRegistry,
-} from "./grants.ts";
 import type { StoreAccessContext, ToolResultStore } from "./store.ts";
 import {
 	SubagentRpcClientError,
@@ -19,9 +13,9 @@ import {
 	type SubagentSpawnParams,
 } from "./subagent-rpc-client.ts";
 
+export const RESULT_ANALYST_RUNTIME_NAME = "result-analyst";
 export const DELEGATION_TOOL_CALL_BUDGET = 8;
 export const DELEGATION_CHILD_TIMEOUT_MS = 4 * 60 * 1_000;
-export const DELEGATION_GRANT_TTL_MS = 5 * 60 * 1_000;
 const DELEGATION_FINAL_OUTPUT_BYTES = 8 * 1_024;
 const DELEGATION_FINAL_OUTPUT_LINES = 200;
 const ANALYST_MANIFEST_PATH = "agents/result-analyst.md";
@@ -43,10 +37,8 @@ type DelegationServiceOptions = {
 	resolveAccess: (
 		context: ToolExecutionContextLike,
 	) => Promise<StoreAccessContext>;
-	grants: RunBoundGrantRegistry;
 	rpc: DelegationRpc;
 	packageRoot: string;
-	now?: () => number;
 };
 
 type DelegationResult = {
@@ -55,7 +47,7 @@ type DelegationResult = {
 };
 
 type PreflightResult =
-	| { ok: true; grant: PrepareGrantInput }
+	| { ok: true }
 	| { ok: false; result: DelegationResult };
 
 function analystManifestValid(text: string): boolean {
@@ -148,19 +140,15 @@ function analystTask(input: DelegationInput): string {
 export class ResultDelegationService {
 	readonly #store: ToolResultStore;
 	readonly #resolveAccess: DelegationServiceOptions["resolveAccess"];
-	readonly #grants: RunBoundGrantRegistry;
 	readonly #rpc: DelegationRpc;
 	readonly #packageRoot: string;
-	readonly #now: () => number;
 	readonly #manifestAvailable: boolean;
 
 	constructor(options: DelegationServiceOptions) {
 		this.#store = options.store;
 		this.#resolveAccess = options.resolveAccess;
-		this.#grants = options.grants;
 		this.#rpc = options.rpc;
 		this.#packageRoot = options.packageRoot;
-		this.#now = options.now ?? Date.now;
 		try {
 			this.#manifestAvailable = analystManifestValid(
 				readFileSync(join(this.#packageRoot, ANALYST_MANIFEST_PATH), "utf8"),
@@ -181,49 +169,20 @@ export class ResultDelegationService {
 	): Promise<DelegationResult> {
 		const preflight = await this.#preflight(input, context, signal);
 		if (!preflight.ok) return preflight.result;
-		const pending = this.#grants.prepare(preflight.grant);
 		let runId: string;
 		try {
 			runId = await this.#rpc.spawn(this.#spawnParams(input), signal);
 		} catch (error) {
-			this.#grants.abort(pending);
 			const outcomeUnknown =
 				error instanceof SubagentRpcClientError &&
 				(error.code === "timeout" || error.code === "aborted");
 			return unavailable(
 				outcomeUnknown ? "spawn_outcome_unknown" : "spawn_failed",
 				outcomeUnknown
-					? "Delegation spawn outcome is unknown. No source grant was committed."
-					: "Delegation could not start. No source grant was committed.",
+					? "Delegation spawn outcome is unknown."
+					: "Delegation could not start.",
 				spawnErrorDiagnostics(error),
 			);
-		}
-
-		try {
-			await this.#grants.commit(pending, runId);
-		} catch {
-			let cleanupStatus = "interrupt_requested";
-			try {
-				await this.#rpc.interrupt(runId);
-			} catch {
-				cleanupStatus = "interrupt_failed";
-			}
-			return {
-				content: [
-					{
-						type: "text",
-						text: `Delegation run ${runId} started without source access; interruption was ${cleanupStatus === "interrupt_requested" ? "requested" : "not confirmed"}.`,
-					},
-				],
-				details: {
-					kind: "tool_result_delegation",
-					status: "delegation_failed",
-					reasonCode: "grant_commit_failed",
-					runId,
-					cleanupStatus,
-					actions: managementActions(runId),
-				},
-			};
 		}
 
 		return {
@@ -289,29 +248,7 @@ export class ResultDelegationService {
 					"Delegation RPC bridge lacks a required capability.",
 				),
 			};
-		const grant: PrepareGrantInput = {
-			agentName: RESULT_ANALYST_RUNTIME_NAME,
-			sourceIds: [input.sourceId],
-			operations: ["outline", "search", "get"],
-			budget: {
-				calls: DELEGATION_TOOL_CALL_BUDGET,
-				outputBytes:
-					PROTECTED_TOOL_OUTPUT_BYTE_LIMIT * DELEGATION_TOOL_CALL_BUDGET,
-			},
-			expiresAt: this.#now() + DELEGATION_GRANT_TTL_MS,
-		};
-		try {
-			this.#grants.assertFeasible(grant);
-		} catch {
-			return {
-				ok: false,
-				result: unavailable(
-					"grant_unavailable",
-					"Delegation grant is not feasible.",
-				),
-			};
-		}
-		return { ok: true, grant };
+		return { ok: true };
 	}
 
 	#spawnParams(input: DelegationInput): SubagentSpawnParams {

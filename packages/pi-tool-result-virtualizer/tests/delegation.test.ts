@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readdir } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -7,14 +7,10 @@ import { fileURLToPath } from "node:url";
 
 import {
 	type DelegationRpc,
+	RESULT_ANALYST_RUNTIME_NAME,
 	ResultDelegationService,
 } from "../src/delegation.ts";
 import type { ExtensionEventBusLike } from "../src/extension-types.ts";
-import { PROTECTED_TOOL_OUTPUT_BYTE_LIMIT } from "../src/formatting.ts";
-import {
-	RESULT_ANALYST_RUNTIME_NAME,
-	RunBoundGrantRegistry,
-} from "../src/grants.ts";
 import { ToolResultStore } from "../src/store.ts";
 import {
 	SUBAGENT_RPC_PROTOCOL_VERSION,
@@ -67,9 +63,7 @@ class FakeRpc implements DelegationRpc {
 	spawnRunId = "run-1";
 	pingError: Error | undefined;
 	spawnError: Error | undefined;
-	interruptError: Error | undefined;
 	spawnCalls: SubagentSpawnParams[] = [];
-	interruptCalls: string[] = [];
 
 	isReady(): boolean {
 		return this.ready;
@@ -86,10 +80,7 @@ class FakeRpc implements DelegationRpc {
 		return this.spawnRunId;
 	}
 
-	async interrupt(runId: string): Promise<void> {
-		this.interruptCalls.push(runId);
-		if (this.interruptError) throw this.interruptError;
-	}
+	async interrupt(_runId: string): Promise<void> {}
 }
 
 async function storedSource(root: string, marker = "DELEGATION_SOURCE") {
@@ -120,7 +111,6 @@ function service(
 			actor: overrides.access ?? "parent",
 			projectId: overrides.projectId ?? PROJECT_ID,
 		}),
-		grants: new RunBoundGrantRegistry(root, { commitWaitMs: 0 }),
 		rpc,
 		packageRoot: overrides.packageRoot ?? PACKAGE_ROOT,
 	});
@@ -357,7 +347,7 @@ test("subagent callers cannot delegate or probe RPC readiness", async () => {
 	assert.equal(rpc.spawnCalls.length, 0);
 });
 
-test("explicit delegation spawns once, commits the returned run, and exposes typed actions", async () => {
+test("explicit delegation spawns one bounded analyst and exposes typed actions", async () => {
 	const { dir } = await makeStore();
 	const source = await storedSource(dir);
 	const rpc = new FakeRpc();
@@ -385,8 +375,10 @@ test("explicit delegation spawns once, commits the returned run, and exposes typ
 	assert.equal(spawn?.agent, RESULT_ANALYST_RUNTIME_NAME);
 	assert.equal(spawn?.context, "fresh");
 	assert.equal(spawn?.async, true);
+	assert.equal(spawn?.timeoutMs, 240_000);
 	assert.equal(spawn?.toolBudget?.hard, 8);
 	assert.deepEqual(spawn?.toolBudget?.block, "*");
+	assert.deepEqual(spawn?.maxOutput, { bytes: 8_192, lines: 200 });
 	const task = spawn?.task ?? "";
 	assert.match(task, new RegExp(source.sourceId));
 	assert.match(task, /Objective: Find the root cause\./);
@@ -396,19 +388,10 @@ test("explicit delegation spawns once, commits the returned run, and exposes typ
 	assert.match(task, /line citations/i);
 	assert.match(task, /Uncertainty: explicit unknowns or none\./);
 	assert.match(task, /Residual risks: explicit remaining risks or none\./);
-	assert.doesNotMatch(task, /grant/i);
 	assert.doesNotMatch(JSON.stringify(result), new RegExp(source.sourceId));
-
-	await new RunBoundGrantRegistry(dir, { commitWaitMs: 0 }).reserve({
-		runId: "run-1",
-		agentName: RESULT_ANALYST_RUNTIME_NAME,
-		operation: "get",
-		sourceIds: [source.sourceId],
-		outputBytes: PROTECTED_TOOL_OUTPUT_BYTE_LIMIT,
-	});
 });
 
-test("spawn failure aborts the pending grant and returns bounded RPC diagnostics", async () => {
+test("spawn failure returns bounded RPC diagnostics", async () => {
 	const { dir } = await makeStore();
 	const source = await storedSource(dir);
 	const rpc = new FakeRpc();
@@ -427,7 +410,6 @@ test("spawn failure aborts the pending grant and returns bounded RPC diagnostics
 	assert.equal(result.details?.clientErrorCode, "rpc_error");
 	assert.equal(result.details?.rpcErrorCode, "execution_failed");
 	assert.doesNotMatch(JSON.stringify(result), /sensitive spawn failure/);
-	await assert.rejects(readdir(join(dir, "grants")), { code: "ENOENT" });
 });
 
 test("spawn failure omits malformed RPC codes and raw messages", async () => {
@@ -448,10 +430,9 @@ test("spawn failure omits malformed RPC codes and raw messages", async () => {
 	assert.equal(result.details?.clientErrorCode, "rpc_error");
 	assert.equal(result.details?.rpcErrorCode, undefined);
 	assert.doesNotMatch(JSON.stringify(result), /sensitive malformed reply|not-bounded/);
-	await assert.rejects(readdir(join(dir, "grants")), { code: "ENOENT" });
 });
 
-test("spawn timeout returns unknown outcome without committing source access", async () => {
+test("spawn timeout returns an unknown outcome", async () => {
 	const { dir } = await makeStore();
 	const source = await storedSource(dir);
 	const rpc = new FakeRpc();
@@ -466,46 +447,4 @@ test("spawn timeout returns unknown outcome without committing source access", a
 	assert.equal(result.details?.clientErrorCode, "timeout");
 	assert.equal(result.details?.rpcErrorCode, undefined);
 	assert.doesNotMatch(JSON.stringify(result), /sensitive timeout/);
-	await assert.rejects(readdir(join(dir, "grants")), { code: "ENOENT" });
-});
-
-test("grant commit failure interrupts the spawned run and returns management actions", async () => {
-	const { dir } = await makeStore();
-	const source = await storedSource(dir);
-	const existingRegistry = new RunBoundGrantRegistry(dir, { commitWaitMs: 0 });
-	await existingRegistry.commit(
-		existingRegistry.prepare({
-			agentName: RESULT_ANALYST_RUNTIME_NAME,
-			sourceIds: [source.sourceId],
-			operations: ["get"],
-			budget: {
-				calls: 1,
-				outputBytes: PROTECTED_TOOL_OUTPUT_BYTE_LIMIT,
-			},
-			expiresAt: Date.now() + 60_000,
-		}),
-		"run-1",
-	);
-	const rpc = new FakeRpc();
-	const result = await service(dir, rpc).delegate(
-		{ sourceId: source.sourceId, task: "Summarize" },
-		{ cwd: dir },
-	);
-
-	assert.equal(status(result), "delegation_failed");
-	assert.equal(result.details?.reasonCode, "grant_commit_failed");
-	assert.deepEqual(rpc.interruptCalls, ["run-1"]);
-	assert.equal(result.details?.runId, "run-1");
-	assert.equal(result.details?.cleanupStatus, "interrupt_requested");
-	assert.equal((result.details?.actions as unknown[] | undefined)?.length, 2);
-
-	const failedCleanupRpc = new FakeRpc();
-	failedCleanupRpc.interruptError = new Error("interrupt failed");
-	const failedCleanup = await service(dir, failedCleanupRpc).delegate(
-		{ sourceId: source.sourceId, task: "Summarize" },
-		{ cwd: dir },
-	);
-	assert.equal(status(failedCleanup), "delegation_failed");
-	assert.equal(failedCleanup.details?.cleanupStatus, "interrupt_failed");
-	assert.doesNotMatch(JSON.stringify(failedCleanup), /interrupt failed/);
 });

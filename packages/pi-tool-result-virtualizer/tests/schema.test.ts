@@ -65,8 +65,8 @@ test("tool-result parameter descriptions stay compact and explicit", () => {
 				"properties.reason": "Optional purpose for session search; byte-capped in details.",
 			},
 			tool_result_search: {
-				"properties.includeGlobal": "Include every project scope; parent-only; default false.",
-				"properties.includeLegacy": "Include legacy sources without verified project provenance; parent-only; default false.",
+				"properties.includeGlobal": "Include every project scope; default false.",
+				"properties.includeLegacy": "Include legacy sources without verified project provenance; default false.",
 				"properties.query": "Non-blank, case-insensitive substring",
 				"properties.sourceId": "Optional Receipt source ID: tr_[a-z0-9_]+, at most 128 bytes",
 				"properties.sourceIds.items": "Receipt source ID: tr_[a-z0-9_]+, at most 128 bytes",
@@ -82,20 +82,20 @@ test("tool-result parameter descriptions stay compact and explicit", () => {
 				"properties.task": "Analysis objective; return cited findings, uncertainty, risks, and access/completion status.",
 			},
 			tool_result_list: {
-				"properties.includeGlobal": "Include every project scope; parent-only; default false.",
-				"properties.includeLegacy": "Include legacy sources without verified project provenance; parent-only; default false.",
+				"properties.includeGlobal": "Include every project scope; default false.",
+				"properties.includeLegacy": "Include legacy sources without verified project provenance; default false.",
 				"properties.limit": "Recent sources to list",
 				"properties.reason": "Optional purpose for session search; byte-capped in details.",
 			},
 			tool_result_diagnostics: {
-				"properties.includeGlobal": "Include every project scope; parent-only; default false.",
-				"properties.includeLegacy": "Include legacy sources without verified project provenance; parent-only; default false.",
+				"properties.includeGlobal": "Include every project scope; default false.",
+				"properties.includeLegacy": "Include legacy sources without verified project provenance; default false.",
 				"properties.limit": "Recent sources to summarize",
 				"properties.reason": "Optional purpose for session search; byte-capped in details.",
 			},
 			tool_result_retention_preview: {
-				"properties.includeGlobal": "Include every project scope; parent-only; default false.",
-				"properties.includeLegacy": "Include legacy sources without verified project provenance; parent-only; default false.",
+				"properties.includeGlobal": "Include every project scope; default false.",
+				"properties.includeLegacy": "Include legacy sources without verified project provenance; default false.",
 				"properties.maxSources": "Candidates older than the newest maxSources sources",
 				"properties.maxAgeHours": "Candidates older than this many hours",
 				"properties.limit": "Candidate and kept source IDs to show (default 20)",
@@ -104,5 +104,5 @@ test("tool-result parameter descriptions stay compact and explicit", () => {
 		},
 	);
 
-	assert.equal(Buffer.byteLength(JSON.stringify(schemas)), 4_736);
+	assert.equal(Buffer.byteLength(JSON.stringify(schemas)), 4_632);
 });
