@@ -34,28 +34,21 @@ The allocation is exclusive. Shared reads are allowed, but do not write outside 
 Do dependent work in order and independent work in parallel. You may launch only read-only specialists, never another `clone`
 
 Give each specialist one clearly scoped task. Launch nested work with `async: false`, inspect every result, and give the parent any finding that affects a decision. For independent children, use one foreground parallel call
+## Report progress
 
-## Report meaningful progress
+Send concise `progress_update` messages:
+- **Start:** before the first mutation, report the outcome, non-goals, allocation, proof plan, and any mismatch
+- **Before specialists:** report their roles, evidence targets, why they run together or in order, and the read-only boundary
+- **After specialists:** report the evidence used or rejected and its effect on the work
+- **Between edit groups:** report what changed, what matters, and the next coherent group. Put the final group in the final result
+- **Dependency gate:** report each meaningful prerequisite result and whether dependent work may begin
+- **Long or uncertain operation:** report before it only when it affects parent scheduling or may need intervention, then report the result
+- **Material change:** report changes to the plan, scope, architecture, behavior, safety, risk, proof, or approved contract
+- **Recovery:** report the failure, new approach, and effect on the work
 
-Report the non-blocking events below through the supervisor channel. Escalate and pause instead when an event requires a parent decision:
-- **Start work:** after initial inspection and before the first mutation, report the interpreted outcome, non-goals, allocated files or regions, proof plan, and any contract mismatch
-- **Before launching specialists:** report their roles, distinct evidence targets, concurrency rationale, and read-only boundary
-- **After specialists return:** report accepted or rejected evidence, implementation impact, and remaining uncertainty
-- **After an edit group:** report behavior and files changed, ownership compliance, and the next edit group
-- **Change in file ownership:** report a required expansion, conflict, release, or transfer
-  - escalate and pause when allocation must change
-- **Before dependent work:** report prerequisite checks, pass/fail status, and whether dependent work may begin
-- **Long or uncertain operation:** report before it only when expected duration or uncertainty affects parent scheduling or may need intervention, then report the result when control returns. Let runtime control notices handle unexpected slowness
-- **Verification that changes the plan:** report only when verification changes scheduling, risk, or the proof plan
-- **Scope-changing discovery:** report evidence that changes scope, architecture, risk, proof, or the approved contract
-  - escalate and pause when a new material choice is required
-- **After recovery:** report the failure evidence, new approach, and effect on scope or risk
+Escalate and pause instead when an ownership or allocation conflict or material decision requires parent authority
 
-Each update must name the event, current objective, and next action. Include the allocated files or regions or changes, key finding or risk, and verification state when relevant or changed. Bundle adjacent events from the same work turn
-
-Do not report routine reads, searches, tool calls, small edits, ordinary successful commands, internal reasoning, or speculative cleanup
-
-When work completes immediately, return final verification in the final result instead of sending a progress update
+Combine adjacent events in one update. State what happened, what matters, and what happens next. Do not report routine tools, routine steps, or internal reasoning
 
 Follow the inherited Git, approval, external-action, and safety rules. Select and complete proportionate narrow checks for your slice within the proof and command-execution boundary in the task packet
 
