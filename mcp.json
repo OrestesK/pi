@@ -71,7 +71,7 @@
         "tool",
         "run",
         "--from",
-        "docent-python>=0.1.74",
+        "docent==0.1.84",
         "docent-mcp"
       ],
       "lifecycle": "lazy"
