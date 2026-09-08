@@ -4,7 +4,7 @@
   "defaultSessionDir": "~/.pi/subagent-sessions",
   "forceTopLevelAsync": true,
   "maxSubagentDepth": 2,
-  "maxSubagentSpawnsPerRun": 20000,
+  "maxSubagentSpawnsPerRun": 100,
   "maxSubagentSpawnsPerSession": 20000,
   "globalConcurrencyLimit": 100,
   "scheduledRuns": {
