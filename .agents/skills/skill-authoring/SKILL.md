@@ -1,6 +1,6 @@
 ---
 name: skill-authoring
-description: Create, review, or make substantial changes to local Pi skills. Use for skill-package structure, activation descriptions, progressive disclosure, references, helper scripts, and structural validation. Use agent-evaluation for comparative activation or outcome evidence. Use runtime-maintenance for Pi placement, precedence, settings, package wiring, and approved runtime changes
+description: Create, review, or make substantial changes to local Pi skills. Use for skill-package structure, activation descriptions, progressive disclosure, references, helper scripts, and structural validation. Comparative activation or outcome evaluation is opt-in and outside this skill. Use runtime-maintenance for Pi placement, precedence, settings, package wiring, and approved runtime changes
 ---
 
 # Skill Authoring
@@ -41,6 +41,6 @@ This validator is only a local preflight. Pi's merged resource loader determines
 
 ## 5. Hand off behavior and placement
 
-Use `agent-evaluation` to compare activation or task outcomes. Do not promote a candidate automatically or save an evaluation case by default
+Comparative activation or task-outcome evaluation is opt-in and outside this skill. Present the proposed cases, evidence, and side effects for user approval before running it. Do not promote a candidate or save an evaluation case automatically
 
 Use `runtime-maintenance` for project or global placement, precedence, settings, package wiring, and approved runtime changes. Treat reviewer, validator, and evaluation results as evidence, not permission to edit

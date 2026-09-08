@@ -1,16 +1,16 @@
 ---
 name: clone
 description: Implements one clearly scoped task that needs judgment and may coordinate read-only specialists
-# Explicitly preserve normal core tools and current functional extensions while enabling child-safe fanout
-tools: read, grep, find, ls, bash, edit, write, mcp, mcpScript, pi_lens_activate_tools, ast_grep_search, ast_grep_replace, ast_grep_outline, ast_grep_dump, lsp_navigation, lsp_diagnostics, lens_diagnostics, lens_diagnostic_mark, symbol_search, project_report, module_report, read_symbol, read_enclosing, tool_result_outline, tool_result_get, tool_result_search, tool_result_delegate, web_search, fetch_content, get_search_content, subagent
-extensions: ~/.config/pi/packages/pi-fff/src/index.ts, ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.config/pi/packages/pi-lens/dist/index.js, ~/.npm-global/lib/node_modules/pi-web-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts
+# Inherit normal built-in tools while loading only the headless extensions Clone needs
+extensions: ~/.config/pi/packages/pi-fff/src/index.ts, ~/.config/pi/packages/pi-hashline-edit-pro/index.ts, ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.config/pi/packages/pi-lens/dist/index.js, ~/.npm-global/lib/node_modules/pi-web-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.npm-global/lib/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts
+mutationTools: replace, undo_last_replace
+allowNestedSubagents: true
 model: inherit
 systemPromptMode: append
 inheritProjectContext: true
 inheritGlobalContext: true
 inheritSkills: true
 defaultContext: fork
-completionGuard: false
 ---
 
 # Clone Agent

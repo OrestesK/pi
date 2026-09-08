@@ -34,13 +34,6 @@ mcp-onboarding.json
 /skills/pi-cleanup
 /skills/pi-memory-curation
 /.agents/skills/*
-!/.agents/skills/agent-evaluation/
-/.agents/skills/agent-evaluation/*
-!/.agents/skills/agent-evaluation/SKILL.md
-!/.agents/skills/agent-evaluation/references/
-/.agents/skills/agent-evaluation/references/*
-!/.agents/skills/agent-evaluation/references/evaluation-record.md
-!/.agents/skills/agent-evaluation/references/skill-activation-profile.md
 !/.agents/skills/skill-authoring/
 /.agents/skills/skill-authoring/*
 !/.agents/skills/skill-authoring/SKILL.md

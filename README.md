@@ -21,7 +21,7 @@ This is the canonical map of configuration surfaces. The `Kind` column distingui
 | [`keybindings.json`](keybindings.json) | Runtime config | Terminal keybindings |
 | [`agents/`](agents/) | Executable prompts | Local subagent roles; same-name files override packaged builtins |
 | [`skills/`](skills/) | Executable workflows | On-demand workflows and domain guidance |
-| [`.agents/skills/`](.agents/skills/) | Project workflows | `agent-evaluation` and `skill-authoring` are project-scoped, narrowly allowlisted, and tracked. Other project-local skills remain ignored |
+| [`.agents/skills/`](.agents/skills/) | Project workflows | `skill-authoring` is project-scoped, narrowly allowlisted, and tracked. Other project-local skills remain ignored |
 | [`extensions/`](extensions/) | Runtime code/config | Commands, UI helpers, and guardrails |
 | [`mcp-servers/`](mcp-servers/) | Runtime code | Local MCP implementations |
 | [`themes/`](themes/) | Runtime config | TUI themes |

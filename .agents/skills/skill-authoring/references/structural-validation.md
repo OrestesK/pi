@@ -53,4 +53,4 @@ Exit codes:
 - `1`: validation errors
 - `2`: missing `yq` dependency or invalid CLI usage
 
-The validator is read-only. It does not install dependencies, mutate the candidate, score prose, execute a model, or prove effective Pi precedence. After local validation, use `runtime-maintenance` to verify placement and Pi's merged discovery diagnostics. Use `agent-evaluation` only when behavioral activation evidence is required and authorized.
+The validator is read-only. It does not install dependencies, mutate the candidate, score prose, execute a model, or prove effective Pi precedence. After local validation, use `runtime-maintenance` to verify placement and Pi's merged discovery diagnostics. Behavioral activation evaluation is a separate opt-in task and requires explicit user approval

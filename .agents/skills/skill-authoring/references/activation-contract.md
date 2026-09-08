@@ -44,4 +44,4 @@ Prepare a small activation profile with:
 - negative control
 - fresh-context case
 
-`skill-authoring` defines these cases but does not judge model behavior. Hand comparative activation evidence to `agent-evaluation`. Structural discovery only proves that the catalog exposes the description; it does not prove that a model will load the skill.
+`skill-authoring` defines these cases but does not judge model behavior. Comparative activation evaluation is a separate opt-in task. Structural discovery only proves that the catalog exposes the description; it does not prove that a model will load the skill
