@@ -261,9 +261,9 @@ You must not:
 
 ### Workflow routing
 
-Load the named skill when relevant. Mechanical work may skip specialized workflows when no meaningful behavior, uncertainty, or verification surface exists:
+Load the named skill when relevant. Treat work as nontrivial when it involves meaningful behavior, material uncertainty, or a verification surface. Mechanical work may skip specialized workflows only when none apply:
 - Vague idea, feature shape, design, or placement → `brainstorming`
-- Implementation, refactor, migration, or service work that needs a reviewed proposal and approval before editing → `manager-workflow`
+- Implementation, refactor, migration, or service work → `manager-workflow` when it needs a reviewed proposal and approval before editing or reaches final evidence
 - Technical specifications, architecture proposals, or approved work needing a durable implementation plan → `writing-plans`
 - Evidence strategy for a behavior change or bug fix → `behavioral-proof`
 - Tests, helpers, fixtures, mocks, or test-review feedback → `writing-tests`

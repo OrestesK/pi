@@ -1,6 +1,6 @@
 ---
 name: manager-workflow
-description: Use for managing implementation work through proposal, approval, execution, and review
+description: Use for managing implementation work, including proposal, approval, approved-plan continuation, execution, review, and final evidence
 ---
 
 # Manager Workflow
@@ -33,6 +33,19 @@ Implementation approval covers the observable result, non-goals, relevant risks,
 
 A later user correction replaces conflicting terms and makes affected child work stale. When the correction changes the approved result, boundaries, or proof, show and review the amended proposal before mutating again
 
+### Trace approved requirements
+
+When this workflow applies:
+- Give each material approved requirement a short ID such as `R1`. Give no ID to implementation details, ownership or ordering constraints, supporting work, tasks, proof, non-goals, or decisions. Keep the trace in the existing task contract or plan. Do not add another artifact, approval, or stage
+- Record where the requirement came from, its normal entrypoint, canonical owner, planned proof and expected observation, and existing implementation tasks when present
+- Carry the IDs through plans, child tasks, proof reports, review packets, and final evidence. Internal handoffs and delegated results state the IDs they cover and any missing or unverified relationship
+- Every material change must point back to an approved requirement. Supporting work must be necessary for its linked requirement and add no separate behavior or material decision. Review requirements forward to implementation and proof, and changes back to requirements
+- When a requirement changes, keep its ID and treat its full trace, affected tasks, implementation, evidence, handoffs, and reviews as stale until refreshed. Give new IDs only to new requirements
+- At final evidence, account for every material change and every ID with fresh proof or the exact unverified boundary. If any material requirement remains unverified, report `INCONCLUSIVE` instead of complete
+
+Stop affected work when a required relationship is missing or stale. A different label or layout is not a defect when the relationship is clear
+
+Keep IDs internal unless the user asks or they clarify a gap or decision. Show a short plain-language requirement and proof summary
 ### Keep the stage and findings visible
 
 When you enter this workflow, whenever you enter a manager stage, and after a user correction, give the normal progress update. Name the current stage and approval or decision status. After a correction, also say what was dropped or superseded. Use one update
@@ -78,8 +91,6 @@ While a manager stage is active, completed handoffs from these skills return her
 - `review`
 
 These handoffs do not create another implementation-approval path
-
-Do not start this workflow for mechanical work that needs no proposal or implementation approval
 
 ## Planning
 
