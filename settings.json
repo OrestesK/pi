@@ -150,10 +150,10 @@
     },
     "tape": {
       "enabled": true,
-      "onlyGit": true,
+      "onlyGit": false,
       "thread": false,
       "context": {
-        "strategy": "recent-only",
+        "strategy": "smart",
         "whitelist": [
           "../global/core"
         ]
