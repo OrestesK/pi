@@ -1,6 +1,6 @@
 {
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-sol",
+  "defaultModel": "gpt-6-astra",
   "defaultThinkingLevel": "high",
   "theme": "gruvbox-custom",
   "quietStartup": true,
@@ -132,7 +132,7 @@
     },
     "packages/pi-sixel",
     "npm:@carter-mcalister/pi-codex-image-gen@0.2.0",
-    "npm:pisesh@0.3.0",
+    "/home/orestes/Sources/pisesh",
     "npm:pi-btw@0.4.1",
     "npm:pi-goal-x@0.27.4"
   ],
@@ -188,6 +188,7 @@
     "openai-codex/gpt-5.5",
     "openai-codex/gpt-5.6-luna",
     "openai-codex/gpt-5.6-sol",
-    "openai-codex/gpt-5.6-terra"
+    "openai-codex/gpt-5.6-terra",
+    "openai-codex/gpt-6-astra"
   ]
 }
