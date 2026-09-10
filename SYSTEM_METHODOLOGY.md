@@ -101,6 +101,8 @@ The complete proposal is reviewed before implementation. I receive the recommend
 
 After approval, Main selects direct work, Worker, or Clone from the judgment and dependency boundary, allocates non-overlapping writes, and keeps independent work moving
 
+For PR work, publishing and CI run alongside implementation and review rather than waiting for final verification. `AGENTS.md` owns the publication and check rules
+
 Detailed routing, packets, coordination, and tool rules remain in `AGENTS.md` and the effective role prompts. Runtime packages execute launches and enforce only the behavior they actually own
 
 ### 4. Review and correct
