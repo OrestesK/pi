@@ -31,5 +31,3 @@ Use specific valid code patterns and limit them to the relevant paths. If a sear
 ## LSP use
 
 Pass paths through each tool's registered `path` or `paths` parameter. When workspace symbol lookup or project resolution needs context, start from a real project file. If usage-site results can be partial, query references from the definition
-
-Run targeted LSP diagnostics after each coherent code-edit group and once more after the final relevant edit. If a needed semantic or diagnostic check is unavailable or does not apply, state exactly why

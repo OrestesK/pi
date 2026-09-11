@@ -40,7 +40,7 @@ After the review:
    - the PR link
    - a one-sentence purpose
    - the requested review level: `stamp`, `focused`, or `deep`
-   - the live-test status
+   - the live-test status, unless it adds no useful information
    - the most useful area to inspect
 
 Draft PR-description changes and update GitHub only with the user’s approval

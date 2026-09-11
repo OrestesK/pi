@@ -34,8 +34,6 @@ Default to the managed browser-use browser. Do **not** start by trying to attach
 
 For read-only cookie or storage inspection, prefer names and metadata. Retrieve only values the task needs. Do not repeat secret values in chat or persist them in files unless the task requires that data and the applicable authorization boundary permits its disclosure or persistence
 
-This is a local reminder. The global authorization rules remain the canonical policy owner
-
 ## Recovery and cleanup
 
 - Only for a task-owned managed browser started for this task, run `browser-use close` after a command failure and retry. Never use `browser-use close` as automatic recovery after `connect`, `cloud connect`, or a `--profile` session

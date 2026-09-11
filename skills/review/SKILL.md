@@ -104,8 +104,7 @@ Use the broader tier when classification is unclear. Continue only while a new v
 
 A final `PASS` requires current coverage of all six base angles and every validated required finding to be fixed or explicitly deferred by the user
 
-Only validated, mechanically local, non-material fixes inside the approved behavior may continue automatically. Automatic continuation does not select the writer
-use the active global ownership rules. Final claim-bound verification is still required
+Only validated, mechanically local, non-material fixes inside the approved behavior may continue automatically. Automatic continuation does not select the writer. Final claim-bound verification is still required
 
 A validated user choice does not fail the implementation and does not authorize work. Present it to the user before final completion
 
@@ -164,11 +163,10 @@ Check feasibility before implementation:
 - all material phases, changed and unchanged behavior, assumptions, uncertainties, risks, alternatives, tradeoffs, reversibility, evidence, and focus points are present
 - tasks are ordered and small
 - likely owners and commands are specific enough without turning them into the user approval boundary
-- the selected behavioral-proof strategy matches each material claim
 - protected-action triggers, exclusions, and stop conditions are identified
 - no mutating Git instructions are included
 
-Review the visible draft asynchronously. The parent integrates supported findings and re-presents the complete revised plan before asking implementation approval
+Review the visible draft asynchronously. The parent integrates supported findings before asking implementation approval
 
 ### 4. Review Feedback Evaluation
 
@@ -177,7 +175,7 @@ Treat review feedback as evidence to evaluate, not an order to obey blindly
 For each item:
 1. Read the full feedback before reacting
 2. Verify it against code, tests, plan, and constraints
-3. Apply the global three-way classification:
+3. Apply the three-way classification:
    - required fix
    - user choice
    - rejected suggestion
@@ -219,13 +217,13 @@ Do not fetch or mutate Git to resolve a target. Ordinary working-tree review is 
 ## How to Review
 
 - Read the approved behavior/non-goals, relevant decisions, plan/spec, proof/evidence, and actual target/effective change before judging
-- Follow the active global instructions already in context, specifically the procedure in the `Changed files and diffs` section, before reviewer dispatch. Review the resulting total effective diffs and the bodies of every in-scope untracked file
+- Before reviewer dispatch, review the total effective diffs and the bodies of every in-scope untracked file
 - Treat ownership/navigation, LSP semantics/relationships, AST structure/search/refactor, and diagnostics as separate relevance-gated evidence groups. Use every materially relevant group and state why an expected group is unavailable or inapplicable
   - do not call irrelevant groups mechanically
 - Inspect available test evidence when it materially improves review confidence
 - Cite file paths and line numbers for findings
 - Categorize reported items as a required fix, user choice, outside-angle pointer, or nonblocking extra
-- Follow the active global instructions already in context, specifically the artifact permission and override policy in the `.scratch/ workspace` section. Return findings inline unless an explicit output path or wrapper capture is provided
+- Return findings inline unless an explicit output path or wrapper capture is provided
   - use `.scratch/reviews/` for allowed review artifacts. Do not use shell writes to create them
 
 ## Delegated Reviewer Subagents

@@ -50,7 +50,7 @@ Escalate and pause instead when an ownership or allocation conflict or material 
 
 Combine adjacent events in one update. State what happened, what matters, and what happens next. Do not report routine tools, routine steps, or internal reasoning
 
-Follow the inherited Git, approval, external-action, and safety rules. Select and complete proportionate narrow checks for your slice within the proof and command-execution boundary in the task packet
+Select and complete proportionate narrow checks for your slice within the proof and command-execution boundary in the task packet
 
 Do not perform a separate implementation-readiness review or launch reviewer fanout. The parent coordinates review and integration decisions
 

@@ -13,8 +13,8 @@ it does not replace code review. Load `review` for the review itself and `github
 - Use `gh` only for GitHub operations. Never use GitHub MCP
 - Before a GitHub mutation, the user must request and explicitly approve the exact tool (`gh`), command, action, target, and expected effect. Follow `github` for the remaining disclosure and wait requirements
 - Recheck the PR head immediately before quoting or posting comments
-- Verify every finding from source, diff, checks, docs, prior comments, and the proof method selected through `github` → `behavioral-proof`
-- Use the proof method that `github` selects through `behavioral-proof`. Do not run a live, external, credentialed, or effectful probe until its approval gate allows it. If a meaningful live check does not run, name the strongest non-live evidence and say what live behavior remains unchecked
+- Verify every finding from source, diff, checks, docs, prior comments, and the selected proof method
+- Use the selected proof method. Do not run a live, external, credentialed, or effectful probe until its approval gate allows it. If a meaningful live check does not run, name the strongest non-live evidence and say what live behavior remains unchecked
 - State assumptions. If a finding depends on one, ask it as a question
   - drop it when the assumption is weak or unverifiable
 - Drop speculative "what if" nits unless the user explicitly asks for exhaustive hypotheticals
@@ -80,7 +80,7 @@ Before drafting comments:
 
 Post only findings that pass all gates:
 - **Evidence:** Direct source/diff/test/docs/CI evidence exists
-- **Claim-bound proof:** The method selected through `github` → `behavioral-proof` directly supports the claim. If live proof did not run, name the strongest non-live evidence and the live behavior that remains unchecked
+- **Claim-bound proof:** The selected proof method directly supports the claim. If live proof did not run, name the strongest non-live evidence and the live behavior that remains unchecked
 - **Impact:** The comment explains why it matters
 - **Actionability:** The author can fix it, answer a focused question, or intentionally decline it
 - **Scope:** The issue belongs to this PR, not unrelated old code
@@ -146,12 +146,12 @@ Proposed fix/question:
 - Assuming <specific assumption>, should we <recommended direction>? If that assumption is wrong, what should this path optimize for instead?
 ```
 
-For tiny comments, it is okay to collapse bullets into short paragraphs, but do not omit evidence or verification when the user asked for verified comments. Include a live test, build, import, or runtime result only when the proof method selected through `github` → `behavioral-proof` includes that probe
+For tiny comments, it is okay to collapse bullets into short paragraphs, but do not omit evidence or verification when the user asked for verified comments. Include a live test, build, import, or runtime result only when the selected proof method includes that probe
 otherwise report the selected non-live evidence and any applicable unverified boundary
 
 ## Claim Verification Examples
 
-The preflight loads `github`, which reaches `behavioral-proof`. Use its selected method for each falsifiable claim. These examples describe possible evidence
+Use the selected proof method for each falsifiable claim. These examples describe possible evidence
 they do not authorize or require command execution:
 - packaging/import claims: wheel/sdist inspection or an installed-package import result
 - type/schema claims: typecheck, schema-generation, OpenAPI-generation, or serialization/validation results
@@ -203,7 +203,7 @@ In comment text, use lightweight severity only when useful:
 1. List candidate findings, sorted with simplification/design/architecture/structure/source-of-truth/deduplication/typing-boundary issues first
 2. For each candidate, write a one-line falsifiable claim
 3. Verify it from source/diff/checks
-4. Use the proof method selected through `github` → `behavioral-proof`. If a meaningful live check does not run, record the strongest non-live evidence, name the unchecked live behavior, and lower confidence when that gap matters
+4. Use the selected proof method. If a meaningful live check does not run, record the strongest non-live evidence, name the unchecked live behavior, and lower confidence when that gap matters
 5. List every assumption the claim depends on. If the finding only works when an assumption is true, phrase the comment as a question
    if the assumption is weak or not worth asking, drop it
 6. Mark it:

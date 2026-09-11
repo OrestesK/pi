@@ -14,11 +14,11 @@ For every nontrivial new diagram, complete these design and validation steps bef
 4. Decide who will read the diagram, its one-sentence takeaway, output size, overview or detail level, required claims, and non-goals
 5. Make a semantic cut: choose the facts the diagram needs to show. Do not force every source fact onto one canvas. Ask for approval before omitting or materially abstracting facts
 6. Use the overview budget by default: at most 9 primary nodes, 11 primary edges, 3 callouts, 5 accent families, one feedback loop, and one obvious endpoint. Split into panels or another diagram when exceeded
-7. Construct and screenshot in stages: skeleton → primary arrows → optional clusters. Do not generate a complex full scene in one batch
+7. Construct and screenshot in stages: skeleton → primary arrows → optional clusters
 8. Run the native scene audit and inspect the final export at native, 50%, 35%, and grayscale sizes
-9. For nontrivial work, run a broad blind adversarial review. A reviewer prompted only to confirm previous fixes is not a final gate
+9. For nontrivial work, run a broad blind adversarial review
 
-Valid JSON and successful canvas commands do not prove the diagram is ready. It must also have complete labels, the allowed arrow count, no clipping at full zoom, and pass the required reviews
+The diagram must have complete labels, the allowed arrow count, no clipping at full zoom, and pass the required reviews
 
 ## Step 0: Pick an Interface
 

@@ -93,7 +93,7 @@ Trivial contained work proceeds directly. Ambiguous or material design work ente
 
 ### 2. Prepare and approve the change
 
-`manager-workflow` owns the proposal, approval, implementation, review, and completion stages for nontrivial implementation work. `brainstorming` resolves open design choices. `writing-plans` records architecture or execution detail when it is useful
+`AGENTS.md` owns the proposal, approval, implementation, review, and completion stages for nontrivial implementation work. `brainstorming` resolves open design choices. `writing-plans` records architecture or execution detail when it is useful
 
 The complete proposal is reviewed before implementation. I receive the recommendation, evidence, material trade-offs, changed and unchanged behavior, risks, checks, and exact approval boundary
 
@@ -107,7 +107,7 @@ Detailed routing, packets, coordination, and tool rules remain in `AGENTS.md` an
 
 ### 4. Review and correct
 
-`review` owns independent coverage, angle definitions, finding groups, and proportionate follow-up. `manager-workflow` owns the transition into review and the final gate
+`review` owns independent coverage, angle definitions, finding groups, and proportionate follow-up. `AGENTS.md` owns the transition into review and the final gate
 
 ### 5. Verify and report
 
@@ -129,9 +129,8 @@ A completion claim must follow the current evidence. Agent confidence, stale out
 - `skills/` owns progressively disclosed workflow and domain procedures
 - `.agents/skills/` owns project-scoped maintenance workflows
 - `agents/` owns role-specific child prompts
-- `manager-workflow` owns the material implementation lifecycle
+- `AGENTS.md` owns the material implementation lifecycle
 - `review` owns review method and coverage
-- `behavioral-proof` owns evidence selection
 - `writing-tests` owns test quality and placement
 
 A workflow or role named here remains governed by its current canonical file. This document does not restate its detailed procedure

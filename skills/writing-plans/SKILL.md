@@ -35,8 +35,6 @@ Not allowed:
 - Claim that a planned check passed
 - Include mutating Git commands for the agent to run
 
-When the user asks for a plan, show it in the conversation. When this skill supports `manager-workflow`, return the detailed plan to the manager. The manager gives the user the short explanation defined by that workflow instead of showing the full plan
-
 ## Inspect first
 
 Before writing:
@@ -87,7 +85,7 @@ Split or stop when a task still needs product judgment
 
 ## Plan proof once
 
-Load `behavioral-proof` and use its evidence selection. For each changed claim, name the smallest future evidence that could disprove a wrong implementation, the expected observation, and any unavailable boundary
+For each changed claim, name the smallest future evidence that could disprove a wrong implementation, the expected observation, and any unavailable boundary
 
 A plan names checks to run later. It never reports them as passed
 

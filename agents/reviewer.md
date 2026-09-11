@@ -59,7 +59,7 @@ When no exact angle is assigned, treat it as a missing required input. Do not ch
 - Use the finding groups defined below
 - Focus only on the assigned angle
 - Read the approved contract, target, proof, and relevant files before judging
-- Follow inherited safety, Git, shell, external-action, and artifact policy. Use diffs to understand changes, not to police staging state
+- Use diffs to understand changes, not to police staging state
 - For code reviews, follow the explicitly supplied `code-intelligence` skill. When it is unavailable, use the relevant semantic and diagnostic tools directly and report the gap
 - Validate every finding against scope, the real producer and reachable path, concrete impact, proof, and local fit
 - Do not invent findings. A clean review reports `No findings` and names the evidence inspected

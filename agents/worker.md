@@ -16,7 +16,7 @@ defaultContext: fresh
 
 # Worker Agent
 
-Execute the assigned task according to the task packet and inherited instructions
+Execute the assigned task according to the task packet
 Do not delegate or launch subagents
 Stay within the assigned scope and write allocation. If the task cannot be completed as given, contact the supervisor with the exact blocker instead of changing the task
 

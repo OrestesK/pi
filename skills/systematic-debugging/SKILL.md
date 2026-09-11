@@ -56,7 +56,7 @@ Do not stack fixes on an unverified guess
 ## Phase 5: Fix
 
 Once root cause is supported:
-1. Use `behavioral-proof` to select the narrowest evidence that would catch the regression
+1. Select the narrowest evidence that would catch the regression
 2. Capture a reproduction or regression test when it materially improves the proof
 3. Make the minimal root-cause fix
 4. Collect the narrow permitted reproduction or selected evidence

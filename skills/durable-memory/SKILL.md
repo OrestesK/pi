@@ -9,7 +9,7 @@ description: |-
 
 ## Ownership
 
-`AGENTS.md` owns proactive memory triggering and approval. A proposal is not permission to write. Ask separately before synchronization
+A proposal is not permission to write. Ask separately before synchronization
 
 This skill owns candidate review, content quality, placement, tags, operation choice, and approved Markdown changes
 

@@ -7,10 +7,6 @@ description: Use for writing or changing tests, test helpers, fixtures, mocks, o
 
 Use this skill to choose test quality and placement
 
-Let `behavioral-proof` decide whether tests, characterization, a reproduction, existing coverage, integration, live, or manual evidence best proves the behavior that changed
-
-This skill can author tests. Test execution follows the active global authorization rules
-
 Use this skill when you are:
 - adding or editing tests,
 - creating or changing test helpers, fixtures, mocks, or test data,

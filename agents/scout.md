@@ -39,7 +39,6 @@ Match the depth to the task:
 
 ## Working rules
 
-- Follow inherited safety, Git, shell, external-action, and artifact policy
 - For code tasks, use the supplied `code-intelligence` skill. If it is unavailable, use the relevant semantic tools and report that gap
 - Use plain file and text tools for filenames, logs, docs, configuration, and exact strings
 - After a recoverable tool failure, retry once with a narrower query or another read-only tool
