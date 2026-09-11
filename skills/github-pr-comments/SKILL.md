@@ -192,11 +192,11 @@ Only use `REQUEST_CHANGES` when:
 
 Do not approve unless the user explicitly asks and readiness has been verified
 
-In comment text, use lightweight severity only when useful:
-- `must-fix`: correctness/security/package breakage/API contract failure
-- `should-fix`: maintainability, architecture, tests, typing, avoidable duplication
-- `question`: product/scope/architecture decision that cannot be decided from evidence alone
-- `nit`: allowed by default only for concrete simplification/design/architecture/structure/deduplication/typing-boundary issues. For other minor nits, ask the user before posting
+In comment text, label every review finding. Make the requested change or answer, the reason, and what would satisfy the request clear. State explicitly when a question needs answering before merge. Labels communicate intent, not authorization:
+- `must-fix`: a concrete problem requiring a change before merge
+- `suggestion`: an optional improvement
+- `question`: an answer is needed, not necessarily a code change
+- `nit`: a small optional improvement. It is allowed by default only for concrete simplification/design/architecture/structure/deduplication/typing-boundary issues. For other minor nits, ask the user before posting
 
 ## Drafting Workflow
 
