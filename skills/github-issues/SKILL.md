@@ -16,7 +16,6 @@ Turn a verified problem into a useful GitHub issue without inventing product dec
 - Do not ask again about a decision the request already makes
 - If a decision is still missing, interview before drafting:
   - never use a finished draft to obtain it
-- Ask one focused question at a time
 - Work on one viable issue at a time unless the user explicitly requests a batch
 - Prefer an existing canonical issue over creating a duplicate
 - Keep the issue detailed enough to act on, but leave detailed design and execution to the assignee

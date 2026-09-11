@@ -31,11 +31,7 @@ Add a helper script only when a current consumer repeats deterministic work. Sta
 
 ## 4. Validate structure
 
-Read [the structural validation guide](references/structural-validation.md). Find this skill's `scripts/validate_skill.py`, then run it on the candidate skill:
-
-```bash
-python3 /absolute/path/to/skill-authoring/scripts/validate_skill.py /absolute/path/to/candidate-skill
-```
+Read [the structural validation guide](references/structural-validation.md). Find this skill's `scripts/validate_skill.py`, then run it on the candidate skill
 
 This validator is only a local preflight. Pi's merged resource loader determines the effective result for parsing, discovery, diagnostics, and collisions
 

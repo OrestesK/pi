@@ -34,7 +34,7 @@ This check confirms freshness:
 
 ## GitHub mutations and command rules
 
-For every GitHub mutation, the user must request and explicitly approve the exact tool (`gh`), command, action, target, and expected effect. State every relevant credential, data, cost, time, environment, and destructive boundary, then wait. Approval for one mutation does not allow another. The active authorization, external-action, and project rules still control what is allowed
+For every GitHub mutation, the user must request and explicitly approve the exact tool (`gh`), command, action, target, and expected effect. State every relevant credential, data, cost, time, environment, and destructive boundary, then wait. The active authorization, external-action, and project rules still control what is allowed
 
 Mutation categories include:
 - creating a PR with `gh pr create --title "..." --body-file /tmp/pr_body.md`

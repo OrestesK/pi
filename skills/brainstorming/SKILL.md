@@ -26,7 +26,6 @@ Use `scout` if the area is broad. Keep raw research in `.scratch/research/`
 Ask only what tools cannot answer. If evidence does not settle user intent, defer to the user instead of choosing silently
 
 Rules:
-- Ask one focused question per `ask_user` call
 - Ask about material intent, preferences, and trade-offs that evidence cannot settle
 - Explain the problem, your recommendation, and why it matters before asking for a decision. If the user is still exploring or correcting the model, keep discussing
 - Surface assumptions that would materially change the design instead of silently deciding them. When several candidate assumptions serve the same focused scope decision, one short checklist may be clearer than asking them separately
@@ -35,7 +34,6 @@ Rules:
 - Do not start planning while a consequential user-owned assumption, material requirement, scope boundary, or design choice is unresolved
 - Use structured options only when the alternatives are clear, materially different, and the user is ready to choose
 - Include a short context summary in `ask_user` so the user sees why the question matters
-- Do not bundle unrelated questions
 
 Clarify:
 - user goal and non-goals

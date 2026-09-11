@@ -106,8 +106,6 @@ A final `PASS` requires current coverage of all six base angles and every valida
 
 Only validated, mechanically local, non-material fixes inside the approved behavior may continue automatically. Automatic continuation does not select the writer. Final claim-bound verification is still required
 
-A validated user choice does not fail the implementation and does not authorize work. Present it to the user before final completion
-
 ## Review Modes
 
 Choose the mode explicitly
@@ -180,7 +178,6 @@ For each item:
    - user choice
    - rejected suggestion
 4. Push back with evidence when feedback is wrong or conflicts with approved scope
-5. Present every validated user choice with a recommendation, evidence, and material pros and cons, then ask one focused question
 
 Structural feedback is not automatically correct. Verify that the proposed simplification is concrete, behavior-preserving, and compatible with approved scope. If it changes architecture, behavior, schema, config, security, data mutation, or public contracts, ask before implementing
 
@@ -198,7 +195,7 @@ Review output keeps these groups distinct:
 4. **Nonblocking extras:** small concrete observations encountered incidentally
    - do not hunt or investigate them, request action, block readiness, or extend a review loop
 
-The verdict covers only the assigned angle. A validated user choice, outside-angle pointer, or nonblocking extra does not change `PASS` to `FAIL`. The parent must present user choices before final completion
+The verdict covers only the assigned angle. A validated user choice, outside-angle pointer, or nonblocking extra does not change `PASS` to `FAIL`
 
 Use `must-fix` or `should-fix` only for required findings. Report a minor concrete observation only as a nonblocking extra when it is already encountered. Omit empty groups rather than manufacturing content
 

@@ -29,8 +29,7 @@ Default to the managed browser-use browser. Do **not** start by trying to attach
 
 ## Authorization for state-changing actions
 
-- Use browser tools freely for read-only navigation and inspection. Before an action that submits data, changes a remote site, uploads content, provisions a cloud resource, opens a public tunnel, or changes, exports, or syncs cookie or profile data, the user must request and explicitly approve it. State the exact tool or subcommand, action, target, expected effect, and every relevant credential, data, cost, time, environment, and destructive boundary. Wait before running it. A fully specified chain may be approved together
-- later-discovered actions need separate approval
+- Use browser tools freely for read-only navigation and inspection. Before an action that submits data, changes a remote site, uploads content, provisions a cloud resource, opens a public tunnel, or changes, exports, or syncs cookie or profile data, the user must request and explicitly approve it. State the exact tool or subcommand, action, target, expected effect, and every relevant credential, data, cost, time, environment, and destructive boundary. Wait before running it
 
 For read-only cookie or storage inspection, prefer names and metadata. Retrieve only values the task needs. Do not repeat secret values in chat or persist them in files unless the task requires that data and the applicable authorization boundary permits its disclosure or persistence
 

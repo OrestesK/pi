@@ -9,8 +9,6 @@ description: |-
 
 ## Ownership
 
-A proposal is not permission to write. Ask separately before synchronization
-
 This skill owns candidate review, content quality, placement, tags, operation choice, and approved Markdown changes
 
 ## Choose durable candidates
