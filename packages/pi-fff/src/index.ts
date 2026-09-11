@@ -17,7 +17,9 @@ import type {
 import { Type } from "@sinclair/typebox";
 import { AuxFinderPool, routePathConstraint } from "./aux-finders";
 import { buildQuery } from "./query";
-import { isHomeDir } from "./paths";
+import { isHomeDir, resolveDbPaths } from "./paths";
+import { loadConfig } from "./config";
+import { FilePickerFactory } from "./file-picker";
 import { loadSdk, SCAN_TIMEOUT_MS } from "./sdk";
 
 export { SCAN_TIMEOUT_MS } from "./sdk";
@@ -28,6 +30,12 @@ export { SCAN_TIMEOUT_MS } from "./sdk";
 
 const DEFAULT_GREP_LIMIT = 20;
 const DEFAULT_FIND_LIMIT = 30;
+const GREP_PAGE_SIZE_MAX = 50;
+// Per-file match cap. Must stay decoupled from pageSize: grep cursors advance by
+// file offset, so clamping this to pageSize makes same-file overflow unreachable
+// on later pages (#825). Matches the engine default.
+const GREP_MAX_MATCHES_PER_FILE = 200;
+const GREP_CONTEXT_MAX = 20;
 const GREP_MAX_LINE_LENGTH = 500;
 
 // If we exceed 10 seconds for indexed grep - something is definitely off
@@ -223,6 +231,13 @@ function formatFindOutput(
 // Extension
 // ---------------------------------------------------------------------------
 
+// Clamp caller-supplied context to a non-negative bounded integer so a large
+// value cannot multiply output size past the model window.
+function clampContext(context: number | undefined): number {
+  if (!context || context < 0) return 0;
+  return Math.min(Math.floor(context), GREP_CONTEXT_MAX);
+}
+
 export default function fffExtension(pi: ExtensionAPI) {
   let mainFinder: FileFinderApi | null = null;
   let finderCwd: string | null = null;
@@ -237,42 +252,92 @@ export default function fffExtension(pi: ExtensionAPI) {
   // before touching `mainFinder` / notifying a destroyed UI.
   let lifecycleId = 0;
 
-  // DB path resolution: flag > env > undefined (use fff-node defaults)
-  const frecencyDbPath =
-    (pi.getFlag("fff-frecency-db") as string | undefined) ??
-    process.env.FFF_FRECENCY_DB ??
-    undefined;
-  const historyDbPath =
-    (pi.getFlag("fff-history-db") as string | undefined) ??
-    process.env.FFF_HISTORY_DB ??
-    undefined;
+  const config = loadConfig();
 
-  // flag (boolean) > env ("1"/"true", or "0"/"false") > default.
-  function resolveBoolOpt(
+  // All startup options use the same flag > env > file > fallback order.
+  function getConfigValue<T>(
     flagName: string,
     envName: string,
-    fallback = false,
-  ): boolean {
-    const flag = pi.getFlag(flagName);
-    if (typeof flag === "boolean") return flag;
-    if (typeof flag === "string") return flag === "true" || flag === "1";
-    const env = process.env[envName];
-    if (env === "1" || env === "true") return true;
-    if (env === "0" || env === "false") return false;
-    return fallback;
+    fileValue: T | undefined,
+    fallback: T,
+    parse: (value: unknown) => T | undefined = (value) => value as T,
+  ): T {
+    const flagValue = pi.getFlag(flagName);
+    if (flagValue !== undefined) {
+      const value = parse(flagValue);
+      if (value !== undefined) return value;
+    }
+
+    const envValue = process.env[envName];
+    if (envValue !== undefined) {
+      const value = parse(envValue);
+      if (value !== undefined) return value;
+    }
+
+    return fileValue ?? fallback;
   }
-  // Root scanning opt-in: FFF refuses to init at / unless this is set.
-  const enableFsRootScanning = resolveBoolOpt(
-    "fff-enable-root-scan",
-    "FFF_ENABLE_ROOT_SCAN",
-  );
-  // Home dir scanning is on by default (launching pi from $HOME is a normal
-  // flow), but configurable so users with huge $HOME trees can opt out.
-  const enableHomeDirScanning = resolveBoolOpt(
-    "fff-enable-home-scan",
-    "FFF_ENABLE_HOME_SCAN",
-    true,
-  );
+
+  function parseBoolean(value: unknown): boolean | undefined {
+    if (typeof value === "boolean") return value;
+    if (value === "1" || value === "true") return true;
+    if (value === "0" || value === "false") return false;
+    return undefined;
+  }
+
+  let resolvedDbPaths: ReturnType<typeof resolveDbPaths>;
+  let enableFsRootScanning = false;
+  let enableHomeDirScanning = true;
+  let warnOnHomeDirScan = true;
+  let followSymlinks = true;
+
+  function resolveStartupConfig(): void {
+    resolvedDbPaths = resolveDbPaths({
+      frecency: getConfigValue(
+        "fff-frecency-db",
+        "FFF_FRECENCY_DB",
+        config.frecencyDbPath,
+        undefined,
+      ),
+      history: getConfigValue(
+        "fff-history-db",
+        "FFF_HISTORY_DB",
+        config.historyDbPath,
+        undefined,
+      ),
+    });
+
+    // Root scanning opt-in: FFF refuses to init at / unless this is set.
+    enableFsRootScanning = getConfigValue(
+      "fff-enable-root-scan",
+      "FFF_ENABLE_ROOT_SCAN",
+      config.enableFsRootScanning,
+      false,
+      parseBoolean,
+    );
+    // Home dir scanning is on by default (launching pi from $HOME is a normal
+    // flow), but configurable so users with huge $HOME trees can opt out.
+    enableHomeDirScanning = getConfigValue(
+      "fff-enable-home-scan",
+      "FFF_ENABLE_HOME_SCAN",
+      config.enableHomeDirScanning,
+      true,
+      parseBoolean,
+    );
+    warnOnHomeDirScan = getConfigValue(
+      "fff-warn-home-scan",
+      "FFF_WARN_HOME_SCAN",
+      config.warnOnHomeDirScan,
+      true,
+      parseBoolean,
+    );
+    followSymlinks = getConfigValue(
+      "fff-follow-symlinks",
+      "FFF_FOLLOW_SYMLINKS",
+      config.followSymlinks,
+      true,
+      parseBoolean,
+    );
+  }
 
   // Set on session_start; the only handle to the UI outside an event handler.
   // setStatus is TUI/RPC-only, hence optional.
@@ -285,20 +350,40 @@ export default function fffExtension(pi: ExtensionAPI) {
   let homeScanTimer: ReturnType<typeof setInterval> | null = null;
 
   function warnHomeDirScan(root: string): void {
+    if (!warnOnHomeDirScan) return;
     uiCtx?.ui.notify(
       `(fff): Your cwd (${root}) is too large. Indexing will take additional time and resources.\n${HOME_SCAN_DISABLE_HINT}`,
       "warning",
     );
   }
 
-  let auxPool = new AuxFinderPool({
-    enableFsRootScanning,
-    enableHomeDirScanning,
-    onHomeDirScan: warnHomeDirScan,
-  });
+  let pickers: FilePickerFactory | null = null;
+  let auxPool: AuxFinderPool | null = null;
+
+  function initializeFinderFactories(): void {
+    if (pickers) return;
+    resolveStartupConfig();
+    pickers = new FilePickerFactory({
+      frecencyDbPath: resolvedDbPaths.frecency,
+      historyDbPath: resolvedDbPaths.history,
+      onDbFailure: (error) =>
+        uiCtx?.ui.notify(
+          `(fff): Failed to open frecency/history database (${error}). Continuing without frecency persistence.`,
+          "error",
+        ),
+    });
+    auxPool = new AuxFinderPool({
+      enableFsRootScanning,
+      enableHomeDirScanning,
+      followSymlinks,
+      onHomeDirScan: warnHomeDirScan,
+      pickers,
+    });
+  }
 
   // in case cwd changes we need to figure this out
   function ensureFinder(cwd: string): Promise<FileFinderApi> {
+    initializeFinderFactories();
     if (mainFinder && !mainFinder.isDestroyed && finderCwd === cwd)
       return Promise.resolve(mainFinder);
 
@@ -312,13 +397,12 @@ export default function fffExtension(pi: ExtensionAPI) {
       }
 
       const { FileFinder } = await loadSdk();
-      const result = FileFinder.create({
+      if (!pickers) throw new Error("FFF picker factory is not initialized");
+      const result = pickers.openWithDbFallback(FileFinder, {
         basePath: cwd,
-        frecencyDbPath,
-        historyDbPath,
-        aiMode: true,
         enableHomeDirScanning,
         enableFsRootScanning,
+        followSymlinks,
       });
 
       if (!result.ok)
@@ -390,6 +474,8 @@ export default function fffExtension(pi: ExtensionAPI) {
   ): Promise<{ finder: FileFinderApi; query: string; root: string } | null> {
     const route = routePathConstraint(pathParam, activeCwd);
     if (!route) return null;
+    initializeFinderFactories();
+    if (!auxPool) throw new Error("FFF auxiliary picker pool is not initialized");
     const aux = await auxPool.acquire(route.root);
     // A broader covering picker may have been reused; rebase the suffix so the
     // constraint stays relative to the picker's actual root.
@@ -423,11 +509,22 @@ export default function fffExtension(pi: ExtensionAPI) {
     type: "boolean",
   });
 
+  pi.registerFlag("fff-warn-home-scan", {
+    description: "Warn when the home directory is indexed (default true; also: FFF_WARN_HOME_SCAN)",
+    type: "boolean",
+  });
+
+  pi.registerFlag("fff-follow-symlinks", {
+    description: "Follow directory symlinks while indexing (also: FFF_FOLLOW_SYMLINKS)",
+    type: "boolean",
+  });
+
   pi.on("session_start", async (_event, ctx) => {
     try {
       activeCwd = ctx.cwd;
       const sessionLifecycleId = ++lifecycleId;
       uiCtx = ctx as unknown as typeof uiCtx;
+      initializeFinderFactories();
 
       // Warm the finder in the background — Pi /new and /resume must not
       // wait on the initial scan. Subsequent tool calls share the same
@@ -468,6 +565,7 @@ export default function fffExtension(pi: ExtensionAPI) {
   pi.on("session_shutdown", async () => {
     lifecycleId++;
     destroyFinder();
+    uiCtx = null;
   });
 
   // --- Shared render helpers ---
@@ -524,11 +622,11 @@ export default function fffExtension(pi: ExtensionAPI) {
       }),
     ),
     context: Type.Optional(
-      Type.Number({ description: "Context lines before+after each match" }),
+      Type.Number({ description: `Context lines before+after each match (0-${GREP_CONTEXT_MAX})` }),
     ),
     limit: Type.Optional(
       Type.Number({
-        description: `Max matches (default ${DEFAULT_GREP_LIMIT})`,
+        description: `Requested page size (default ${DEFAULT_GREP_LIMIT}, capped at ${GREP_PAGE_SIZE_MAX}; a page can exceed it to finish a file)`,
       }),
     ),
     cursor: Type.Optional(
@@ -557,6 +655,11 @@ export default function fffExtension(pi: ExtensionAPI) {
 
       const picker = aux ? aux.finder : await ensureFinder(activeCwd);
       const effectiveLimit = Math.max(1, params.limit ?? DEFAULT_GREP_LIMIT);
+      // pageSize caps TOTAL matches across all files (soft cap: the current file
+      // is always finished first). maxMatchesPerFile stays decoupled at the engine
+      // default so same-file overflow remains reachable via cursor (#825).
+      const pageSize = Math.min(effectiveLimit, GREP_PAGE_SIZE_MAX);
+      const context = clampContext(params.context);
       const query = aux
         ? aux.query
         : buildQuery(params.path, pattern, params.exclude, activeCwd);
@@ -604,10 +707,11 @@ export default function fffExtension(pi: ExtensionAPI) {
       const grepResult = picker.grep(query, {
         mode,
         smartCase,
-        maxMatchesPerFile: Math.min(effectiveLimit, 50),
+        maxMatchesPerFile: GREP_MAX_MATCHES_PER_FILE,
+        pageSize,
         cursor: (params.cursor ? getCursor(params.cursor) : null) ?? null,
-        beforeContext: params.context ?? 0,
-        afterContext: params.context ?? 0,
+        beforeContext: context,
+        afterContext: context,
         classifyDefinitions: true,
         timeBudgetMs: GREP_TIME_BUDGET_MS,
       });
@@ -636,7 +740,8 @@ export default function fffExtension(pi: ExtensionAPI) {
         const fuzzy = picker.grep(fuzzyQuery, {
           mode: "fuzzy",
           smartCase,
-          maxMatchesPerFile: Math.min(effectiveLimit, 50),
+          maxMatchesPerFile: GREP_MAX_MATCHES_PER_FILE,
+          pageSize,
           cursor: null,
           beforeContext: 0,
           afterContext: 0,

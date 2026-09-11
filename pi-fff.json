@@ -1,0 +1,6 @@
+{
+  "$schema": "./packages/pi-fff/pi-fff.schema.json",
+  "frecencyDbPath": "/home/orestes/.config/pi/fff/frecency",
+  "historyDbPath": "/home/orestes/.config/pi/fff/history",
+  "followSymlinks": false
+}
