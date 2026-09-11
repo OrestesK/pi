@@ -9,12 +9,12 @@ These files are copied verbatim or closely adapted from upstream repositories. T
 | Local file                                      | Upstream source                                                                                         | Relationship                | Upstream license |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------- |
 | [`extensions/answer.ts`](extensions/answer.ts) | [`mitsuhiko/agent-stuff`](https://github.com/mitsuhiko/agent-stuff) `extensions/answer.ts` | Copied verbatim | Apache-2.0 |
-| [`extensions/files.ts`](extensions/files.ts) | [`mitsuhiko/agent-stuff`](https://github.com/mitsuhiko/agent-stuff) `extensions/files.ts` | Locally modified adaptation | Apache-2.0 |
+| Historical [`extensions/files.ts`](https://github.com/OrestesK/pi/blob/f32485b7f5cddabff756fb6797a218d614bada3d/extensions/files.ts) | [`mitsuhiko/agent-stuff`](https://github.com/mitsuhiko/agent-stuff) `extensions/files.ts` | Locally modified adaptation | Apache-2.0 |
 | [`extensions/continue.ts`](extensions/continue.ts) | [`MansoorMajeed/Clawd`](https://github.com/MansoorMajeed/Clawd) `extensions/continue.ts` | Locally modified adaptation | Apache-2.0 |
 | [`extensions/compact-advisor.ts`](extensions/compact-advisor.ts) | [`MansoorMajeed/Clawd`](https://github.com/MansoorMajeed/Clawd) `extensions/compact-advisor.ts` | Copied verbatim | Apache-2.0 |
-| [`extensions/todos/index.ts`](extensions/todos/index.ts) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `extensions/todos/index.ts` | Locally modified adaptation | MIT |
+| Historical [`extensions/todos/index.ts`](https://github.com/OrestesK/pi/blob/8c408969c4625b8b44be7f3984ad7d6f744140cb/extensions/todos/index.ts) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `extensions/todos/index.ts` | Locally modified adaptation | MIT |
 | [`skills/session-reader/scripts/read_session.py`](skills/session-reader/scripts/read_session.py) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/session-reader/scripts/read_session.py` | Copied verbatim | MIT |
-| [`skills/self-improve/SKILL.md`](skills/self-improve/SKILL.md) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/self-improve/SKILL.md` | Closely adapted | MIT |
+| Historical [`skills/self-improve/SKILL.md`](https://github.com/OrestesK/pi/blob/9ef371e3ac9d121a9d27146078b865ff33775199/skills/self-improve/SKILL.md) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/self-improve/SKILL.md` | Closely adapted | MIT |
 | [`skills/session-reader/SKILL.md`](skills/session-reader/SKILL.md) | [`HazAT/pi-config`](https://github.com/HazAT/pi-config) `skills/session-reader/SKILL.md` | Closely adapted | MIT |
 | [`skills/writing-plans/SKILL.md`](skills/writing-plans/SKILL.md) | [`dmmulroy/skills`](https://github.com/dmmulroy/skills/blob/8603380821fee6a77c82639f364ce8fe4f5a92be/tech-spec/SKILL.md) | Locally modified adaptation | MIT |
 

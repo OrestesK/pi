@@ -11,7 +11,6 @@ it does not replace code review. Load `review` for the review itself and `github
 ## Core Rules
 
 - Use `gh` only for GitHub operations. Never use GitHub MCP
-- Before a GitHub mutation, the user must request and explicitly approve the exact tool (`gh`), command, action, target, and expected effect. Follow `github` for the remaining disclosure and wait requirements
 - Recheck the PR head immediately before quoting or posting comments
 - Verify every finding from source, diff, checks, docs, prior comments, and the selected proof method
 - Use the selected proof method. Do not run a live, external, credentialed, or effectful probe until its approval gate allows it. If a meaningful live check does not run, name the strongest non-live evidence and say what live behavior remains unchecked

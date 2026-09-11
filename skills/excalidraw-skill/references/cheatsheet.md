@@ -196,12 +196,6 @@ Exit codes: `0` clean, `1` blocked, `2` invalid input, `3` review required. Warn
 
 ## Design Guide (quick version)
 
-Default local style: white canvas, transparent rounded rectangles, near-black strokes, roughness `1`, 20px body labels, 30–36px titles, and direct solid 2px arrows bound at both ends. Use light dashed gray rectangles only for real scope boundaries.
-
 Fallback stroke/fill pairs when semantic color is actually useful: `#e03131`/`#ffc9c9` red, `#2f9e44`/`#b2f2bb` green, `#1971c2`/`#a5d8ff` blue, `#9c36b5`/`#eebefa` purple, `#e8590c`/`#ffd8a8` orange, `#0c8599`/`#99e9f2` cyan, `#868e96`/`#e9ecef` gray. This palette is optional; monochrome is the baseline.
 
-Sizing: shapes ≥120×60 with width ≥ `labelChars * 12`, bound body text normally 20px, free annotations ≥16px, gaps 40–80px, and much larger gutters between panels.
-
-Order of work: contract/reference extraction → semantic cut → primary nodes → screenshot → primary bound arrows → screenshot → optional clusters → audit → target-size/50%/35%/grayscale review → blind adversarial review.
-
-Do not default to decorative backgrounds, ribbons, halos, global loops, complex multi-bend arrows, or a legend. Read `orestes-clean-style.md` and `quality-gates.md` for the full design contract. MCP mode's `read_diagram_guide` is fallback guidance and does not override the local profile.
+Read `orestes-clean-style.md` and `quality-gates.md` for the full design contract. MCP mode's `read_diagram_guide` is fallback guidance and does not override the local profile.

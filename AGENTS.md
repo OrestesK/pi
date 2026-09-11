@@ -270,7 +270,7 @@ Load the named skill when relevant. Treat work as nontrivial when it involves me
 - Proposing, reviewing, or applying a durable-memory change → `durable-memory`
 - GitHub/PR/CI → `github`
 
-  PR preparation, review, or feedback → `vals-pr`
+  User request to hand off their own PR for human review → `pr-review-handoff`
 - Entity-level Git change, changed-function, or change blast-radius analysis → `semantic-git`
 
 ### Implementation lifecycle

@@ -50,11 +50,7 @@
     "pendingTtlMs": 300000,
     "artifactRoot": ".scratch/compactions"
   },
-  "skills": [
-    "skills"
-  ],
   "packages": [
-    "extensions/claude-ui",
     "packages/pi-hashline-edit-pro",
     {
       "source": "git:github.com/nicobailon/pi-intercom@e234a4446e2b3f9c13a1ec3151ae2169315c810f",

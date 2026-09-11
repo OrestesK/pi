@@ -20,7 +20,7 @@ This is an orientation map of configuration surfaces. The linked files and effec
 | [`keybindings.json`](keybindings.json) | Runtime config | Terminal keybindings |
 | [`agents/`](agents/) | Executable prompts | Local subagent roles. Same-name files override packaged builtins |
 | [`skills/`](skills/) | Executable workflows | On-demand workflows and domain guidance |
-| [`.agents/skills/`](.agents/skills/) | Project workflows | `skill-authoring` is project-scoped, narrowly allowlisted, and tracked. Other project-local skills remain ignored |
+| [`.agents/skills/`](.agents/skills/) | Project workflows | Project-local workflows. These remain ignored |
 | [`extensions/`](extensions/) | Runtime code/config | Commands, UI helpers, and guardrails |
 | [`themes/`](themes/) | Runtime config | TUI themes |
 | [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md) | Provenance | Copied, adapted, and influential sources |
