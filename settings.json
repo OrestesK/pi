@@ -134,7 +134,7 @@
     "/home/orestes/Sources/pisesh",
     "npm:pi-btw@0.4.1",
     "npm:pi-goal-x@0.31.2",
-    "git:github.com/algal/pi-openai-server-compaction@8a3de2f3b0c178fdd6f73f2f94172dfc3943e466"
+    "npm:pi-codex-compaction@0.1.3"
   ],
   "pi-memory-md": {
     "enabled": true,
