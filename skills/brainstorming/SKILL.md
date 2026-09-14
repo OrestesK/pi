@@ -13,7 +13,7 @@ This is a discussion and design skill, not an implementation skill
 
 ### 1. Understand the current state
 
-Before asking questions, inspect what can be answered from tools:
+Inspect the current state:
 - relevant README/docs/instruction files
 - nearby code and tests
 - existing patterns and similar implementations
@@ -23,15 +23,21 @@ Use `scout` if the area is broad. Keep raw research in `.scratch/research/`
 
 ### 2. Clarify intent
 
-Ask only what tools cannot answer. If evidence does not settle user intent, defer to the user instead of choosing silently
-
 Rules:
+- Follow `AGENTS.md` for questions and parallel investigation
+- If evidence does not settle user intent, defer to the user instead of choosing silently
 - Ask about material intent, preferences, and trade-offs that evidence cannot settle
 - Explain the problem, your recommendation, and why it matters before asking for a decision. If the user is still exploring or correcting the model, keep discussing
 - Surface assumptions that would materially change the design instead of silently deciding them. When several candidate assumptions serve the same focused scope decision, one short checklist may be clearer than asking them separately
-- Map the workflows, roles, states, failure paths, and consequences that can actually occur. Ask about unresolved behavior in those paths. Do not invent impossible cases or ask questions tools can answer
+- Map the workflows, roles, states, failure paths, and consequences that can actually occur
+  - Ask about unresolved behavior in those paths
+  - Do not invent impossible cases
 - When cost, time, downtime, rollout, production load, or resource tolerance could change the design, explain the consequence and ask whether it is acceptable. Do not silently optimize around it
-- Do not start planning while a consequential user-owned assumption, material requirement, scope boundary, or design choice is unresolved
+- Do not start planning for the affected work while any of these remains unresolved:
+  - a consequential user-owned assumption
+  - a material requirement
+  - a scope boundary
+  - a design choice
 - Use structured options only when the alternatives are clear, materially different, and the user is ready to choose
 - Include a short context summary in `ask_user` so the user sees why the question matters
 
@@ -52,15 +58,29 @@ Use bullets or short labeled options in generated Markdown. Use a table in direc
 
 ### 4. Validate design
 
-For larger work, show the design in short sections so it is easy to inspect and comment on without stopping progress. These sections are not an approval wait and do not replace the complete reviewed design:
-- architecture / placement
-- data/control flow
-- previous and proposed user-visible behavior
-- reachable failure behavior when relevant
-- proof strategy
-- rollout/cleanup when relevant
+#### Design sections
 
-The only default normal-mode wait is after the complete draft, asynchronous review, and complete revised design. Any additional milestone wait must be named in the decision-ready proposal and explicitly approved
+For larger work:
+- Show the design in short sections so it is easy to inspect and comment on without stopping progress
+- These sections are not an approval wait
+- They do not replace the complete reviewed design for the scope being approved
+- Cover:
+  - architecture / placement
+  - data/control flow
+  - previous and proposed user-visible behavior
+  - reachable failure behavior when relevant
+  - proof strategy
+  - rollout/cleanup when relevant
+
+#### Approval wait
+
+- The only default normal-mode wait is after:
+  - the complete draft
+  - asynchronous review
+  - the complete revised design for the scope being approved
+- Any additional milestone wait must be:
+  - named in the decision-ready proposal
+  - explicitly approved
 
 ### 5. Save a design when useful
 

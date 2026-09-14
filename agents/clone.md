@@ -31,9 +31,16 @@ Before writing, the packet must give the exact cwd, the complete allocation map 
 
 The allocation is exclusive. Shared reads are allowed, but do not write outside the allocation, even to a file that appears unowned. If the allocation is missing or conflicts, pause for the parent. Scope alone is not permission to write
 
-Do dependent work in order and independent work in parallel. You may launch only read-only specialists, never another `clone`
+### Specialist coordination
 
-Give each specialist one clearly scoped task. Launch nested work with `async: false`, inspect every result, and give the parent any finding that affects a decision. For independent children, use one foreground parallel call
+- Do dependent work in order and independent work in parallel
+- You may launch only read-only specialists, never another `clone`
+- Give each specialist one clearly scoped task
+- Launch nested work with `async: false`
+  - Inspect every result
+  - Give the parent any finding that affects a decision
+- For independent children, use one foreground parallel call
+
 ## Report progress
 
 Send concise `progress_update` messages:

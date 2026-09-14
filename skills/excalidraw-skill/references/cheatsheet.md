@@ -2,14 +2,14 @@
 
 ## Defaults
 
-- Canvas base URL: `EXPRESS_SERVER_URL` (default `http://127.0.0.1:3000`); CLI also accepts `--url <canvasUrl>`
+- Canvas base URL: `EXPRESS_SERVER_URL` (default `http://127.0.0.1:3000`). CLI also accepts `--url <canvasUrl>`
 - Canvas health: `GET /health` or `npx -y mcp-excalidraw-server status`
 - Auto-start: any canvas-touching CLI command starts the server if it's down (opt out with `EXCALIDRAW_NO_AUTOSTART=1`)
 
 ## CLI Reference
 
 `npx -y mcp-excalidraw-server <command>` (or `excalidraw-canvas <command>` after `npm i -g`).
-JSON results on stdout — except `describe` (plain text) and raw-content output when `--out` is omitted (`export` scene JSON, `screenshot --format svg`). Diagnostics on stderr. Exit codes: 0 ok, 1 error, 2 usage, 3 canvas unreachable, 4 browser tab required. Explicit `start` overrides `EXCALIDRAW_NO_AUTOSTART=1`.
+JSON results on stdout — except `describe` (plain text) and raw-content output when `--out` is omitted (`export` scene JSON, `screenshot --format svg`). Diagnostics on stderr. Exit codes: 0 ok, 1 error, 2 usage, 3 canvas unreachable, 4 browser tab required. Explicit `start` overrides `EXCALIDRAW_NO_AUTOSTART=1`
 
 ### Server
 
@@ -129,13 +129,13 @@ JSON results on stdout — except `describe` (plain text) and raw-content output
 | `create_from_mermaid` | Mermaid diagram to Excalidraw | `mermaidDiagram` |
 
 Notes:
-- **CLI + MCP**: Set `text` on shapes to label them (auto-converts to `label.text`). Use `startElementId`/`endElementId` on arrows.
-- **CLI `apply.update`**: Update entries can use either direct fields (`{"id":"a","x":120}`) or a `set` object (`{"id":"a","set":{"x":120}}`). Do not mix both forms in one update entry.
+- **CLI + MCP**: Set `text` on shapes to label them (auto-converts to `label.text`). Use `startElementId`/`endElementId` on arrows
+- **CLI `apply.update`**: Update entries can use either direct fields (`{"id":"a","x":120}`) or a `set` object (`{"id":"a","set":{"x":120}}`). Do not mix both forms in one update entry
 - **Raw REST**: Use `"label": {"text": "..."}` for shape labels. Use `"start": {"id": "..."}` / `"end": {"id": "..."}` for arrow binding. (Different format!)
-- `fontFamily` must be a string (e.g. `"1"`, `"helvetica"`) or omitted — do NOT pass a number.
-- `points` accepts both `[[x,y]]` tuples and `[{x,y}]` objects.
-- **Curved arrows**: Use `"roundness": {"type": 2}` with 3+ points for smooth curves. Use `"elbowed": true` for right-angle routing.
-- Prefer creating shapes first, then arrows, then alignment/grouping.
+- `fontFamily` must be a string (e.g. `"1"`, `"helvetica"`) or omitted — do NOT pass a number
+- `points` accepts both `[[x,y]]` tuples and `[{x,y}]` objects
+- **Curved arrows**: Use `"roundness": {"type": 2}` with 3+ points for smooth curves. Use `"elbowed": true` for right-angle routing
+- Prefer creating shapes first, then arrows, then alignment/grouping
 
 ## Canvas REST API (HTTP)
 
@@ -192,10 +192,10 @@ python /absolute/path/to/excalidraw-skill/scripts/audit_scene.py diagram.excalid
 python /absolute/path/to/excalidraw-skill/scripts/audit_scene.py diagram.excalidraw --mode technical --json
 ```
 
-Exit codes: `0` clean, `1` blocked, `2` invalid input, `3` review required. Warning-only scenes are never reported as `PASS`; technical mode always returns review-required because static JSON checks cannot prove panel/read-order quality. The audit does not replace rendered-image review.
+Exit codes: `0` clean, `1` blocked, `2` invalid input, `3` review required. Warning-only scenes are never reported as `PASS`. Technical mode always returns review-required because static JSON checks cannot prove panel/read-order quality. The audit does not replace rendered-image review
 
 ## Design Guide (quick version)
 
-Fallback stroke/fill pairs when semantic color is actually useful: `#e03131`/`#ffc9c9` red, `#2f9e44`/`#b2f2bb` green, `#1971c2`/`#a5d8ff` blue, `#9c36b5`/`#eebefa` purple, `#e8590c`/`#ffd8a8` orange, `#0c8599`/`#99e9f2` cyan, `#868e96`/`#e9ecef` gray. This palette is optional; monochrome is the baseline.
+Fallback stroke/fill pairs when semantic color is actually useful: `#e03131`/`#ffc9c9` red, `#2f9e44`/`#b2f2bb` green, `#1971c2`/`#a5d8ff` blue, `#9c36b5`/`#eebefa` purple, `#e8590c`/`#ffd8a8` orange, `#0c8599`/`#99e9f2` cyan, `#868e96`/`#e9ecef` gray. This palette is optional. Monochrome is the baseline
 
-Read `orestes-clean-style.md` and `quality-gates.md` for the full design contract. MCP mode's `read_diagram_guide` is fallback guidance and does not override the local profile.
+Read `orestes-clean-style.md` and `quality-gates.md` for the full design contract. MCP mode's `read_diagram_guide` is fallback guidance and does not override the local profile

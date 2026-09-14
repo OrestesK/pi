@@ -1,6 +1,9 @@
 {
   "waitTool": false,
   "toolDescriptionMode": "compact",
+  "inlineToolDisplay": "summary",
+  "asyncWidget": false,
+  "fleetView": true,
   "defaultSessionDir": "~/.pi/subagent-sessions",
   "forceTopLevelAsync": true,
   "maxSubagentDepth": 2,

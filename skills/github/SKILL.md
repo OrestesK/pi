@@ -66,9 +66,11 @@ Live tests, supporting artifacts, and stacked PRs are recommendations, not block
    - stacked PRs when clear dependent slices would be easier to review
 5. After meaningful changes, run a fresh review of the current PR, then refresh the suggested tests and checks
 
-Continue until the code and evidence are current. Complete independent agent work before optional human-handoff interactions. Ask the author earlier only when a real decision or approval is needed
+### Progress and handoff
 
-Draft PR-description changes and update GitHub only with the user’s approval
+- Continue until the code and evidence are current
+- Complete independent agent work before optional human-handoff interactions
+- Follow `AGENTS.md` for early questions and parallel investigation
 
 ## Review Someone Else's PR
 
@@ -92,6 +94,14 @@ Draft PR-description changes and update GitHub only with the user’s approval
 
 ## PR Description Format
 
+### Timing and approval
+
+- Prepare the description when creating a PR
+- Refresh it at final completion or handoff of the PR work, not continuously as the work evolves
+- Draft PR-description changes and update GitHub only with the user’s approval
+
+### Body format
+
 Use this format when drafting PR text or when the user explicitly asks to update a PR description/body:
 
 ```
@@ -105,9 +115,9 @@ Motivation, context, problem being solved
 Tests added/updated, manual checks, commands run
 ```
 
-This format is not deterministc, you can add sections, and also plug in the format's sections into the existing repository's pr template
+The format is flexible. You may add sections and use the format's sections in the repository's existing PR template
 
-When the work context mentions a ticket or issue, attach it to the pr and include it in the desciption
+When the work context mentions a ticket or issue, attach it to the PR and include it in the description
 
 For a PR with a large or mixed diff, add guidance that tells reviewers where to start and separates core behavior from generated, mechanical, or formatting-only changes:
 - separate core behavior files from generated, mechanical, or formatting-only files

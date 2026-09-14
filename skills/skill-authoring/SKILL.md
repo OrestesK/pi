@@ -1,6 +1,6 @@
 ---
 name: skill-authoring
-description: Create, review, or make substantial changes to local Pi skills. Use for skill-package structure, activation descriptions, progressive disclosure, references, helper scripts, and structural validation. Comparative activation or outcome evaluation is opt-in and outside this skill. Use runtime-maintenance for Pi placement, precedence, settings, package wiring, and approved runtime changes
+description: Create, review, or make substantial changes to local Pi skills. Use for skill-package structure, activation descriptions, progressive disclosure, references, helper scripts, and structural validation. Comparative activation or outcome evaluation is opt-in and outside this skill. Use pi-config for Pi placement, precedence, settings, package wiring, and approved runtime changes
 ---
 
 # Skill Authoring
@@ -13,7 +13,7 @@ Before writing:
 - identify the current consumer and normal task entrypoint
 - inspect existing skills and runtime owners for overlap
 - keep each policy with one owner instead of copying it
-- keep placement, precedence, settings, and runtime mutation with `runtime-maintenance`
+- keep placement, precedence, settings, and runtime mutation with `pi-config`
 
 Do not add a skill, script, compatibility layer, or reference tree without a current consumer
 
@@ -39,4 +39,4 @@ This validator is only a local preflight. Pi's merged resource loader determines
 
 Comparative activation or task-outcome evaluation is opt-in and outside this skill. Present the proposed cases, evidence, and side effects for user approval before running it. Do not promote a candidate or save an evaluation case automatically
 
-Use `runtime-maintenance` for project or global placement, precedence, settings, package wiring, and approved runtime changes. Treat reviewer, validator, and evaluation results as evidence, not permission to edit
+Use `pi-config` for project or global placement, precedence, settings, package wiring, and approved runtime changes. Treat reviewer, validator, and evaluation results as evidence, not permission to edit

@@ -13,5 +13,5 @@ Use `sem` to inspect code-level changes and dependencies. These commands read Gi
 - `sem log` — trace an entity through Git history
 - `sem entities [PATH]` — list entities in a file or directory
 
-Use raw `git diff` too when you need the complete line-by-line patch. Do not use `sem setup` or `sem unsetup`
-they change global Git diff behavior
+- Use raw `git diff` too when you need the complete line-by-line patch
+- Do not use `sem setup` or `sem unsetup` because they change global Git diff behavior

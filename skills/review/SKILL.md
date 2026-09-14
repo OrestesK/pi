@@ -9,7 +9,9 @@ Review is evidence gathering, not rubber-stamping
 
 ## Independent review routing
 
-For every nontrivial plan review, nontrivial review request, and nontrivial code change, require current independent coverage of all six base angles below before final readiness. Build a coverage map before fanout
+For every nontrivial plan review, nontrivial review request, and nontrivial code change, use the six base angles below by default. Build a coverage map before fanout
+
+For rare contained plan or implementation changes with understood impact, the parent may select a relevant subset and briefly explain the task-specific reason. Use all six when impact is uncertain. Independent review and final claim-bound verification remain required
 
 An explicit deep code-quality review uses the same six angles over the wider user-approved target
 
@@ -19,7 +21,7 @@ Count an angle as covered only when:
 - its conclusion and evidence remain usable
 - no later correction changed that angle’s approved contract, evidence target, relevant item or effective change, conclusion, or proof
 
-Treat uncertain, implicit, parent-only, combined-angle, stale, inaccessible, or superseded evidence as uncovered. Launch one fresh independent reviewer for each uncovered base angle, assigned to exactly that one angle. One reviewer cannot satisfy two uncovered base angles. Do not relaunch an angle with valid current coverage only because the overall diff changed outside the evidence it covers. When no angle has valid coverage, launch six base reviewers. Record each angle’s status, evidence boundary, and review artifact before synthesizing `PASS`, `FAIL`, or `INCONCLUSIVE`
+Treat uncertain, implicit, parent-only, combined-angle, stale, inaccessible, or superseded evidence as uncovered. Launch one fresh independent reviewer for each uncovered selected base angle, assigned to exactly that one angle. One reviewer cannot satisfy two uncovered base angles. Do not relaunch an angle with valid current coverage only because the overall diff changed outside the evidence it covers. When none of the selected angles has valid coverage, launch one base reviewer for each selected angle. Record the subset reason when applicable and each angle’s status, evidence boundary, and review artifact before synthesizing `PASS`, `FAIL`, or `INCONCLUSIVE`
 
 The parent also inspects the target, validates findings, synthesizes the result, and owns every decision
 
@@ -80,7 +82,7 @@ Do not launch a second overlapping quality-reviewer set. Increase the target dep
 
 ### Conditional specialists
 
-Add a fresh specialist only after user approval for a demonstrated additional surface, such as:
+Select fresh specialists dynamically for concrete additional questions, opportunities, or risks. Relevant surfaces can include the following, not a default checklist:
 - security, privacy, or supply chain
 - runtime operations, deployment, rollback, performance, capacity, or observability
 - data/schema migration or persisted compatibility
@@ -102,9 +104,9 @@ After a coherent review-fix group, choose the follow-up by effective risk:
 
 Use the broader tier when classification is unclear. Continue only while a new validated required finding produces a material correction. Stop when review is clean, only user choices or rejected suggestions remain, evidence stalls, a blocker appears, or another approval is required
 
-A final `PASS` requires current coverage of all six base angles and every validated required finding to be fixed or explicitly deferred by the user
+A final `PASS` requires current coverage of all selected base angles and every validated required finding to be fixed or explicitly deferred by the user
 
-Only validated, mechanically local, non-material fixes inside the approved behavior may continue automatically. Automatic continuation does not select the writer. Final claim-bound verification is still required
+Automatic continuation does not select the writer. Final claim-bound verification is still required
 
 ## Review Modes
 

@@ -62,16 +62,14 @@ Before writing a test, identify the owned behavior boundary:
 
 Choose the smallest test shape that proves the real behavior. Do not use a heavier layer just because it is available, and do not use a tiny unit test when the claim depends on real wiring across a boundary
 
-Use advanced techniques only when the behavior demands them
-
-they are triggered options, not default gates:
+Use advanced techniques only when the behavior demands them. They are triggered options, not default gates:
 - property-based tests for broad input spaces with stable invariants,
 - characterization tests before refactoring legacy or poorly understood behavior,
 - differential or metamorphic tests for reimplementations, parsers, serializers, scoring, ranking, or transformations with a reference relation,
 - exhaustive tests for small finite state spaces,
 - golden or snapshot tests only when the serialized or rendered output is itself the contract and diffs are small enough for human review,
 - contract or recorded-fixture tests when hand-written mocks would hide real interface drift
-  reviewed fixtures do not replace required live validation,
+  - Reviewed fixtures do not replace required live validation
 - doc-sync tests only when published docs, schemas, examples, generated manifests, or registries are treated as contract artifacts
 
 ## Placement and Structure

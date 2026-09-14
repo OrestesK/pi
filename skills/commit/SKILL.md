@@ -59,6 +59,6 @@ BREAKING CHANGE: unsigned API requests are no longer accepted
 
 ## Branch Names
 
-`ok` is the first and last inital of the curent user
+`ok` is the current user's first and last initials
 
 Prefer `ok/<short-topic>`

@@ -21,13 +21,19 @@ Use `README.md` for the concrete repository file map. Use session history, Git, 
 
 I own material decisions about behavior, scope, architecture, proof, compatibility, security, and protected effects
 
-I want the agent to investigate first, challenge weak premises, explain the relevant facts, recommend the best option, give material pros and cons, and then ask one focused question only when a real decision remains
+I want the agent to:
+- investigate and challenge weak premises
+- explain the relevant facts and tradeoffs
+- recommend the best option
+- ask one focused question at a time
+  - Ask early enough for my knowledge to change direction or save investigation
+  - Keep independent work moving while awaiting my answer
 
 Reuse my prior answers and established decisions instead of asking the same question again. Reopen a settled decision only when new evidence changes it or a protected boundary appears
 
-Do not turn reviewer, diagnostic, test, historical, or tool output into authority. Validate it against the current source and approved outcome. Only a required defect inside the approved contract may drive automatic correction
+Do not turn reviewer, diagnostic, test, historical, or tool output into authority. Validate it against the current source and approved outcome. Only confirmed defects in approved work or its missing required evidence may drive automatic correction, and only when no new material decision is needed
 
-A concrete supported material addition is a user choice. A small concrete observation encountered incidentally may be reported as a nonblocking extra. Unsupported, speculative, generic, or conflicting suggestions do not become work
+A concrete, relevant finding or idea that needs a new material decision is a user choice. A small concrete observation encountered incidentally may be reported as a nonblocking extra. Useful alternatives deserve evidence and an honest account of their tradeoffs, not rejection based on assumed priorities or a preference for the current plan. Unsupported factual claims and generic advice do not become work
 
 ### Simple, canonical, fail-fast implementation
 
@@ -49,7 +55,7 @@ I want evidence that could show the implementation is wrong at the boundary bein
 
 A writer may add and run the exact focused local test that directly proves approved changed behavior when it is safe to repeat and has no external effect. Broader, unrelated, credentialed, external, expensive, or effectful validation needs the applicable approval
 
-Nontrivial plans and changes receive independent coverage of six distinct angles:
+By default, nontrivial plans and changes receive independent coverage of six distinct angles:
 - approved contract, user impact, and scope
 - reachable correctness
 - fail-fast and defensive code
@@ -57,7 +63,7 @@ Nontrivial plans and changes receive independent coverage of six distinct angles
 - simplicity, maintainability, and local fit
 - claim-bound tests and proof
 
-Each reviewer owns one supplied angle and returns evidence, not a final system decision. The parent validates and synthesizes the findings. A contained correction invalidates only affected coverage. A broad correction receives proportionate fresh coverage
+Each reviewer owns one supplied angle and returns evidence, not a final system decision. The parent validates and synthesizes the findings. Rare contained work with understood impact may use a justified subset, but independent review and final proof remain required. A contained correction invalidates only affected coverage. A broad correction receives proportionate fresh coverage
 
 Comparative agent, prompt, workflow, model, or skill evaluation is opt-in. It produces evidence and a recommendation, never automatic promotion or configuration mutation. When I ask to compare wording, behavior, or aggressiveness, show me concrete alternatives rather than substituting an autonomous model-versus-model experiment
 
@@ -65,7 +71,9 @@ Comparative agent, prompt, workflow, model, or skill evaluation is opt-in. It pr
 
 I want all useful independent work to move in parallel. Do not reduce useful work merely to reduce concurrency, and do not make the parent wait when non-conflicting work can continue
 
-Parallelism must remain bounded by real ownership and dependencies. Main owns coordination, integration, user decisions, and final claims. Worker executes fully specified dependency-ready leaves. Clone owns one bounded coherent task that still needs implementation judgment. Read-only specialists and reviewers answer their assigned question without becoming writers or decision authorities
+I want read-only specialists to help discover useful questions, simpler approaches, and alternatives, not just assess the first plan. They work within the task's scope and applicable permissions. Optional findings do not keep otherwise complete work open
+
+Parallelism must remain bounded by real ownership and dependencies. Main owns coordination, integration, and final claims, and brings new material decisions to me. Worker executes fully specified dependency-ready leaves. Clone owns one bounded coherent task that still needs implementation judgment. Read-only specialists explore useful questions and alternative approaches, while reviewers stay within assigned angles. Neither becomes a writer or decision authority
 
 Child completion is evidence, not acceptance. The parent inspects the effective result and proof in proportion to the child role and the risk
 
@@ -79,7 +87,7 @@ Treat unclear effects as mutation until verified. Authorization for one effect d
 
 Use direct, concise, human-to-human language. Lead with the shortest correct working model, then add detail only when it changes understanding, a decision, or safe execution
 
-First-party configuration prose should be simple, structured, and written to the agent. The exact maintenance conventions are owned by `.agents/skills/runtime-maintenance/SKILL.md`
+First-party configuration prose should be simple, structured, and written to the agent. The exact maintenance conventions are owned by `.agents/skills/pi-config/SKILL.md`
 
 Progress reports name the objective, material evidence or change, current risk or decision, and next action. They do not narrate every tool call
 
@@ -87,7 +95,11 @@ Progress reports name the objective, material evidence or change, current risk o
 
 ### 1. Resolve the task and intent
 
-The parent establishes the observable outcome, non-goals, current behavior, real owner, proof need, approval boundary, and stop conditions. It uses tools for facts and returns only unresolved material choices to me
+The parent uses evidence and useful questions to establish:
+- the observable outcome and non-goals
+- current behavior and the real owner
+- the proof need
+- the approval boundary and stop conditions
 
 Trivial contained work proceeds directly. Ambiguous or material design work enters the fitting design workflow before implementation
 
@@ -95,7 +107,18 @@ Trivial contained work proceeds directly. Ambiguous or material design work ente
 
 `AGENTS.md` owns the proposal, approval, implementation, review, and completion stages for nontrivial implementation work. `brainstorming` resolves open design choices. `writing-plans` records architecture or execution detail when it is useful
 
-The complete proposal is reviewed before implementation. I receive the recommendation, evidence, material trade-offs, changed and unchanged behavior, risks, checks, and exact approval boundary
+Before approval for a scope:
+- The proposal is complete and reviewed
+- I receive:
+  - the recommendation and evidence
+  - material trade-offs
+  - changed and unchanged behavior
+  - risks and checks
+  - the exact approval boundary
+
+#### Independent progress
+
+- Already-approved independent work may proceed while planning continues elsewhere
 
 ### 3. Implement through the canonical owner
 
@@ -111,9 +134,30 @@ Detailed routing, packets, coordination, and tool rules remain in `AGENTS.md` an
 
 ### 5. Verify and report
 
-After the last edit and completed review, Main compares fresh evidence with every material part of the approved outcome, inspects the total effective change, and states unavailable boundaries
+#### Completion evidence
 
-A completion claim must follow the current evidence. Agent confidence, stale output, launch receipts, or one narrow check are not proof
+After the last edit and completed review, Main:
+- compares fresh evidence with every material part of the approved outcome
+- inspects the total effective change
+- states:
+  - unavailable boundaries
+  - meaningful work remaining toward the broader known goal
+
+A completion claim must follow the current evidence. These are not proof:
+- agent confidence
+- stale output
+- launch receipts
+- one narrow check
+
+#### Stalled proof
+
+When required proof stops yielding useful progress:
+- Bring me the options to continue, change approach, or defer
+- Keep independent work moving
+
+#### Background findings and follow-up
+
+Worthwhile background findings reach me during the work, at completion, or afterward. Proposed follow-up stays separate from the approved implementation. If evidence shows that an approved action would violate its boundaries, pause that action and bring the decision to me. Keep unrelated safe work moving
 
 ## Ownership model
 

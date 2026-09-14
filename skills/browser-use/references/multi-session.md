@@ -27,7 +27,7 @@ browser-use --session work state           # reads from 'work' daemon
 browser-use state                          # goes to 'default' daemon (different browser)
 ```
 
-If you forget `--session`, the command goes to the `default` session. This is the most common mistake — you'll interact with the wrong browser.
+If you forget `--session`, the command goes to the `default` session. This is the most common mistake — you'll interact with the wrong browser
 
 ## Combining sessions with browser modes
 
@@ -42,7 +42,7 @@ browser-use --session chrome connect
 browser-use --session debug --headed open <url>
 ```
 
-Each session is fully independent. The cloud session talks to a remote browser, the chrome session talks to the user's Chrome, and the debug session manages its own Chromium — all running simultaneously.
+Each session is fully independent. The cloud session talks to a remote browser, the chrome session talks to the user's Chrome, and the debug session manages its own Chromium — all running simultaneously
 
 ## Listing and managing sessions
 
@@ -58,7 +58,7 @@ chrome           running        12346    cdp
 debug            ready          12347    headed
 ```
 
-PHASE shows the daemon lifecycle state: `initializing`, `ready`, `starting`, `running`, `shutting_down`, `stopped`, `failed`.
+PHASE shows the daemon lifecycle state: `initializing`, `ready`, `starting`, `running`, `shutting_down`, `stopped`, `failed`
 
 ```bash
 browser-use --session cloud close           # close one session
