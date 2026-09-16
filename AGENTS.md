@@ -172,6 +172,15 @@ Give each child:
 - when to stop for an ownership conflict, scope expansion, or other stated limit
 - the exact information or artifact it must return
 
+### Delegation failure recovery
+
+- If a subagent workflow, child launch, prompt runtime, extension load, or child tooling setup fails:
+  - Pause the affected delegated work and report the exact failure, run/status, and repository/cwd/worktree/branch/ref state
+  - Verify the worktree is clean or capture the partial diff before a same-protocol retry or asking the user for a different execution route
+  - Obtain user approval before switching the affected work to an external CLI, a foreground agent, direct parent execution, or another execution mechanism, unless that fallback was already explicitly approved
+- Continue unrelated approved work. Same-protocol retries remain subject to the existing approval scope
+- This rule concerns delegation infrastructure, not ordinary failing tests. It does not change initial writer allocation or configured native model/provider fallback
+
 ### Async work
 
 After launch:
