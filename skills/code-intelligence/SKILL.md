@@ -15,8 +15,8 @@ If a Pi Lens tool you need is unavailable, call `pi_lens_activate_tools` with it
   - `symbol_search`, then `module_report`
   - read exact bodies with `read_symbol` or `read_enclosing`
 - **Types and relationships:** `lsp_navigation` for definitions, references, implementations, hover, symbols, rename previews, and call hierarchy
-- **Structural patterns:** Use `ast_grep_search`. For a structural rewrite, use `ast_grep_replace` and dry-run it before applying changes. Use `ast_grep_outline` for syntax-only structure and `ast_grep_dump` when the AST shape is unclear
-- **Diagnostics:** `lsp_diagnostics` for focused language-server checks and `lens_diagnostics` for aggregate edited-file or project findings
+- **Structural patterns:** Use `ast_grep_search`. For a structural rewrite, use `ast_grep_replace` and dry-run it before applying changes. Use `ast_grep_outline` for syntax-only structure and `ast_grep_search` with `dump: true`, a representative snippet in `pattern`, and `lang` when the AST shape is unclear
+- **Diagnostics:** Use `lens_diagnostics` with `source: "lsp"`, `scope: "paths"`, and explicit `paths` for focused language-server checks. Use `source: "session"` for cached findings only. Cached results do not prove unobserved files are clean
 
 Use every evidence group that can answer a material question. Do not call a group only because it is listed. Stop when you have enough evidence to settle ownership, implementation, or correctness
 
@@ -26,7 +26,7 @@ Before changing an identifiable function, class, method, callback, or symbol, re
 
 ## Structural search
 
-Use specific valid code patterns and limit them to the relevant paths. If a search finds no match, simplify it once. Use `ast_grep_dump` when node kinds or nesting are unclear. Fall back to text search only when code structure cannot answer the question
+Use specific valid code patterns and limit them to the relevant paths. If a search finds no match, simplify it once. Use `ast_grep_search` with `dump: true`, a representative snippet in `pattern`, and `lang` when node kinds or nesting are unclear. Fall back to text search only when code structure cannot answer the question
 
 ## LSP use
 
