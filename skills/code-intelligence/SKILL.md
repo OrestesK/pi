@@ -11,6 +11,7 @@ Use semantic tools to understand code structure, behavior, types, relationships,
 
 If a Pi Lens tool you need is unavailable, call `pi_lens_activate_tools` with its name. Use the activated tool on the next model turn
 
+- **Repository-wide orientation:** Use `project_report` when the task needs an overview of architecture, subsystems, hubs, or dependency cycles
 - **Ownership and shape:**
   - `symbol_search`, then `module_report`
   - read exact bodies with `read_symbol` or `read_enclosing`
