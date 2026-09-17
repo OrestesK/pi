@@ -1,6 +1,6 @@
 {
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-6-astra",
+  "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "high",
   "theme": "gruvbox-custom",
   "quietStartup": true,
@@ -175,7 +175,42 @@
   },
   "subagents": {
     "defaultModel": "openai-codex/gpt-5.6-luna",
-    "disableBuiltins": true
+    "disableBuiltins": true,
+    "agentOverrides": {
+      "clone": {
+        "model": "inherit",
+        "thinking": "medium"
+      },
+      "context-builder": {
+        "model": "openai-codex/gpt-5.6-sol",
+        "thinking": "medium"
+      },
+      "oracle": {
+        "model": "openai-codex/gpt-6-astra",
+        "thinking": "medium"
+      },
+      "planner": {
+        "model": "openai-codex/gpt-6-astra",
+        "thinking": "medium"
+      },
+      "researcher": {
+        "model": "openai-codex/gpt-5.6-sol",
+        "thinking": "medium"
+      },
+      "reviewer": {
+        "model": "openai-codex/gpt-6-astra",
+        "thinking": "medium"
+      },
+      "run-monitor": {
+        "thinking": "low"
+      },
+      "scout": {
+        "thinking": "medium"
+      },
+      "worker": {
+        "thinking": "medium"
+      }
+    }
   },
   "autocompleteMaxVisible": 10,
   "doubleEscapeAction": "tree",

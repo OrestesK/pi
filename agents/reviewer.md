@@ -3,9 +3,6 @@ name: reviewer
 description: Review-only specialist for one assigned angle of code, plans, proposed solutions, codebase health, or PR and issue validation
 tools: read, grep, find, ls, bash, pi_lens_activate_tools, ast_grep_search, ast_grep_outline, lsp_navigation, lens_diagnostics, symbol_search, module_report, project_report, read_symbol, read_enclosing, tool_result_outline, tool_result_get, tool_result_search, mcp, mcpScript
 extensions: ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.config/pi/packages/pi-lens/dist/index.js, ~/.config/pi/npm/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.config/pi/npm/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.config/pi/npm/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts
-model: openai-codex/gpt-5.6-terra
-fallbackModels: openai-codex/gpt-5.6-sol, openai-codex/gpt-5.5
-thinking: high
 systemPromptMode: replace
 inheritProjectContext: true
 inheritGlobalContext: true

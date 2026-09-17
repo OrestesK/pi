@@ -5,7 +5,6 @@ description: Implements one clearly scoped task that needs judgment and may coor
 extensions: ~/.config/pi/packages/pi-fff/src/index.ts, ~/.config/pi/packages/pi-hashline-edit-pro/index.ts, ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.config/pi/packages/pi-lens/dist/index.js, ~/.config/pi/npm/node_modules/pi-web-access/index.ts, ~/.config/pi/npm/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.config/pi/npm/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.config/pi/npm/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts
 mutationTools: replace, insert, undo_last_change
 allowNestedSubagents: true
-model: inherit
 systemPromptMode: append
 inheritProjectContext: true
 inheritGlobalContext: true

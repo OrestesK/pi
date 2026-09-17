@@ -69,16 +69,18 @@ Do not:
 - wait for optional or non blocking agents to finish
 - set runtime budgets
 
-### Background discovery [main agent only]
+### Investigation ownership and discovery [main agent only]
 
-- Use read-only subagents proactively to explore useful questions and alternatives for the current task, including opportunities to simplify or reuse existing capabilities
+- Own direction-setting, dispatch decisions, synthesis, and acceptance
+  - Use focused direct investigation or delegated discovery to steer the work
+- Proactively assign read-only subagents responsibility for answering questions and resolving uncertainties within the task's scope, including exploration of useful alternatives and opportunities to simplify or reuse existing capabilities
 - Choose specialists for the questions being investigated, not from a fixed checklist
 - Grounded hypotheses may guide exploration
   - Keep uncertainty explicit
   - Do not treat them as confirmed findings or implementation requirements
 - Exploration may challenge the approved approach without changing what is approved for implementation
 
-Continue useful background investigation when it reveals meaningful new questions. Stop work that only repeats findings or produces generic advice
+Continue useful investigation when it reveals meaningful new questions. Stop work that only repeats findings or produces generic advice
 
 ### Main writer allocation and implementation routing [main agent only]
 
@@ -111,7 +113,7 @@ Fanout
 │  └─ scout
 ├─ Needs current external evidence
 │  └─ researcher
-├─ Needs implementation or handoff context
+├─ Needs deep source investigation, implementation context, or handoff context
 │  └─ context-builder
 ├─ Needs a plan after requirements are clear
 │  └─ planner
@@ -138,12 +140,14 @@ Before launching a child:
 - Pass the complete set because an explicit `skill` value replaces the agent defaults
 - Do not rely on a child to discover additional skills unless it inherits the skill catalog
 
-### Main integration and writing-child execution [main agent only]
+### Main integration and child execution [main agent only]
 
 Require `worker` to run the checks named in its packet and return the required final response
 Require `clone` to select and run proportionate narrow checks within the proof and command-execution boundary named in its packet
 Continue ready work. Wait only on dependencies. Child completion is not acceptance:
 - Use each child's completed work and current evidence as the starting point for its assigned task. Repeat work only for a concrete gap, contradiction, stale result, or integration risk
+  - By default, guide the responsible child to resolve the specific evidence issue, using the child task contract for the follow-up
+  - If a focused follow-up remains unsupported or contradictory, assign a fresh read-only specialist the unresolved question and existing evidence
 - Validate findings from children, reviewers, diagnostics, and tools and apply the following classification before they change the plan or active work:
   - **Required fix:** a confirmed problem in the approved work: an approved requirement is not met, behavior is incorrect, unapproved behavior was added, or required evidence is missing
   - **User choice:** a concrete, relevant finding or idea that requires a new material decision from the user
@@ -166,7 +170,8 @@ Continue ready work. Wait only on dependencies. Child completion is not acceptan
 Give each child:
 - the approved outcome and non-goals
 - the exact `cwd`, dependency state, and prerequisite results when applicable
-- the exact evidence target, why it is distinct, established inputs it may rely on, required proof, and permitted named checks
+- the exact evidence target or, for exploratory work, the discovery purpose and uncertainty to investigate
+  - Include why it is distinct, established inputs it may rely on, required proof, and permitted named checks
 - effect and mutation boundaries
 - for every writing child, the complete current allocation map and exact files or regions it may change
 - when to stop for an ownership conflict, scope expansion, or other stated limit
