@@ -63,6 +63,9 @@ Do:
 - Maximize useful parallelism
 - Run read-only work in parallel with all other work. Delay a read only when it needs an unfinished result, and refresh its evidence after relevant mutations when the final state matters
 - Use native supervisor coordination for children, not intercom
+- Before launching a newly generated or materially changed `workflowScript` or `workflowScriptPath`, call `subagent` with `action: "validate"` using the same script input and `args`
+- Pass substantial or dynamically generated workflow data through `args` instead of interpolating it into JavaScript source
+  - `args` persist as evidence. Never include secrets
 
 Do not:
 - invent, duplicate, prolong work only to satisfy requirements
@@ -184,7 +187,7 @@ Give each child:
   - Verify the worktree is clean or capture the partial diff before a same-protocol retry or asking the user for a different execution route
   - Obtain user approval before switching the affected work to an external CLI, a foreground agent, direct parent execution, or another execution mechanism, unless that fallback was already explicitly approved
 - Continue unrelated approved work. Same-protocol retries remain subject to the existing approval scope
-- This rule concerns delegation infrastructure, not ordinary failing tests. It does not change initial writer allocation or configured native model/provider fallback
+- This rule concerns delegation infrastructure, not ordinary failing tests. It does not change initial writer allocation
 
 ### Async work
 

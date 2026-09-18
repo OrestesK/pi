@@ -1,15 +1,12 @@
 {
   "waitTool": false,
-  "toolDescriptionMode": "compact",
   "inlineToolDisplay": "summary",
   "asyncWidget": false,
   "fleetView": true,
   "defaultSessionDir": "~/.pi/subagent-sessions",
   "forceTopLevelAsync": true,
   "maxSubagentDepth": 2,
-  "maxSubagentSpawnsPerRun": 100,
-  "maxSubagentSpawnsPerSession": 20000,
-  "globalConcurrencyLimit": 100,
+  "globalConcurrencyLimit": 20,
   "scheduledRuns": {
     "enabled": false
   },

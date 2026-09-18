@@ -1,9 +1,11 @@
 ---
 name: researcher
 description: Researches external evidence and returns focused, well-sourced briefs
+acceptanceRole: read-only
 tools: read, tool_result_outline, tool_result_get, tool_result_search, web_search, source_check, fetch_content, get_search_content, mcp:context7/resolve-library-id, mcp:context7/query-docs, mcp, mcpScript
 extensions: ~/.npm-global/lib/node_modules/pi-mcp-adapter/index.ts, ~/.config/pi/npm/node_modules/pi-web-access/index.ts, ~/.config/pi/npm/node_modules/@aliou/pi-guardrails/extensions/path-access/index.ts, ~/.config/pi/npm/node_modules/@aliou/pi-guardrails/extensions/guardrails/index.ts, ~/.config/pi/npm/node_modules/@aliou/pi-guardrails/extensions/permission-gate/index.ts, ~/.config/pi/packages/pi-tool-result-virtualizer/src/index.ts
 systemPromptMode: replace
+completionGuard: false
 inheritProjectContext: true
 inheritGlobalContext: true
 inheritSkills: false
