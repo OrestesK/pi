@@ -107,6 +107,10 @@ TODO — the assignee will review the evidence and propose the implementation be
 ## Related work
 
 - [<Issue or PR>](<url>) — <the exact overlap, dependency, distinction, or ownership boundary>
+
+## Work that may be helpful
+
+- [<Issue, PR, document, or code>](<url>) — <why it may help and its current status>
 ```
 
 Formatting rules:
@@ -116,7 +120,8 @@ Formatting rules:
 - Use `Verified evidence` only for claims actually verified
 - Put material unknowns in Context or Evidence:
   - do not invent a separate section to fill space
-- Omit `Related work` when nothing materially relevant exists
+- Omit `Related work` and `Work that may be helpful` when nothing qualifies
+- Keep `Work that may be helpful` to the smallest useful set; do not use it to collect thematic or merely adjacent links
 - Do not add standalone `Technical constraints`, `Risks`, `Recommendations`, `Open questions`, or `References` sections by default
 
 ## Assignee-Owned Implementation
@@ -146,7 +151,9 @@ Research and best practices are evidence, not authority to turn a suggestion int
 - Describe an existing PR as partial, local, undeployed, historical, or for a different boundary when that is what the evidence shows
 - Do not include credentials, secrets, or unnecessary personal data
 
-## Related Work Test
+## Related and Helpful Work Tests
+
+### Related work
 
 Include a link only when it materially affects at least one of:
 - the exact problem or evidence
@@ -155,7 +162,19 @@ Include a link only when it materially affects at least one of:
 - the implementation boundary
 - completion or closure
 
-Read the linked material completely enough to verify the relationship. Explain in the issue what it covers and, when useful, what it does not cover. Remove thematic, duplicate, placeholder, stale, or merely adjacent links
+Read the linked material completely enough to verify the relationship. Explain in the issue what it covers and, when useful, what it does not cover.
+
+### Work that may be helpful
+
+Include a link only when it gives the assignee concrete implementation or investigation leverage without owning or blocking the issue, such as:
+- an implementation precedent or reusable code path
+- a prior investigation or design example
+- focused tests that demonstrate a relevant pattern
+- a historical attempt whose constraints or outcome matter
+
+State why each item may help and whether it is merged, open, historical, partial, or otherwise limited. Helpful work does not establish requirements, dependencies, approval, or completion.
+
+For both sections, keep the smallest useful set. Remove thematic, duplicate, placeholder, stale, merely adjacent, or repetitive links.
 
 ## Existing Issue Updates
 
