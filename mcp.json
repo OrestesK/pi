@@ -53,10 +53,6 @@
       },
       "lifecycle": "lazy"
     },
-    "retool": {
-      "url": "https://valsai.retool.com/mcp",
-      "lifecycle": "lazy"
-    },
     "excalidraw-local": {
       "command": "pnpm",
       "args": [
