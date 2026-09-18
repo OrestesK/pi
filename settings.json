@@ -153,7 +153,7 @@
       "onlyGit": false,
       "thread": false,
       "context": {
-        "strategy": "smart",
+        "strategy": "recent-only",
         "whitelist": [
           "../global/core"
         ]
