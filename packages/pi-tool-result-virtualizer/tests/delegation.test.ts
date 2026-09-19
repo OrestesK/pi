@@ -48,7 +48,7 @@ class FakeEvents implements ExtensionEventBusLike {
 
 const READY_PING: SubagentRpcPing = {
 	version: SUBAGENT_RPC_PROTOCOL_VERSION,
-	methods: ["ping", "status", "spawn", "interrupt", "stop"],
+	methods: ["ping", "status", "spawn", "interrupt", "stop", "manage", "steer", "resume"],
 	capabilities: {
 		status: true,
 		asyncSpawn: true,
@@ -234,6 +234,11 @@ test("RPC ready state requires the complete delegation capability set", () => {
 	assert.equal(client.isReady(), false);
 	events.emit(SUBAGENT_RPC_READY_EVENT, READY_PING);
 	assert.equal(client.isReady(), true);
+	events.emit(SUBAGENT_RPC_READY_EVENT, {
+		...READY_PING,
+		methods: [...READY_PING.methods, "bad-method!"],
+	});
+	assert.equal(client.isReady(), false);
 	events.emit(SUBAGENT_RPC_READY_EVENT, {
 		...READY_PING,
 		capabilities: { ...READY_PING.capabilities, asyncSpawn: false },

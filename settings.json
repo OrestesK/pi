@@ -118,7 +118,7 @@
       "source": "npm:pi-ask-user@0.15.0",
       "skills": []
     },
-    "packages/pi-tool-result-virtualizer",
+    "./packages/pi-tool-result-virtualizer",
     {
       "source": "npm:context-mode@1.0.169",
       "skills": []

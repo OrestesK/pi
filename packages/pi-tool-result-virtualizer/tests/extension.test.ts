@@ -294,7 +294,7 @@ test("packaged analyst exposes only exact retrieval tools and no inherited conte
 		frontmatter,
 		/^tools: tool_result_outline, tool_result_search, tool_result_get$/m,
 	);
-	assert.match(frontmatter, /^extensions: \.\/src\/index\.ts$/m);
+	assert.match(frontmatter, /^extensions: \.\.\/src\/index\.ts$/m);
 	assert.match(frontmatter, /^systemPromptMode: replace$/m);
 	assert.match(frontmatter, /^inheritProjectContext: false$/m);
 	assert.match(frontmatter, /^inheritSkills: false$/m);

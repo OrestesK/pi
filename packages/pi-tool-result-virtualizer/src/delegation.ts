@@ -58,7 +58,7 @@ function analystManifestValid(text: string): boolean {
 		/^tools: tool_result_outline, tool_result_search, tool_result_get$/m.test(
 			frontmatter,
 		) &&
-		/^extensions: \.\/src\/index\.ts$/m.test(frontmatter) &&
+		/^extensions: \.\.\/src\/index\.ts$/m.test(frontmatter) &&
 		/^systemPromptMode: replace$/m.test(frontmatter) &&
 		/^inheritProjectContext: false$/m.test(frontmatter) &&
 		/^inheritSkills: false$/m.test(frontmatter) &&

@@ -3,7 +3,7 @@ name: result-analyst
 package: pi-tool-result-virtualizer
 description: Read-only analyst for focused synthesis of virtualized tool-result evidence
 tools: tool_result_outline, tool_result_search, tool_result_get
-extensions: ./src/index.ts
+extensions: ../src/index.ts
 systemPromptMode: replace
 inheritProjectContext: false
 inheritSkills: false

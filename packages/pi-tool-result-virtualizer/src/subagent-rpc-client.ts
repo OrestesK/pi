@@ -16,7 +16,7 @@ export type SubagentRpcMethod =
 
 export type SubagentRpcPing = {
 	version: 1;
-	methods: SubagentRpcMethod[];
+	methods: string[];
 	capabilities: {
 		status: boolean;
 		asyncSpawn: boolean;
@@ -87,14 +87,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isMethod(value: unknown): value is SubagentRpcMethod {
-	return (
-		value === "ping" ||
-		value === "status" ||
-		value === "spawn" ||
-		value === "interrupt" ||
-		value === "stop"
-	);
+function isMethod(value: unknown): value is string {
+	return typeof value === "string" && /^[a-z][a-z0-9_]{0,63}$/.test(value);
 }
 
 function parsePing(value: unknown): SubagentRpcPing | undefined {
